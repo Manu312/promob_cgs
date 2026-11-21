@@ -6,6 +6,7 @@ import { packGuillotine, nestAll } from '../src/domain/nesting.js';
 import { computeBudget } from '../src/domain/budget.js';
 import { DEFAULT_SETTINGS } from '../src/domain/catalog.js';
 import { sampleProject } from '../src/domain/project.js';
+import { normalizeRoom, roomWalls, wallPieces, pointInPolygon } from '../src/domain/room.js';
 
 const ctx = { t: 18, tf: 18 };
 
@@ -123,6 +124,58 @@ test('mesada: va al presupuesto por m², no al despiece', () => {
   assert.equal(b.hardware.mesada, 0.36); // 600 × (560+18+20)
   assert.ok(!b.parts.some((p) => /mesada/i.test(p.name)));
   assert.ok(b.decors.some((d) => d.decor === 'mesada'));
+});
+
+test('ambiente rectangular: 4 paredes con normales hacia afuera', () => {
+  const r = normalizeRoom({ w: 3000, d: 2000 });
+  const ws = roomWalls(r);
+  assert.equal(ws.length, 4);
+  assert.deepEqual(ws.map((w) => w.len), [3000, 2000, 3000, 2000]);
+  const r0 = (v) => Math.round(v) + 0; // evita -0
+  assert.deepEqual(ws[0].n.map(r0), [0, -1]); // pared del fondo mira hacia z negativo
+  assert.deepEqual(ws[1].n.map(r0), [1, 0]); // pared derecha mira hacia x positivo
+});
+
+test('ambiente en L: 6 paredes y la esquina entrante funciona', () => {
+  const r = normalizeRoom({ shape: 'L', w: 4000, d: 3000, cutW: 1500, cutD: 1000 });
+  assert.equal(r.points.length, 6);
+  assert.ok(pointInPolygon([500, 2500], r.points));
+  assert.ok(!pointInPolygon([3500, 2500], r.points)); // recorte
+  const ws = roomWalls(r);
+  assert.deepEqual(ws[2].n.map((v) => Math.round(v) + 0), [0, 1]); // pared del recorte mira hacia el recorte
+});
+
+test('ambiente libre: usa los puntos y calcula el ancho total', () => {
+  const r = normalizeRoom({ shape: 'libre', points: [[0, 0], [5000, 0], [5000, 1000], [3000, 3000], [0, 3000]] });
+  assert.equal(r.w, 5000);
+  assert.equal(roomWalls(r).length, 5);
+});
+
+test('pared con ventana y puerta se parte en trozos macizos', () => {
+  const pieces = wallPieces(3000, 2600, [
+    { offset: 500, width: 1000, sill: 900, height: 1100 },
+    { offset: 2000, width: 800, sill: 0, height: 2000 },
+  ]);
+  // izq, bajo ventana, sobre ventana, medio, dintel puerta, der
+  assert.equal(pieces.length, 6);
+  const area = pieces.reduce((a, p) => a + (p.u1 - p.u0) * (p.v1 - p.v0), 0);
+  assert.equal(area, 3000 * 2600 - 1000 * 1100 - 800 * 2000);
+});
+
+test('aberturas se ajustan a su pared', () => {
+  const r = normalizeRoom({ w: 2000, d: 2000, openings: [{ id: 'a', wall: 0, offset: 1800, width: 900, height: 3000, sill: 0 }, { id: 'b', wall: 9, offset: 0, width: 500, height: 500 }] });
+  assert.equal(r.openings.length, 1); // la de pared inexistente se descarta
+  assert.equal(r.openings[0].offset, 1100);
+  assert.equal(r.openings[0].height, 2600);
+});
+
+test('snap a paredes de un ambiente en L y a columnas', () => {
+  const room = normalizeRoom({ shape: 'L', w: 4000, d: 3000, cutW: 1500, cutD: 1000, columns: [{ id: 'c', x: 1000, z: 0, w: 300, d: 300 }] });
+  const m = { params: { width: 600, depth: 560 }, x: 1880, z: 1420, rot: 0 };
+  // borde derecho cerca de la pared del recorte (x=2500) y frente cerca de z=2000
+  assert.deepEqual(snapPosition(m, [], room), { x: 1900, z: 1440 });
+  const m2 = { params: { width: 600, depth: 560 }, x: 1320, z: 5, rot: 0 };
+  assert.deepEqual(snapPosition(m2, [], room), { x: 1300, z: 0 }); // pegado a la columna
 });
 
 test('snap a pared y a vecino', () => {

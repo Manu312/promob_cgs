@@ -3,6 +3,8 @@
 // z = profundidad (fondo/pared = 0 → frente = depth). Cada pieza es una caja
 // alineada a ejes; la misma geometría alimenta el 3D y el despiece.
 
+import { snapCandidates } from './room.js';
+
 const SLIDES = [250, 300, 350, 400, 450, 500, 550, 600];
 const GROOVE = 8; // profundidad de ranura para fondo
 const GROOVE_SET = 10; // distancia de la ranura al canto trasero
@@ -288,7 +290,8 @@ export function clampToRoom(mod, room) {
 
 export function snapPosition(mod, others, room, thr = 40) {
   const { fw, fd } = footprint(mod);
-  const cx = [0, room.w - fw], cz = [0, room.d - fd];
+  const walls = room.points ? snapCandidates(room, fw, fd) : { xs: [0, room.w - fw], zs: [0, room.d - fd] };
+  const cx = [...walls.xs], cz = [...walls.zs];
   for (const o of others) {
     const f = footprint(o);
     cx.push(o.x + f.fw, o.x - fw, o.x, o.x + f.fw - fw);

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+e2e/screens/
+*.log
+.env
+.env.*
+# Evidencias/bundles de REA y binarios de terceros: nunca al repo
+*.rea-evidence*
+evidence/
+*.dll
+*.exe

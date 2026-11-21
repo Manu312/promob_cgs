@@ -4,7 +4,7 @@ import { newModule, footprint, snapPosition, clampToRoom, uid } from './domain/m
 import { buildAll, computeCutList } from './domain/cutlist.js';
 import { nestAll } from './domain/nesting.js';
 import { computeBudget } from './domain/budget.js';
-import { sampleProject, emptyProject } from './domain/project.js';
+import { sampleProject, emptyProject, normalizeProject } from './domain/project.js';
 import Scene3D from './ui/Scene3D.jsx';
 import Catalog from './ui/Catalog.jsx';
 import Inspector from './ui/Inspector.jsx';
@@ -14,9 +14,9 @@ import Settings from './ui/Settings.jsx';
 import ErrorBoundary from './ui/ErrorBoundary.jsx';
 import { download, money } from './ui/fields.jsx';
 
-function usePersistent(key, init) {
+function usePersistent(key, init, migrate = (x) => x) {
   const [v, setV] = useState(() => {
-    try { const s = localStorage.getItem(key); if (s) return JSON.parse(s); } catch { /* sin storage */ }
+    try { const s = localStorage.getItem(key); if (s) return migrate(JSON.parse(s)); } catch { /* sin storage */ }
     return typeof init === 'function' ? init() : init;
   });
   useEffect(() => { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* sin storage */ } }, [key, v]);
@@ -26,7 +26,9 @@ function usePersistent(key, init) {
 const TABS = [['diseno', 'Diseño 3D'], ['corte', 'Plan de corte'], ['presupuesto', 'Presupuesto'], ['precios', 'Precios']];
 
 export default function App() {
-  const [project, setProject] = usePersistent('mueblesapp.project', sampleProject);
+  const [project, setProject] = usePersistent('mueblesapp.project', sampleProject, normalizeProject);
+  const [showDims, setShowDims] = useState(false);
+  const [autoHideWalls, setAutoHideWalls] = useState(true);
   const [rawSettings, setSettings] = usePersistent('mueblesapp.settings', DEFAULT_SETTINGS);
   const settings = useMemo(() => mergeSettings(rawSettings), [rawSettings]);
   const [tab, setTab] = useState('diseno');
@@ -108,7 +110,7 @@ export default function App() {
     try {
       const p = JSON.parse(await file.text());
       if (!p || !Array.isArray(p.modules) || !p.room) throw new Error('formato');
-      setProject(p); setSelectedId(null);
+      setProject(normalizeProject(p)); setSelectedId(null);
     } catch { window.alert('El archivo no es un proyecto válido.'); }
   };
   const newProject = () => { if (window.confirm('¿Empezar un proyecto vacío? (exportá el actual si lo querés guardar)')) { setProject(emptyProject()); setSelectedId(null); } };
@@ -136,12 +138,14 @@ export default function App() {
             <ErrorBoundary onReset={() => { setPhotoreal(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
-                view={view} captureRef={captureRef} />
+                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoHideWalls} />
             </ErrorBoundary>
             <div className="vp-toolbar">
               {[['perspectiva', 'Perspectiva'], ['frente', 'Frente'], ['planta', 'Planta']].map(([k, l]) => (
-                <button key={k} onClick={() => setView((v) => ({ name: k, tick: v.tick + 1 }))}>{l}</button>
+                <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => { setView((v) => ({ name: k, tick: v.tick + 1 })); if (k === 'planta') setShowDims(true); }}>{l}</button>
               ))}
+              <button className={showDims ? 'active-soft' : ''} onClick={() => setShowDims((s) => !s)} title="Mostrar medidas de paredes y módulos">Cotas</button>
+              <button className={autoHideWalls ? 'active-soft' : ''} onClick={() => setAutoHideWalls((s) => !s)} title="Ocultar las paredes que tapan la vista">Paredes auto</button>
               <span className="sep" />
               <button className={renderMode && !photoreal ? 'active' : ''} disabled={photoreal} onClick={() => { setRenderMode((r) => !r); setSelectedId(null); }}>
                 {renderMode && !photoreal ? '✓ Modo render' : 'Modo render'}
@@ -166,7 +170,7 @@ export default function App() {
             onParams={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
             onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}
-            onProject={(fn) => setProject((p) => { const np = fn(p); return { ...np, modules: np.modules.map((m) => clampToRoom(m, np.room)) }; })} />
+            onProject={(fn) => setProject((p) => { const np = normalizeProject(fn(p)); return { ...np, modules: np.modules.map((m) => clampToRoom(m, np.room)) }; })} />
         </main>
       )}
       {tab === 'corte' && <CutPlan cut={cut} nesting={nesting} settings={settings} project={project} />}

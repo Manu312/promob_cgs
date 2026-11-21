@@ -150,6 +150,29 @@ try {
   check('Fondo en ranura → laterales a profundidad completa', lateralDepth.includes(560), lateralDepth.join(','));
   await clickText('.tabs button', 'Diseño 3D'); await sleep(1500);
   await shot('08-mesada-veta');
+
+  // Ambientes reales
+  await page.keyboard.press('Escape'); await sleep(200);
+  p = await project();
+  check('Ambiente de ejemplo con ventana y puerta', p.room.openings.length === 2 && p.room.points.length === 4);
+  await (await fieldInput('Forma')).select('L'); await sleep(500);
+  p = await project();
+  check('Cambiar a ambiente en L', p.room.points.length === 6, `${p.room.points.length} vértices`);
+  await clickText('.room-editor .row-btns button', '+ Ventana'); await sleep(400);
+  p = await project();
+  check('Agregar ventana', p.room.openings.length === 3);
+  await clickText('.room-editor .row-btns button', '+ Columna'); await sleep(400);
+  p = await project();
+  check('Agregar columna', p.room.columns.length === 1);
+  await clickText('.vp-toolbar button', 'Planta'); await sleep(1200);
+  const nCotas = await page.$$eval('.cota', (e) => e.length);
+  check('Planta muestra cotas de paredes y módulos', nCotas >= 6 + p.modules.length, `${nCotas} cotas`);
+  await shot('09-planta-L-cotas');
+  await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(1200);
+  await shot('10-ambiente-L');
+  await (await fieldInput('Forma')).select('libre'); await sleep(400);
+  const nPts = await page.$$eval('.pts-row', (r) => r.length);
+  check('Modo libre muestra los vértices editables', nPts === 6);
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

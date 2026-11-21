@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { WebGLPathTracer, GradientEquirectTexture } from 'three-gpu-pathtracer';
 import { footprint } from '../domain/modules.js';
 import { mat3d, metal, stone } from './materials3d.js';
+import { Room3D, Dimensions } from './Room3D.jsx';
 
 const S = 0.001; // mm → m
 
@@ -55,30 +56,6 @@ function ModuleObject({ mod, b, selected, showSel, onDown }) {
   );
 }
 
-function Room({ room }) {
-  const W = room.w * S, D = room.d * S, H = room.h * S, T = 0.1;
-  return (
-    <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[W / 2, 0, D / 2]} receiveShadow>
-        <planeGeometry args={[W, D]} />
-        <meshStandardMaterial color="#d8d1c4" roughness={0.9} />
-      </mesh>
-      <mesh position={[W / 2, H / 2, -T / 2]} receiveShadow>
-        <boxGeometry args={[W + 2 * T, H, T]} />
-        <meshStandardMaterial color="#efece6" roughness={0.95} />
-      </mesh>
-      <mesh position={[-T / 2, H / 2, D / 2]} receiveShadow>
-        <boxGeometry args={[T, H, D]} />
-        <meshStandardMaterial color="#eae6df" roughness={0.95} />
-      </mesh>
-      <mesh position={[W + T / 2, H / 2, D / 2]} receiveShadow>
-        <boxGeometry args={[T, H, D]} />
-        <meshStandardMaterial color="#eae6df" roughness={0.95} />
-      </mesh>
-    </group>
-  );
-}
-
 function CameraRig({ view, room, controlsRef }) {
   const { camera } = useThree();
   useEffect(() => {
@@ -118,9 +95,13 @@ function PathTracer({ maxSamples, onProgress, controlsRef, sceneKey }) {
     last.current = -1;
     const c = controlsRef.current;
     const onChange = () => pt.updateCamera();
+    // Al soltar la cámara, las paredes que se ocultan pudieron cambiar: reconstruir la escena del trazador.
+    const onEnd = () => setTimeout(() => { if (ptRef.current === pt) pt.setScene(scene, camera); }, 50);
     c?.addEventListener('change', onChange);
+    c?.addEventListener('end', onEnd);
     return () => {
       c?.removeEventListener('change', onChange);
+      c?.removeEventListener('end', onEnd);
       try { pt.dispose(); } catch { /* three-gpu-pathtracer 0.0.23 falla al liberar recursos internos no creados */ }
       ptRef.current = null;
       scene.environment = prevEnv;
@@ -201,7 +182,7 @@ function DragController({ drag, setDrag, onMove, controlsRef, room }) {
   return null;
 }
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, onMove, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, onMove, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const { room } = project;
@@ -250,7 +231,8 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, onMo
         </Environment>
       )}
       <group position={[-cx, 0, -cz]}>
-        <Room room={room} />
+        <Room3D room={room} autoHide={autoHideWalls} />
+        {showDims && !renderMode && <Dimensions room={room} modules={project.modules} />}
         {project.modules.map((m) => {
           const b = builtById.get(m.id);
           if (!b) return null;

@@ -1,5 +1,6 @@
 import { MODULE_TYPES, PARAM_DEFS, RULE_DEFS, DEFAULT_RULES, fieldsFor } from '../domain/modules.js';
 import { NumField, SelField, TextField, num } from './fields.jsx';
+import RoomEditor from './RoomEditor.jsx';
 
 // Reglas de construcción. Con `inherit`, cada campo puede quedar "igual al proyecto".
 function RulesEditor({ rules, inherit, onChange }) {
@@ -28,16 +29,13 @@ function MatSelect({ label, value, settings, onChange, allowInherit }) {
 export default function Inspector({ project, settings, selected, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onProject }) {
   if (!selected) {
     const { room, defaults } = project;
-    const setRoom = (k, v) => onProject((p) => ({ ...p, room: { ...p.room, [k]: v } }));
     const setDef = (k, v) => onProject((p) => ({ ...p, defaults: { ...p.defaults, [k]: v } }));
     return (
       <aside className="inspector">
         <h3>Proyecto</h3>
         <TextField label="Nombre" value={project.name} onChange={(v) => onProject((p) => ({ ...p, name: v }))} />
         <h4>Ambiente</h4>
-        <NumField label="Ancho" unit="mm" value={room.w} min={1000} max={12000} step={50} onChange={(v) => setRoom('w', v)} />
-        <NumField label="Profundidad" unit="mm" value={room.d} min={1000} max={12000} step={50} onChange={(v) => setRoom('d', v)} />
-        <NumField label="Alto" unit="mm" value={room.h} min={2000} max={4000} step={50} onChange={(v) => setRoom('h', v)} />
+        <RoomEditor room={room} onChange={(r) => onProject((p) => ({ ...p, room: r }))} />
         <h4>Materiales por defecto</h4>
         <MatSelect label="Cuerpo" value={defaults.cuerpo} settings={settings} onChange={(v) => setDef('cuerpo', v)} />
         <MatSelect label="Frentes" value={defaults.frente} settings={settings} onChange={(v) => setDef('frente', v)} />

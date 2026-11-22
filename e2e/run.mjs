@@ -143,6 +143,50 @@ try {
   p = await project();
   check('Deshacer devuelve el módulo adentro', p.modules.length === 8 && (() => { const m = p.modules.find((o) => o.id === target.id); return m.x + fwOf(m) <= 3600; })());
 
+  // Panel Herramientas · Movimiento (#41)
+  {
+    const sel = await page.evaluate((id) => window.__muebles.screenOf(id, 100), target.id);
+    await page.mouse.click(sel.x, sel.y); await sleep(500);
+    const m0 = await modNow(target.id);
+    await page.keyboard.down('Control'); await page.keyboard.down('Shift'); await page.keyboard.press('KeyM');
+    await page.keyboard.up('Shift'); await page.keyboard.up('Control'); await sleep(400);
+    const onTool = () => page.$eval('.tools-item.on', (e) => e.textContent.trim());
+    check('Ctrl+Shift+M abre Herramientas · Movimiento', (await onTool()).endsWith('Movimiento') && !!(await page.$('.movement')));
+    await shot('03b-movimiento');
+    const press = async (label) => { await page.click(`.mv-arrow[aria-label="${label}"]`); await sleep(300); };
+    await press('Ancho +');
+    let mm = await modNow(target.id);
+    check('Ancho + mueve 10 mm sobre el eje del módulo', Math.abs(mm.x - m0.x) + Math.abs(mm.z - m0.z) === 10, `(${m0.x},${m0.z}) → (${mm.x},${mm.z}) rot ${m0.rot}`);
+    const stepIn = await page.$('.mv-step input');
+    await stepIn.click({ clickCount: 3 }); await stepIn.type('100'); await page.keyboard.press('Enter'); await sleep(300);
+    await press('Alto +');
+    mm = await modNow(target.id);
+    check('Con paso 100, Alto + sube el módulo 100 mm', (mm.y || 0) === (m0.y || 0) + 100, `y=${mm.y}`);
+    await page.keyboard.press('PageDown'); await sleep(300);
+    mm = await modNow(target.id);
+    check('AvPág baja 10 mm', mm.y === (m0.y || 0) + 90, `y=${mm.y}`);
+    await clickText('.mv-tabs button', 'Rotación');
+    const r0 = mm.rot;
+    await press('Alto +');
+    mm = await modNow(target.id);
+    check('Rotación + gira 90° sobre el centro', mm.rot === (r0 + 90) % 360, `rot ${r0} → ${mm.rot}`);
+    await clickText('.mv-tabs button', 'Desplazamiento');
+    await page.keyboard.press('KeyX'); await sleep(200);
+    check('Tecla X traba el movimiento en X', ((await page.$eval('.sb-lock', (e) => e.textContent).catch(() => '')) || '').includes('ancho'));
+    const mz = mm.z;
+    await dragBy(target.id, -10, 12, 15);
+    mm = await modNow(target.id);
+    check('Con la traba, arrastrar no cambia la profundidad', mm.z === mz, `z ${mz} → ${mm.z}, x=${mm.x}`);
+    await page.keyboard.press('KeyX'); await sleep(200);
+    check('X de nuevo quita la traba', !(await page.$('.sb-lock')));
+    for (let i = 0; i < 5; i++) await ctrl('KeyZ');
+    mm = await modNow(target.id);
+    check('Deshacer vuelve el módulo a donde estaba', mm.x === m0.x && mm.z === m0.z && (mm.y || 0) === (m0.y || 0) && mm.rot === m0.rot, `(${mm.x},${mm.z},${mm.y}) rot ${mm.rot}`);
+    await page.keyboard.press('KeyE'); await sleep(300);
+    check('E vuelve a Propiedades', (await onTool()).endsWith('Propiedades') && !!(await page.$('.inspector h3')));
+    check('Sin errores de consola tras el panel Movimiento', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Arrastrar en vacío rota cámara, no deselecciona errores
   await page.mouse.move(700, 200); await page.mouse.down(); await page.mouse.move(800, 250, { steps: 8 }); await page.mouse.up();
   await sleep(300);

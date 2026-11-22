@@ -26,6 +26,23 @@ h2 { margin: 0; font-size: 20px; } h3 { margin: 16px 0 8px; font-size: 15px; } h
 .design { flex: 1; display: grid; grid-template-columns: 220px 1fr 290px; min-height: 0; }
 .catalog, .inspector { background: var(--panel); overflow-y: auto; padding: 10px 12px 24px; }
 .catalog { border-right: 1px solid var(--line); } .inspector { border-left: 1px solid var(--line); }
+.tools-col { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--panel); }
+.tools-col > .inspector { flex: 1; min-height: 0; border-left: none; }
+.tools-nav { display: flex; flex-direction: column; padding: 6px 8px; border-bottom: 1px solid var(--line); gap: 2px; }
+.tools-title { font-size: 11.5px; font-weight: 600; color: var(--muted); padding: 2px 4px 4px; text-transform: uppercase; letter-spacing: .03em; }
+.tools-item { display: flex; align-items: center; gap: 8px; text-align: left; border: 1px solid transparent; background: transparent; padding: 3px 6px; border-radius: 4px; }
+.tools-item.on { border-color: #5b8def; background: var(--accent-weak); }
+.tools-item:disabled { opacity: .45; }
+.tools-ico { width: 16px; text-align: center; color: var(--accent); }
+.mv-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+.mv-tabs button { border: 1px solid transparent; border-bottom: none; background: transparent; border-radius: 4px 4px 0 0; padding: 4px 10px; }
+.mv-tabs button.on { border-color: var(--line); background: #fff; font-weight: 600; }
+.mv-grid { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
+.mv-col { display: flex; flex-direction: column; gap: 4px; }
+.mv-arrow { font-weight: 700; font-size: 15px; padding: 2px 8px; background: #fff; }
+.mv-step .numwrap { max-width: 110px; margin: 0 auto; }
+.mv-rel { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+.statusbar .sb-lock { color: #b45309; font-weight: 600; white-space: nowrap; }
 .catalog h3, .inspector h3 { margin-top: 4px; }
 .cat h4 { margin-top: 12px; }
 .mod-btn { display: flex; flex-direction: column; align-items: flex-start; width: 100%; margin-bottom: 5px; text-align: left; }

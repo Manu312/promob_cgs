@@ -23,7 +23,7 @@ h2 { margin: 0; font-size: 20px; } h3 { margin: 16px 0 8px; font-size: 15px; } h
 .top-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .total-pill { background: var(--accent-weak); color: var(--accent); padding: 5px 10px; border-radius: 999px; font-weight: 600; }
 
-.design { flex: 1; display: grid; grid-template-columns: 220px 1fr 290px; min-height: 0; }
+.design { flex: 1; display: grid; grid-template-columns: 1fr 290px; min-height: 0; }
 .catalog, .inspector { background: var(--panel); overflow-y: auto; padding: 10px 12px 24px; }
 .catalog { border-right: 1px solid var(--line); } .inspector { border-left: 1px solid var(--line); }
 .tools-col { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--panel); }
@@ -45,9 +45,27 @@ h2 { margin: 0; font-size: 20px; } h3 { margin: 16px 0 8px; font-size: 15px; } h
 .statusbar .sb-lock { color: #b45309; font-weight: 600; white-space: nowrap; }
 .catalog h3, .inspector h3 { margin-top: 4px; }
 .cat h4 { margin-top: 12px; }
-.mod-btn { display: flex; flex-direction: column; align-items: flex-start; width: 100%; margin-bottom: 5px; text-align: left; }
-.mod-btn small { color: var(--muted); font-size: 11px; }
-.viewport { position: relative; min-width: 0; min-height: 300px; }
+/* Barra de modulación (catálogo) arriba del visor, como Promob */
+.catalog-bar { flex-shrink: 0; background: var(--panel); border-bottom: 1px solid var(--line); padding: 4px 8px 2px; display: flex; flex-direction: column; gap: 2px; }
+.cb-row { display: flex; gap: 2px; flex-wrap: wrap; align-items: center; }
+.cb-tab { border: 1px solid transparent; background: transparent; padding: 2px 9px; border-radius: 3px; font-size: 12.5px; }
+.cb-tab:hover { background: var(--accent-weak); }
+.cb-tab.on { border-color: var(--line); background: #fff; font-weight: 600; }
+.cb-groups { border-top: 1px solid var(--line); padding-top: 2px; }
+.cb-items-row { display: flex; align-items: center; gap: 4px; }
+.cb-items { flex: 1; display: flex; gap: 4px; min-width: 0; overflow: hidden; min-height: 112px; }
+.cb-page, .cb-nav { padding: 2px 6px; font-size: 12px; }
+.cb-count { font-size: 11px; color: var(--muted); min-width: 34px; text-align: right; }
+.cb-empty { align-self: center; margin: 0 8px; }
+.mod-btn { display: flex; flex-direction: column; align-items: center; width: 118px; flex: 0 0 118px; padding: 4px; text-align: center; border: 1px solid transparent; background: transparent; border-radius: 4px; }
+.mod-btn:hover { background: var(--accent-weak); }
+.mod-btn.picked { border-color: #5b8def; background: var(--accent-weak); }
+.mod-btn span { font-size: 12px; line-height: 1.2; }
+.mod-btn small { color: var(--muted); font-size: 10.5px; }
+.cb-thumb { width: 70px; height: 70px; }
+img.cb-thumb { object-fit: contain; }
+.viewport { display: flex; flex-direction: column; min-width: 0; min-height: 300px; }
+.vp-area { position: relative; flex: 1; min-height: 0; }
 .vp-toolbar { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 4px; flex-wrap: wrap; pointer-events: none; }
 .vp-toolbar > * { pointer-events: auto; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .vp-error { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 24px; text-align: center; background: var(--bg); }
@@ -115,7 +133,6 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 
 @media (max-width: 900px) {
   .design { grid-template-columns: 1fr; grid-template-rows: auto 60vh auto; }
-  .catalog { max-height: 30vh; border-right: none; border-bottom: 1px solid var(--line); }
 }
 @media print {
   .topbar, .row-btns, .hint { display: none !important; }

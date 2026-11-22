@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { SLOTS, libraryTree, pathLabel } from '../domain/catalog.js';
+import { SLOTS, ACC_FAMILIES, libraryTree, pathLabel } from '../domain/catalog.js';
 import { effectiveModel } from '../domain/models.js';
 import { moduleName } from '../domain/modules.js';
 
 export function Swatch({ m }) {
-  if (!m) return null;
+  if (!m || !m.color) return null; // los accesorios no tienen muestra de color
   const style = m.kind === 'piedra'
     ? { background: `radial-gradient(circle at 30% 30%, ${m.grain} 1px, transparent 1.5px) 0 0 / 5px 5px, ${m.color}` }
     : { background: m.wood ? `repeating-linear-gradient(90deg, ${m.color}, ${m.color} 3px, rgba(0,0,0,.12) 4px)` : m.color };
@@ -59,7 +59,7 @@ function ShowAll({ materials, current, onApply, onClose }) {
           {list.map((m) => (
             <div key={m.id} className={`qf-item${sel === m.id ? ' on' : ''}`} role="button" tabIndex={0} onClick={() => setSel(m.id)} onDoubleClick={() => onApply(m.id)}>
               <Swatch m={m} /><span>{pathLabel(m)}</span>
-              <small>{m.kind === 'piedra' ? `$ ${m.priceM2.toLocaleString('es-AR')}/m²` : `${m.t} mm`}</small>
+              <small>{m.kind === 'piedra' ? `$ ${m.priceM2.toLocaleString('es-AR')}/m²` : m.kind === 'placa' ? `${m.t} mm` : `$ ${(m.price || 0).toLocaleString('es-AR')}`}</small>
             </div>
           ))}
         </div>
@@ -83,8 +83,29 @@ export default function ModelsPanel({ project, settings, selected, onApply, head
     window.addEventListener('pointerdown', close);
     return () => window.removeEventListener('pointerdown', close);
   }, [menu]);
-  const byId = new Map(settings.materials.map((m) => [m.id, m]));
+  // Filas: tipos de pieza (materiales) y, aparte, los accesorios con sus modelos.
+  const rows = [
+    ...SLOTS.map((s) => ({ ...s, list: settings.materials.filter((m) => (m.kind === 'piedra') === (s.kind === 'piedra')) })),
+    ...ACC_FAMILIES.map((f) => ({ ...f, acc: true, list: settings.accessories?.[f.id] || [] })),
+  ];
   const apply = (slot, id) => { onApply(slot, id, scope); setMenu(null); setAll(null); };
+  const row = (s) => {
+    const eff = effectiveModel(project, s.id, sel);
+    const m = s.list.find((x) => x.id === eff.id);
+    return (
+      <div key={s.id} className="md-row">
+        <span className="md-label">{s.label}:</span>
+        <button className={`md-value${eff.inherited ? ' inherited' : ''}`} title={eff.inherited ? 'Igual que Todos' : 'Clic para cambiar'}
+          onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { setMenuAt(anchorBelow(e.currentTarget)); setMenu(menu === s.id ? null : s.id); }}>
+          <Swatch m={m} /> {m ? pathLabel(m) : '—'}
+        </button>
+        {menu === s.id && (
+          <CascadeMenu node={libraryTree(s.list)} anchor={menuAt} onPick={(id) => apply(s.id, id)} onShowAll={() => { setAll(s.id); setMenu(null); }}
+            extra={sel && !eff.inherited ? <button className="cm-item" onClick={() => apply(s.id, null)}>↺ Igual que Todos</button> : null} />
+        )}
+      </div>
+    );
+  };
   return (
     <aside className="inspector models">
       {header}
@@ -93,28 +114,14 @@ export default function ModelsPanel({ project, settings, selected, onApply, head
         <button className={scope === 'seleccion' ? 'on' : ''} disabled={!selected} title={selected ? '' : 'Seleccioná un módulo'} onClick={() => setScope('seleccion')}>Selección</button>
       </div>
       <div className="md-group">Muebles{sel ? ` · ${moduleName(sel)}` : ''}</div>
-      {SLOTS.map((s) => {
-        const eff = effectiveModel(project, s.id, sel);
-        const m = byId.get(eff.id);
-        return (
-          <div key={s.id} className="md-row">
-            <span className="md-label">{s.label}:</span>
-            <button className={`md-value${eff.inherited ? ' inherited' : ''}`} title={eff.inherited ? 'Igual que Todos' : 'Clic para cambiar'}
-              onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { setMenuAt(anchorBelow(e.currentTarget)); setMenu(menu === s.id ? null : s.id); }}>
-              <Swatch m={m} /> {m ? pathLabel(m) : '—'}
-            </button>
-            {menu === s.id && (
-              <CascadeMenu node={libraryTree(settings.materials, s.kind)} anchor={menuAt} onPick={(id) => apply(s.id, id)} onShowAll={() => { setAll(s.id); setMenu(null); }}
-                extra={sel && !eff.inherited ? <button className="cm-item" onClick={() => apply(s.id, null)}>↺ Igual que Todos</button> : null} />
-            )}
-          </div>
-        );
-      })}
+      {rows.filter((r) => !r.acc).map(row)}
+      <div className="md-group">Accesorios</div>
+      {rows.filter((r) => r.acc).map(row)}
       <p className="hint">{scope === 'todos'
         ? 'Todos: cambia el modelo de todos los módulos del ambiente y de los que insertes después.'
         : 'Selección: cambia solo el módulo seleccionado. En gris, lo que sigue igual que Todos.'}</p>
       {all && (
-        <ShowAll materials={settings.materials.filter((m) => (m.kind === 'piedra') === (SLOTS.find((s) => s.id === all).kind === 'piedra'))}
+        <ShowAll materials={rows.find((r) => r.id === all).list}
           current={effectiveModel(project, all, sel).id} onApply={(id) => apply(all, id)} onClose={() => setAll(null)} />
       )}
     </aside>

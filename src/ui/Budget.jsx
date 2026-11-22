@@ -1,7 +1,7 @@
 import { money, num } from './fields.jsx';
 
 export default function Budget({ budget, settings, project, built }) {
-  const groups = ['Placas', 'Tapacantos', 'Herrajes'];
+  const groups = ['Placas', 'Tapas', 'Tapacantos', 'Herrajes'];
   return (
     <div className="page">
       <div className="page-head">

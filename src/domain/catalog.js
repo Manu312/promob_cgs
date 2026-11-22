@@ -40,7 +40,6 @@ export const DEFAULT_HARDWARE = [
   { code: 'soporte_estante', name: 'Soporte de estante', unit: 'u', price: 80 },
   { code: 'kit_corrediza', name: 'Kit puerta corrediza (por hoja)', unit: 'u', price: 25000 },
   { code: 'kit_armado', name: 'Kit armado por módulo (minifix, tarugos, tornillos)', unit: 'u', price: 4000 },
-  { code: 'mesada', name: 'Mesada (granito / cuarzo)', unit: 'm²', price: 150000 },
   { code: 'bacha', name: 'Bacha de acero inoxidable', unit: 'u', price: 85000 },
 ];
 
@@ -62,8 +61,52 @@ export function mergeSettings(s) {
   base.materials = migrateMaterials(base.materials);
   const hw = Array.isArray(base.hardware) ? [...base.hardware] : [];
   for (const d of DEFAULT_HARDWARE) if (!hw.find((h) => h.code === d.code)) hw.push(d);
-  base.hardware = hw;
+  base.hardware = hw.filter((h) => h.code !== 'mesada'); // la mesada ahora se cobra por m² de su piedra
   return base;
+}
+
+// Tipos de pieza (filas del panel Modelos, como Promob). Cada uno lleva un material; las
+// tapas, una piedra. `slotOf` decide el tipo de cada pieza por su rol y su nombre.
+export const SLOTS = [
+  { id: 'cajas', label: 'Cajas', kind: 'placa' },
+  { id: 'externo', label: 'Externo cajas', kind: 'placa' },
+  { id: 'puertas', label: 'Puertas', kind: 'placa' },
+  { id: 'frentes', label: 'Frentes', kind: 'placa' },
+  { id: 'fondos', label: 'Fondos', kind: 'placa' },
+  { id: 'cajones', label: 'Cajones', kind: 'placa' },
+  { id: 'tapas', label: 'Tapas', kind: 'piedra' },
+];
+
+export function slotOf(part) {
+  if (part.role === 'fondo') return 'fondos';
+  if (part.role === 'cajon') return 'cajones';
+  if (part.role === 'frente') return /^Puerta/.test(part.name) ? 'puertas' : 'frentes';
+  return part.name === 'Lateral' ? 'externo' : 'cajas';
+}
+
+// Materiales por tipo de pieza a partir de los nombres viejos (cuerpo, frente, fondo, cajon).
+// En el proyecto completa todo (cajones = cajas si no hay); en un módulo deja sin definir
+// lo que hereda del proyecto.
+export function slotIds(o = {}, { fill = false } = {}) {
+  const v = (x) => (x === '' ? undefined : x);
+  const out = {
+    cajas: v(o.cajas) ?? v(o.cuerpo),
+    externo: v(o.externo) ?? v(o.cuerpo),
+    puertas: v(o.puertas) ?? v(o.frente),
+    frentes: v(o.frentes) ?? v(o.frente),
+    fondos: v(o.fondos) ?? v(o.fondo),
+    cajones: v(o.cajones) ?? v(o.cajon),
+    tapas: v(o.tapas),
+  };
+  if (fill) {
+    out.cajas ??= 'mel18_blanco'; out.externo ??= out.cajas; out.puertas ??= 'mel18_roble'; out.frentes ??= out.puertas;
+    out.fondos ??= 'fibro3_blanco'; out.cajones ??= out.cajas; out.tapas ??= 'gra_gris_mara';
+  }
+  return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
+}
+
+export function stoneById(settings, id) {
+  return settings.materials.find((m) => m.id === id && m.kind === 'piedra') || settings.materials.find((m) => m.kind === 'piedra');
 }
 
 // Placa por id (si no existe, la primera placa: un id viejo o borrado no rompe el despiece).

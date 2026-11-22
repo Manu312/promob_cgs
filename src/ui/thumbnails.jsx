@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { buildAll } from '../domain/cutlist.js';
 import { itemParams } from '../domain/library.js';
-import { mat3d, metal, stone } from './materials3d.js';
+import { mat3d, metal } from './materials3d.js';
 
 // Miniaturas del catálogo generadas con el mismo modelo 3D que el visor (como Promob):
 // un único renderer fuera de pantalla, de a una por vez, con caché por ítem + medidas + materiales.
@@ -43,8 +43,8 @@ function render(item, variant, ctx) {
   const { width: W, height: H, depth: D } = params;
   const g = new THREE.Group();
   g.position.set((-W / 2) * S, (-H / 2) * S, (-D / 2) * S);
-  for (const p of b.parts) g.add(box(p, mat3d(b.mats[p.role])));
-  for (const d of b.decors) g.add(box(d, d.decor === 'mesada' ? stone : metal));
+  for (const p of b.parts) g.add(box(p, mat3d(b.mats[p.slot])));
+  for (const d of b.decors) g.add(box(d, d.decor === 'mesada' ? mat3d(b.mats.tapas) : metal));
   scene.add(g);
   // Cámara de frente, un poco de costado y desde arriba; encuadra la esfera que envuelve al módulo.
   const cam = new THREE.PerspectiveCamera(28, 1, 0.01, 100);

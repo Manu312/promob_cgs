@@ -10,6 +10,10 @@ export function computeBudget(cut, nesting, settings) {
     const m = r2(e.m * (1 + settings.edgeWaste));
     lines.push({ group: 'Tapacantos', desc: `Tapacanto ${e.name}`, qty: m, unit: 'm', unitPrice: settings.edgePerM, total: m * settings.edgePerM });
   }
+  for (const s of Object.values(cut.stones || {})) {
+    const m2 = r2(s.m2);
+    lines.push({ group: 'Tapas', desc: `Tapa ${s.name}`, qty: m2, unit: 'm²', unitPrice: s.priceM2, total: m2 * s.priceM2 });
+  }
   for (const [code, qty] of Object.entries(cut.hardware)) {
     const h = settings.hardware.find((x) => x.code === code);
     if (!h) continue;

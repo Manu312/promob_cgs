@@ -285,6 +285,42 @@ export function footprint(mod) {
 }
 
 
+// Flechas de redimensionar, en el sistema del módulo: eje local y signo hacia afuera.
+export const RESIZE_HANDLES = {
+  right: { param: 'width', axis: 'x', sign: 1 },
+  left: { param: 'width', axis: 'x', sign: -1 },
+  front: { param: 'depth', axis: 'z', sign: 1 },
+  top: { param: 'height', axis: 'y', sign: 1 },
+};
+
+// Ejes locales del módulo en planta (x, z del mundo) según su rotación (igual que el 3D: giro sobre y).
+export function localAxes(rot = 0) {
+  const t = (rot * Math.PI) / 180;
+  const c = Math.round(Math.cos(t) * 1e9) / 1e9, s = Math.round(Math.sin(t) * 1e9) / 1e9;
+  return { ex: [c, -s], ez: [s, c] };
+}
+
+// Estira o achica con una flecha: `delta` mm hacia afuera (negativo = achicar). La cara
+// opuesta queda fija; respeta mínimo y máximo de la medida.
+export function resizeModule(mod, handle, delta) {
+  const h = RESIZE_HANDLES[handle];
+  if (!h || !delta) return mod;
+  const def = PARAM_DEFS[h.param];
+  const old = mod.params[h.param];
+  const val = Math.min(def.max, Math.max(def.min, Math.round(old + delta)));
+  const eff = val - old;
+  if (!eff) return mod;
+  const params = { ...mod.params, [h.param]: val };
+  if (h.axis === 'y') return { ...mod, params };
+  const f0 = footprint(mod);
+  const c = [mod.x + f0.fw / 2, mod.z + f0.fd / 2];
+  const { ex, ez } = localAxes(mod.rot || 0);
+  const e = h.axis === 'x' ? ex : ez;
+  const nc = [c[0] + e[0] * h.sign * (eff / 2), c[1] + e[1] * h.sign * (eff / 2)];
+  const f1 = footprint({ ...mod, params });
+  return { ...mod, params, x: Math.round(nc[0] - f1.fw / 2), z: Math.round(nc[1] - f1.fd / 2) };
+}
+
 // `step`: paso al que se redondea cuando no hay imán cerca (10 mm, o la grilla magnética en Planta).
 export function snapPosition(mod, others, room, thr = 40, step = 10) {
   const { fw, fd } = footprint(mod);

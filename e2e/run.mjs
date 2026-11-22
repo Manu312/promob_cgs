@@ -308,6 +308,36 @@ try {
   const pr = p.room.nodes;
   check('Editar la cota de una pared cambia su largo', Math.round(Math.hypot(pr[1].x - pr[0].x, pr[1].z - pr[0].z)) === 4500, p1);
   check('Sin errores de consola tras editar cotas', errors.length === 0, errors.slice(-3).join(' | '));
+
+  // Flechas para estirar / achicar el módulo seleccionado (#29)
+  await page.keyboard.press('Escape'); await sleep(200);
+  p = await project();
+  let cz = p.modules.find((m) => m.type === 'cajonera_placard');
+  const czp = await page.evaluate((id) => window.__muebles.screenOf(id), cz.id);
+  await page.mouse.click(czp.x, czp.y); await sleep(600);
+  const hR = await page.evaluate((id) => window.__muebles.screenOfHandle(id, 'right'), cz.id);
+  const hL = await page.evaluate((id) => window.__muebles.screenOfHandle(id, 'left'), cz.id);
+  const len = Math.hypot(hR.x - hL.x, hR.y - hL.y);
+  const ux = (hR.x - hL.x) / len, uy = (hR.y - hL.y) / len;
+  await dragFrom(hR, ux * 60, uy * 60);
+  p = await project();
+  let c1 = p.modules.find((m) => m.id === cz.id);
+  check('Flecha derecha estira el ancho y deja fijo el lado izquierdo', c1.params.width > cz.params.width && c1.params.width % 10 === 0 && c1.x === cz.x, `${cz.params.width} → ${c1.params.width}, x=${c1.x}`);
+  await shot('18-flecha-derecha');
+  const right = c1.x + c1.params.width;
+  const hL2 = await page.evaluate((id) => window.__muebles.screenOfHandle(id, 'left'), cz.id);
+  await dragFrom(hL2, -ux * 50, -uy * 50);
+  p = await project();
+  const c2b = p.modules.find((m) => m.id === cz.id);
+  check('Flecha izquierda estira y deja fijo el lado derecho', c2b.params.width > c1.params.width && c2b.x + c2b.params.width === right, `x=${c2b.x}, ancho=${c2b.params.width}`);
+  await ctrl('KeyZ');
+  p = await project();
+  check('Deshacer un estiramiento en un paso', p.modules.find((m) => m.id === cz.id).params.width === c1.params.width);
+  const hT = await page.evaluate((id) => window.__muebles.screenOfHandle(id, 'top'), cz.id);
+  await dragFrom(hT, 0, -40);
+  p = await project();
+  check('Flecha de arriba cambia el alto', p.modules.find((m) => m.id === cz.id).params.height > cz.params.height, `alto=${p.modules.find((m) => m.id === cz.id).params.height}`);
+  check('Sin errores de consola tras redimensionar', errors.length === 0, errors.slice(-3).join(' | '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

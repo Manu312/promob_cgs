@@ -85,3 +85,19 @@ test('un módulo nuevo se apoya en la pared del fondo aunque esté en z negativo
   assert.equal(m.z, -300);
   assert.equal(m.x, 0);
 });
+
+// Los módulos acompañan a la pared (#44)
+import { followWall } from '../src/domain/wallEdit.js';
+import { MODULE_TYPES as MT44 } from '../src/domain/modules.js';
+import { normalizeRoom as nr44 } from '../src/domain/room.js';
+
+test('mover la pared del fondo arrastra los módulos apoyados en ella y no los demás', () => {
+  const r = nr44({ w: 3600, d: 3000, openings: [] });
+  const fondo = r.walls[0].id;
+  const m = (id, x, z, y = 0) => ({ id, type: 'bajo', params: { ...MT44.bajo.defaults }, x, z, y, rot: 0 });
+  const mods = [m('a', 0, 0), m('b', 600, 0), m('c', 1500, 1500)];
+  const out = followWall(r, fondo, mods, 0, -250);
+  assert.deepEqual(out.map((o) => [o.id, o.x, o.z]), [['a', 0, -250], ['b', 600, -250], ['c', 1500, 1500]]);
+  // siempre desde la base: un segundo paso no acumula
+  assert.deepEqual(followWall(r, fondo, mods, 0, -100, out).map((o) => o.z), [-100, -100, 1500]);
+});

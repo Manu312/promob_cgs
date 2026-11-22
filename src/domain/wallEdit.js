@@ -148,3 +148,13 @@ export function splitWall(room, wallId, offset) {
 export function updateWall(room, wallId, patch) {
   return normalizeRoom({ ...room, walls: room.walls.map((w) => (w.id === wallId ? { ...w, ...patch } : w)) });
 }
+
+// Al mover una pared, los módulos apoyados en ella la acompañan (mismo desplazamiento).
+// Se calcula siempre desde el estado del comienzo del arrastre (`baseRoom`, `baseModules`);
+// `current` son los módulos actuales (los que no están apoyados quedan como estén).
+export function followWall(baseRoom, wallId, baseModules, dx, dz, current = baseModules) {
+  const ids = new Set(modulesOnWall(baseRoom, wallId, baseModules));
+  if (!ids.size) return current;
+  const base = new Map(baseModules.map((m) => [m.id, m]));
+  return current.map((m) => (ids.has(m.id) && base.has(m.id) ? { ...m, x: Math.round(base.get(m.id).x + dx) + 0, z: Math.round(base.get(m.id).z + dz) + 0 } : m));
+}

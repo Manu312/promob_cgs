@@ -8,6 +8,7 @@ import { withItem } from './domain/library.js';
 import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
 import ModelsPanel from './ui/ModelsPanel.jsx';
 import { applyModel } from './domain/models.js';
+import { applyStyle, stylesOf } from './domain/styles.js';
 import StatusToggles from './ui/StatusToggles.jsx';
 import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls, followWall } from './domain/wallEdit.js';
 import { WallContextMenu, WallDeleteDialog, ModuleContextMenu } from './ui/WallMenus.jsx';
@@ -542,7 +543,9 @@ export default function App() {
           <ToolsNav tool={tool} onTool={setTool} />
           {tool === 'modelos' && (
             <ModelsPanel project={project} settings={settings} selected={selected}
-              onApply={(slot, id, scope) => setProject((p) => applyModel(p, slot, id, scope, selectedId ? [selectedId] : []))} />
+              onApply={(slot, id, scope) => setProject((p) => applyModel(p, slot, id, scope, selectedId ? [selectedId] : []))}
+              styles={stylesOf(settings)} onStyles={(list) => setSettings((s) => ({ ...s, styles: list }))}
+              onApplyStyle={(style, scope) => setProject((p) => applyStyle(p, style, scope, selectedId ? [selectedId] : []))} />
           )}
           {tool === 'movimiento'
             ? <MovementPanel label={selected ? describeSelection(project, selection) : null} ui={ui} setUi={setUi} onNudge={nudgeSelected} onRotate={(sign) => rotateBy(sign * (ui.rotStep ?? 90))} />

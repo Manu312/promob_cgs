@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { SLOTS, ACC_FAMILIES, libraryTree, pathLabel } from '../domain/catalog.js';
 import { effectiveModel } from '../domain/models.js';
 import { moduleName } from '../domain/modules.js';
+import StylesBar from './StylesBar.jsx';
 
 export function Swatch({ m }) {
   if (!m || !m.color) return null; // los accesorios no tienen muestra de color
@@ -70,7 +71,7 @@ function ShowAll({ materials, current, onApply, onClose }) {
 }
 
 // Herramientas · Modelos: ámbito Todos / Selección y una fila por tipo de pieza.
-export default function ModelsPanel({ project, settings, selected, onApply, header }) {
+export default function ModelsPanel({ project, settings, selected, onApply, styles, onStyles, onApplyStyle }) {
   const [scope, setScope] = useState('todos');
   const [menu, setMenu] = useState(null); // slot con el menú abierto
   const [menuAt, setMenuAt] = useState(null);
@@ -108,7 +109,7 @@ export default function ModelsPanel({ project, settings, selected, onApply, head
   };
   return (
     <aside className="inspector models">
-      {header}
+      <StylesBar styles={styles} rows={rows} project={project} selected={selected} scope={sel ? 'seleccion' : 'todos'} onStyles={onStyles} onApplyStyle={onApplyStyle} />
       <div className="mv-tabs">
         <button className={scope === 'todos' ? 'on' : ''} onClick={() => setScope('todos')}>Todos</button>
         <button className={scope === 'seleccion' ? 'on' : ''} disabled={!selected} title={selected ? '' : 'Seleccioná un módulo'} onClick={() => setScope('seleccion')}>Selección</button>

@@ -88,6 +88,7 @@ export const DEFAULT_HARDWARE = [
 export const DEFAULT_SETTINGS = {
   materials: DEFAULT_MATERIALS,
   accessories: DEFAULT_ACCESSORIES,
+  styles: null, // null = los de fábrica (src/domain/styles.js)
   hardware: DEFAULT_HARDWARE,
   edgePerM: 600, // $ por metro de tapacanto
   edgeWaste: 0.1, // 10% desperdicio de tapacanto

@@ -1,6 +1,7 @@
 // Panel Movimiento (como Promob): mover y girar el objeto seleccionado de a un paso.
 // Ejes: 'w' ancho (rojo), 'd' profundidad (verde), 'h' alto (azul).
 import { footprint, localAxes } from './modules.js';
+import { modulePoly, overlaps } from './collision.js';
 
 export const MOVE_AXES = [
   { axis: 'w', label: 'Ancho', color: '#e03131' },
@@ -32,4 +33,22 @@ export function lockAxis(mod, x, z, lock) {
   if (lock === 'x') return { x, z: mod.z };
   if (lock === 'z') return { x: mod.x, z };
   return { x, z };
+}
+
+// Apoyar sobre otros (bacha sobre mesada, microondas sobre un bajo): altura de la cara de
+// arriba más alta entre los módulos que tiene debajo en planta. Solo apoyan superficies de
+// trabajo: módulos en el piso o apoyados a su vez, con la cara de arriba hasta SUPPORT_MAX_H
+// (una alacena colgada o un placard no son apoyo: contra ellos actúa la colisión).
+export const SUPPORT_MAX_H = 1200;
+
+export function restingHeight(mod, modules) {
+  const poly = modulePoly(mod);
+  let y = 0;
+  for (const o of modules) {
+    if (o.id === mod.id || !((o.y || 0) <= 1 || o.rest)) continue;
+    if ((o.y || 0) + o.params.height > SUPPORT_MAX_H) continue;
+    if (!overlaps(poly, modulePoly(o))) continue;
+    y = Math.max(y, (o.y || 0) + o.params.height);
+  }
+  return Math.round(y);
 }

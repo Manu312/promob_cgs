@@ -85,3 +85,27 @@ test('la colisión usa el rectángulo girado: la esquina frena contra la pared',
   const zs = modulePoly({ ...m, ...to }).map((p) => p[1]);
   assert.ok(Math.min(...zs) >= -0.5 && Math.min(...zs) < 2, `z mínima ${Math.min(...zs)}`);
 });
+
+// Apoyar sobre otros (#46)
+import { restingHeight } from '../src/domain/movement.js';
+
+test('apoyado: toma la altura de la mesada que tiene debajo; sin nada, el piso', () => {
+  const bajo = mod('b', 0, 0);
+  const caja = { ...mod('c', 100, 50), rest: true };
+  assert.equal(restingHeight(caja, [bajo, caja]), 870);
+  assert.equal(restingHeight({ ...caja, x: 1500 }, [bajo, caja]), 0);
+});
+
+test('apoyado: una alacena colgada no es apoyo, pero un módulo apoyado sí', () => {
+  const alacena = { ...mod('a', 0, 0), type: 'alacena', params: { ...MODULE_TYPES.alacena.defaults }, y: 1450 };
+  const caja = { ...mod('c', 0, 0), rest: true };
+  assert.equal(restingHeight(caja, [alacena, caja]), 0);
+  const bajo = mod('b', 0, 0), tabla = { ...mod('s', 0, 0), params: { ...mod('s', 0, 0).params, height: 40 }, y: 870, rest: true };
+  assert.equal(restingHeight(caja, [bajo, tabla, caja]), 910);
+});
+
+test('apoyado: un placard alto no es apoyo (ahí choca)', () => {
+  const placard = { ...mod('p', 0, 0), params: { ...mod('p', 0, 0).params, height: 2400 } };
+  const caja = { ...mod('c', 0, 0), rest: true };
+  assert.equal(restingHeight(caja, [placard, caja]), 0);
+});

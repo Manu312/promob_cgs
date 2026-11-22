@@ -43,7 +43,11 @@ diseño 3D, renderizado, plan de corte y presupuesto. Se quieren todas las funci
    selección y propiedades de pared, arrastrar paredes y vértices, construir paredes con clics y teclado, plantillas,
    eliminar/dividir con menú de clic derecho, cotas automáticas (lineales, angulares, de módulos a paredes/vecinos) y editables,
    flechas para estirar módulos, aberturas y columnas arrastrables, Auto Rebajar, regla de alturas, cotas manuales y plano de referencia.
-   Siguiente: Fase 2 (#15) en adelante.
+3c. ✅ **Paridad con Promob — Fase 2, movimiento y manipulación** (ver `docs/PLAN-FASE-2.md`, issues #39–#46):
+   colisión (`B`) y acoplamientos en la barra inferior como Promob, arrastre que no se pierde, cotas verticales
+   (piso/techo), panel Herramientas · Movimiento (desplazamiento, rotación, paso, posición relativa), rotación libre,
+   flechas por eje a ambos lados, módulos que acompañan a la pared, tamaño máximo (clic derecho) y apoyar sobre otros.
+   Siguiente: Fase 3 (#16) — catálogo tipo Promob.
 4. ⏳ **Esquineros y especiales**: bajo esquinero L, alacena esquinera, horno/anafe, heladera, rebatibles, cajonera interna, alacena sobre heladera.
 5. ⏳ **Corte para taller**: orden de cortes, etiquetas por pieza imprimibles, sobrantes reutilizables.
 6. ⏳ **Módulo libre** a medida (editor por piezas).

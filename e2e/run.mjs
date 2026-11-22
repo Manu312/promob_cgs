@@ -214,6 +214,29 @@ try {
     check('Deshacer el tamaño máximo', mm.params.width === m0.params.width);
   }
 
+  // Apoyar sobre lo de abajo (#46): una cajonera sobre la mesada de un bajo
+  {
+    const bajoC = (await project()).modules.find((m) => m.type === 'bajo_cajones');
+    await clickText('.mod-btn span', 'Cajonera interior'); await sleep(300);
+    const setField = async (label, v) => { const f = await fieldInput(label); await f.click({ clickCount: 3 }); await f.type(String(v)); await page.keyboard.press('Enter'); await sleep(300); };
+    await setField('X (desde pared izq.)', bajoC.x);
+    await setField('Z (desde pared fondo)', 0);
+    const cid = (await project()).modules.at(-1).id;
+    await page.evaluate(() => [...document.querySelectorAll('.inspector label.check-row')].find((l) => l.textContent.includes('Apoyar'))?.querySelector('input').click());
+    await sleep(400);
+    let cm2 = await modNow(cid);
+    check('Apoyar sobre lo de abajo: la cajonera sube a la mesada del bajo', cm2.rest === true && cm2.y === bajoC.params.height, `y=${cm2.y}`);
+    for (let i = 0; i < 8; i++) { await page.keyboard.down('Shift'); await page.keyboard.press('ArrowDown'); await page.keyboard.up('Shift'); await sleep(150); }
+    cm2 = await modNow(cid);
+    check('Al sacarla de encima del bajo baja al piso', cm2.y === 0 && cm2.z >= 560, `z=${cm2.z}, y=${cm2.y}`);
+    for (let i = 0; i < 8; i++) { await page.keyboard.down('Shift'); await page.keyboard.press('ArrowUp'); await page.keyboard.up('Shift'); await sleep(150); }
+    cm2 = await modNow(cid);
+    check('Al volver sobre el bajo se apoya otra vez en la mesada', cm2.y === bajoC.params.height, `z=${cm2.z}, y=${cm2.y}`);
+    await shot('03e-apoyar');
+    await page.keyboard.press('Delete'); await sleep(300);
+    check('Sin errores de consola tras apoyar', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Arrastrar en vacío rota cámara, no deselecciona errores
   await page.mouse.move(700, 200); await page.mouse.down(); await page.mouse.move(800, 250, { steps: 8 }); await page.mouse.up();
   await sleep(300);

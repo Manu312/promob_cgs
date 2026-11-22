@@ -1,6 +1,7 @@
 import { MODULE_TYPES, PARAM_DEFS, RULE_DEFS, DEFAULT_RULES, fieldsFor } from '../domain/modules.js';
 import { NumField, SelField, TextField, num } from './fields.jsx';
 import RoomEditor from './RoomEditor.jsx';
+import WallPanel from './WallPanel.jsx';
 
 // Reglas de construcción. Con `inherit`, cada campo puede quedar "igual al proyecto".
 function RulesEditor({ rules, inherit, onChange }) {
@@ -26,7 +27,11 @@ function MatSelect({ label, value, settings, onChange, allowInherit }) {
   return <SelField label={label} value={value || ''} onChange={(v) => onChange(v || undefined)} options={opts} />;
 }
 
-export default function Inspector({ project, settings, selected, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onProject }) {
+export default function Inspector({ project, settings, selected, selectedWallId, onSelectWall, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onProject }) {
+  if (selectedWallId && project.room.walls.some((w) => w.id === selectedWallId)) {
+    return <WallPanel room={project.room} wallId={selectedWallId} onBack={() => onSelectWall(null)}
+      onRoom={(fn) => onProject((p) => ({ ...p, room: fn(p.room) }))} />;
+  }
   if (!selected) {
     const { room, defaults } = project;
     const setDef = (k, v) => onProject((p) => ({ ...p, defaults: { ...p.defaults, [k]: v } }));
@@ -35,7 +40,7 @@ export default function Inspector({ project, settings, selected, built, onParams
         <h3>Proyecto</h3>
         <TextField label="Nombre" value={project.name} onChange={(v) => onProject((p) => ({ ...p, name: v }))} />
         <h4>Ambiente</h4>
-        <RoomEditor room={room} onChange={(r) => onProject((p) => ({ ...p, room: r }))} />
+        <RoomEditor room={room} onChange={(r) => onProject((p) => ({ ...p, room: r }))} onSelectWall={onSelectWall} />
         <h4>Materiales por defecto</h4>
         <MatSelect label="Cuerpo" value={defaults.cuerpo} settings={settings} onChange={(v) => setDef('cuerpo', v)} />
         <MatSelect label="Frentes" value={defaults.frente} settings={settings} onChange={(v) => setDef('frente', v)} />
@@ -44,7 +49,7 @@ export default function Inspector({ project, settings, selected, built, onParams
         <h4>Construcción del proyecto</h4>
         <RulesEditor rules={{ ...DEFAULT_RULES, ...project.rules }} onChange={(r) => onProject((p) => ({ ...p, rules: r }))} />
         <p className="hint">Estas reglas aplican a todos los módulos; cada módulo puede tener las suyas.</p>
-        <p className="hint">Elegí un módulo del catálogo para agregarlo. Hacé clic en un módulo para editarlo; arrastralo para moverlo (se pega a paredes y vecinos).</p>
+        <p className="hint">Elegí un módulo del catálogo para agregarlo. Hacé clic en un módulo para editarlo; arrastralo para moverlo (se pega a paredes y vecinos). Hacé clic en una pared para ver sus propiedades.</p>
         <p className="hint">Atajos: <b>R</b> rotar · <b>Supr</b> borrar · <b>flechas</b> mover 10mm (Shift 100mm) · <b>Esc</b> deseleccionar.</p>
       </aside>
     );

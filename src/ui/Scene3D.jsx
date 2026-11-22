@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { WebGLPathTracer, GradientEquirectTexture } from 'three-gpu-pathtracer';
 import { footprint } from '../domain/modules.js';
 import { bounds } from '../domain/walls.js';
+import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
 import { mat3d, metal, stone } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
@@ -171,6 +172,15 @@ function DevProbe({ project }) {
         const r = gl.domElement.getBoundingClientRect();
         return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
       },
+      // Punto de la cara interior de una pared, a la altura `y` (mm).
+      screenOfWall(id, y = 1500) {
+        const g = roomWalls(project.room).find((w) => w.id === id);
+        if (!g) return null;
+        const mx = (g.a[0] + g.b[0]) / 2 - g.n[0] * 2, mz = (g.a[1] + g.b[1]) / 2 - g.n[1] * 2;
+        const v = new THREE.Vector3((mx - project.room.w / 2) * S, y * S, (mz - project.room.d / 2) * S).project(camera);
+        const r = gl.domElement.getBoundingClientRect();
+        return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+      },
     };
   });
   return null;
@@ -200,7 +210,7 @@ function DragController({ drag, setDrag, onMove, onDragEnd, controlsRef, room })
   return null;
 }
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, onMove, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const { room } = project;
@@ -251,7 +261,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, onMo
         </Environment>
       )}
       <group position={[-cx, 0, -cz]}>
-        <Room3D room={room} autoHide={autoHideWalls} />
+        <Room3D room={room} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onSelectWall={renderMode ? null : onSelectWall} />
         {planta && !renderMode && <PlanGrid room={room} />}
         {showDims && !renderMode && <Dimensions room={room} modules={project.modules} />}
         {project.modules.map((m) => {

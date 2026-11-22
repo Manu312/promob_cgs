@@ -14,6 +14,7 @@ import Settings from './ui/Settings.jsx';
 import ErrorBoundary from './ui/ErrorBoundary.jsx';
 import { download, money } from './ui/fields.jsx';
 import { useHistoryState } from './ui/useHistoryState.js';
+import { describeSelection } from './domain/selection.js';
 
 function usePersistent(key, init, migrate = (x) => x) {
   const [v, setV] = useState(() => {
@@ -33,7 +34,12 @@ export default function App() {
   const [rawSettings, setSettings] = usePersistent('mueblesapp.settings', DEFAULT_SETTINGS);
   const settings = useMemo(() => mergeSettings(rawSettings), [rawSettings]);
   const [tab, setTab] = useState('diseno');
-  const [selectedId, setSelectedId] = useState(null);
+  // Selección única: { kind: 'module' | 'wall', id } (Fase 1 suma aberturas, columnas y cotas).
+  const [selection, setSelection] = useState(null);
+  const selectedId = selection?.kind === 'module' ? selection.id : null;
+  const selectedWallId = selection?.kind === 'wall' ? selection.id : null;
+  const setSelectedId = useCallback((id) => setSelection(id ? { kind: 'module', id } : null), []);
+  const selectWall = useCallback((id) => setSelection(id ? { kind: 'wall', id } : null), []);
   const [renderMode, setRenderMode] = useState(false);
   const [photoreal, setPhotoreal] = useState(false);
   const [samples, setSamples] = useState(0);
@@ -150,6 +156,7 @@ export default function App() {
           <section className="viewport">
             <ErrorBoundary onReset={() => { setPhotoreal(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
+                selectedWallId={selectedWallId} onSelectWall={selectWall}
                 onDragStart={history.begin} onDragEnd={history.commit}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoHideWalls} />
@@ -175,7 +182,7 @@ export default function App() {
               </button>
               <button className={photoreal ? 'active' : ''} onClick={() => { setPhotoreal((r) => !r); setSamples(0); setSelectedId(null); }}
                 title="Trazado de rayos: la imagen se va refinando. Podés girar la cámara y vuelve a empezar.">
-                {photoreal ? '■ Detener render final' : 'Render final (fotorrealista)'}
+                {photoreal ? '■ Detener render final' : 'Render final'}
               </button>
               {photoreal && (
                 <span className="pt-progress">
@@ -187,9 +194,13 @@ export default function App() {
               )}
               <button onClick={exportImage}>Exportar imagen</button>
             </div>
-            <div className="vp-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</div>
+            <div className="statusbar">
+              <span className="sb-sel">{describeSelection(project, selection) || 'Sin selección'}</span>
+              <span className="sb-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</span>
+            </div>
           </section>
           <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
+            selectedWallId={selectedWallId} onSelectWall={selectWall}
             onParams={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
             onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}

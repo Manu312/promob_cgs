@@ -5,7 +5,7 @@ const SHAPES = [['rect', 'Rectangular'], ['L', 'En L'], ['libre', 'Libre (puntos
 
 // Editor numérico del ambiente. Las formas regeneran las paredes conservando sus ids
 // (las aberturas siguen en su pared). Se reemplaza por la edición interactiva de la Fase 1.
-export default function RoomEditor({ room, onChange }) {
+export default function RoomEditor({ room, onChange, onSelectWall }) {
   const set = (patch) => onChange({ ...room, ...patch });
   const rebuild = (patch) => onChange(rebuildFromShape(room, patch));
   const walls = roomWalls(room);
@@ -65,6 +65,19 @@ export default function RoomEditor({ room, onChange }) {
       )}
       <NumField label="Alto" unit="mm" value={room.h} min={2000} max={5000} step={50} onChange={(v) => onChange(setWallDefaults(room, { h: v }))} />
       <NumField label="Espesor paredes" unit="mm" value={room.t} min={50} max={400} step={10} onChange={(v) => onChange(setWallDefaults(room, { t: v }))} />
+
+      {onSelectWall && (
+        <>
+          <h4>Paredes</h4>
+          <div className="wall-list">
+            {walls.map((w) => (
+              <button key={w.id} className={`small${w.wall.visible ? '' : ' muted'}`} onClick={() => onSelectWall(w.id)} title="Ver propiedades de la pared">
+                P{w.i + 1} · {w.len}{w.wall.visible ? '' : ' (oculta)'}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <h4>Aberturas</h4>
       {room.openings.map((o) => (

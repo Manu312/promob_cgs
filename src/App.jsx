@@ -9,6 +9,8 @@ import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
 import ModelsPanel from './ui/ModelsPanel.jsx';
 import AggregatesPanel from './ui/AggregatesPanel.jsx';
 import AutoInsertPanel from './ui/AutoInsertPanel.jsx';
+import AperturasPanel from './ui/AperturasPanel.jsx';
+import { frontsOf, invertHinge } from './domain/fronts.js';
 import { applyAuto, withAutoInsert } from './domain/autoInsert.js';
 import { setAgg } from './domain/aggregates.js';
 import { applyModel } from './domain/models.js';
@@ -64,7 +66,10 @@ export default function App() {
   // Paneles laterales (pestañas verticales a la izquierda): Lista de Módulos o Inserción Automática.
   const side = ui.side ?? (ui.listOpen ? 'lista' : null);
   const setSide = (s) => setUi((u) => ({ ...u, listOpen: undefined, side: (u.side ?? (u.listOpen ? 'lista' : null)) === s ? null : s }));
-  const tool = ['movimiento', 'modelos', 'agregados'].includes(ui.tool) ? ui.tool : 'propiedades'; // botonera Herramientas
+  const tool = ['movimiento', 'modelos', 'agregados', 'aperturas'].includes(ui.tool) ? ui.tool : 'propiedades'; // botonera Herramientas
+  // Aperturas: qué frentes están abiertos (solo de la vista: no se guarda ni va al historial).
+  const [openFronts, setOpenFronts] = useState({}); // { [moduleId]: { open: { [k]: true }, cascade } }
+  const toggleFront = (id, k) => setOpenFronts((o) => { const st = o[id] || {}; return { ...o, [id]: { open: { ...(st.open || {}), [k]: !st.open?.[k] }, cascade: false } }; });
   const setTool = (t) => setUi((u) => ({ ...u, tool: t }));
   // Traba de eje al arrastrar (teclas X / Y de Promob): 'x' o 'z'.
   const [axisLock, setAxisLock] = useState(null);
@@ -482,7 +487,8 @@ export default function App() {
                 selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
-                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower} pickRef={pickRef} ghost={ghost} />
+                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower} pickRef={pickRef} ghost={ghost}
+                openFronts={openFronts} onToggleFront={toggleFront} />
             </ErrorBoundary>
             <div className="vp-toolbar">
               {[['perspectiva', 'Perspectiva'], ['frente', 'Frente'], ['planta', 'Planta']].map(([k, l]) => (
@@ -558,6 +564,12 @@ export default function App() {
           {tool === 'agregados' && (
             <AggregatesPanel selected={selected} rules={selected ? resolveRules(selected, project) : null}
               onAgg={(id, on, qty) => selectedId && setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === selectedId ? setAgg(m, resolveRules(m, p), id, on, qty) : m)) }))} />
+          )}
+          {tool === 'aperturas' && (
+            <AperturasPanel selected={selected} built={selected ? builtById.get(selected.id) : null} state={openFronts}
+              onState={(id, st) => setOpenFronts((o) => ({ ...o, [id]: st }))}
+              onAll={(open) => setOpenFronts(open ? Object.fromEntries(built.map((b) => [b.id, { open: Object.fromEntries(frontsOf(b).map((f) => [f.k, true])) }])) : {})}
+              onInvert={(k) => selected && setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === selected.id ? invertHinge(m, builtById.get(m.id), k) : m)) }))} />
           )}
           {tool === 'modelos' && (
             <ModelsPanel project={project} settings={settings} selected={selected}

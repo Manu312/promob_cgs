@@ -428,6 +428,40 @@ try {
     await page.keyboard.press('KeyE'); await page.keyboard.press('Escape'); await sleep(200);
   }
 
+  // Aperturas (#84): abrir, cascada, doble clic, invertir bisagra
+  {
+    const ap = (await project()).modules.find((m) => m.type === 'bajo_mixto'); // visible desde la cámara (1 cajón + 2 puertas)
+    const app = await page.evaluate((id) => window.__muebles.screenOf(id, 100), ap.id);
+    await page.mouse.click(app.x, app.y); await sleep(400);
+    await clickText('.tools-item', '⇱Aperturas');
+    const nFr = await page.$$eval('.ap-diagram .ap-front', (e) => e.length);
+    check('Aperturas muestra el diagrama del frente', nFr === 3, nFr + ' frentes');
+    await clickText('.ap-tools button', 'Abrir cascada'); await sleep(500);
+    let os = await page.evaluate((id) => window.__muebles.openFronts?.[id], ap.id);
+    check('Abrir cascada abre los cajones escalonados', os?.cascade === true);
+    await shot('02d-cascada');
+    await clickText('.ap-tools button', 'Cerrar'); await sleep(300);
+    const dAl = (await project()).modules.filter((m) => m.type === 'alacena').at(-1); // frente hacia la cámara
+    // al centro hay una luz de 3 mm entre las dos puertas: se apunta a la mitad de la puerta izquierda
+    const dAlp = await page.evaluate((m) => window.__muebles.screenOfPoint(m.x + m.params.width / 4, m.z + m.params.depth + 10, m.y + m.params.height / 2), dAl);
+    await page.mouse.click(dAlp.x, dAlp.y, { clickCount: 2 }); await sleep(400);
+    os = await page.evaluate((id) => window.__muebles.openFronts?.[id], dAl.id);
+    check('Doble clic sobre una puerta en el 3D la abre', !!os && Object.values(os.open || {}).some(Boolean), JSON.stringify(os));
+    await clickText('.ap-tools button', 'Cerrar todos'); await sleep(300);
+    const al1 = (await project()).modules.find((m) => m.type === 'bajo_mixto');
+    const al1p = await page.evaluate((id) => window.__muebles.screenOf(id, 100), al1.id);
+    await page.mouse.click(al1p.x, al1p.y); await sleep(400);
+    await page.evaluate(() => [...document.querySelectorAll('.ap-diagram .ap-front')].find((g) => g.textContent === 'Puerta').dispatchEvent(new MouseEvent('click', { bubbles: true }))); await sleep(200);
+    await clickText('.ap-tools button', 'Invertir seleccionado'); await sleep(400);
+    const inv = (await project()).modules.find((m) => m.id === al1.id).params.hinges;
+    check('Invertir seleccionado cambia el lado de la bisagra', !!inv && Object.values(inv).length === 1, JSON.stringify(inv));
+    await clickText('.ap-tools button', 'Abrir todos'); await sleep(500);
+    await shot('02e-abrir-todos');
+    await clickText('.ap-tools button', 'Cerrar todos'); await sleep(300);
+    await ctrl('KeyZ');
+    await page.keyboard.press('KeyE'); await page.keyboard.press('Escape'); await sleep(200);
+  }
+
   // Arrastrar en vacío rota cámara, no deselecciona errores
   await page.mouse.move(700, 200); await page.mouse.down(); await page.mouse.move(800, 250, { steps: 8 }); await page.mouse.up();
   await sleep(300);

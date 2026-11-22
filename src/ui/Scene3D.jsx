@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { WebGLPathTracer, GradientEquirectTexture } from 'three-gpu-pathtracer';
 import { footprint, localAxes, RESIZE_HANDLES, AXIS_COLORS } from '../domain/modules.js';
 import { bounds } from '../domain/walls.js';
+import { frontTransforms } from '../domain/fronts.js';
 import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
 import { mat3d, metal, stone } from './materials3d.js';
@@ -23,9 +24,9 @@ const DRAW_BUTTONS = { LEFT: -1, MIDDLE: THREE.MOUSE.PAN, RIGHT: -1 };
 const S = 0.001; // mm → m
 const MAX_DRAG_DIST = 25; // m: más lejos, el plano de arrastre está casi de canto a la cámara
 
-function PartMesh({ p, material }) {
+function PartMesh({ p, material, onDoubleClick }) {
   return (
-    <mesh position={[(p.x + p.sx / 2) * S, (p.y + p.sy / 2) * S, (p.z + p.sz / 2) * S]} rotation={[0, p.ry || 0, 0]} material={material} castShadow receiveShadow>
+    <mesh position={[(p.x + p.sx / 2) * S, (p.y + p.sy / 2) * S, (p.z + p.sz / 2) * S]} rotation={[0, p.ry || 0, 0]} material={material} castShadow receiveShadow onDoubleClick={onDoubleClick}>
       <boxGeometry args={[p.sx * S, p.sy * S, p.sz * S]} />
     </mesh>
   );
@@ -88,15 +89,28 @@ function ResizeHandles({ W, H, D, planta, onDown }) {
     ));
 }
 
-function ModuleObject({ mod, b, selected, showSel, onDown, onMenu, onResizeDown, planta }) {
+// Frente abierto: la puerta gira sobre su bisagra; el cajón sale hacia adelante.
+function FrontMove({ T, children }) {
+  if (!T) return children;
+  if (T.type === 'drawer') return <group position={[0, 0, T.dz * S]}>{children}</group>;
+  return (
+    <group position={[T.px * S, 0, T.pz * S]} rotation={[0, T.angle, 0]}>
+      <group position={[-T.px * S, 0, -T.pz * S]}>{children}</group>
+    </group>
+  );
+}
+
+function ModuleObject({ mod, b, selected, showSel, onDown, onMenu, onResizeDown, planta, openState, onToggleFront }) {
   const { fw, fd } = footprint(mod);
   const W = mod.params.width, D = mod.params.depth, H = mod.params.height;
+  const tfm = useMemo(() => frontTransforms(b, openState, D), [b, openState, D]);
+  const dbl = (p) => (p.front != null && onToggleFront ? (e) => { e.stopPropagation(); onToggleFront(mod.id, p.front); } : undefined);
   return (
     <group position={[(mod.x + fw / 2) * S, (mod.y || 0) * S, (mod.z + fd / 2) * S]} rotation={[0, ((mod.rot || 0) * Math.PI) / 180, 0]} onPointerDown={(e) => onDown(e, mod)}
       onContextMenu={onMenu ? (e) => onMenu(e, mod) : undefined}>
       <group position={[(-W / 2) * S, 0, (-D / 2) * S]}>
-        {b.parts.map((p, i) => <PartMesh key={i} p={p} material={mat3d(b.mats[p.slot])} />)}
-        {b.decors.map((d, i) => <DecorMesh key={'d' + i} d={d} stoneMat={b.mats.tapas ? mat3d(b.mats.tapas) : null} />)}
+        {b.parts.map((p, i) => <FrontMove key={i} T={p.front != null ? tfm.get(p.front) : null}><PartMesh p={p} material={mat3d(b.mats[p.slot])} onDoubleClick={dbl(p)} /></FrontMove>)}
+        {b.decors.map((d, i) => <FrontMove key={'d' + i} T={d.front != null ? tfm.get(d.front) : null}><DecorMesh d={d} stoneMat={b.mats.tapas ? mat3d(b.mats.tapas) : null} /></FrontMove>)}
       </group>
       {selected && showSel && <SelBox w={W} h={H} d={D} />}
       {selected && showSel && onResizeDown && <ResizeHandles W={W} H={H} D={D} planta={planta} onDown={(e, k) => onResizeDown(e, mod, k)} />}
@@ -236,7 +250,7 @@ function GhostBox({ mod }) {
 }
 
 // Solo en desarrollo: permite a los tests e2e ubicar módulos, paredes y vértices en pantalla.
-function DevProbe({ project, origin }) {
+function DevProbe({ project, origin, openFronts }) {
   const { camera, gl, scene } = useThree();
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -249,6 +263,7 @@ function DevProbe({ project, origin }) {
       cameraType: camera.type,
       planImageShown: !!scene.getObjectByName('planImage'),
       ghostShown: !!scene.getObjectByName('insertGhost'),
+      openFronts,
       screenOf(id, dy = 0) {
         const m = project.modules.find((o) => o.id === id);
         if (!m) return null;
@@ -374,7 +389,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true, pickRef, ghost }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const dragRef = useRef(null);
@@ -529,6 +544,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
           if (!b || m.hidden) return null; // oculto desde la Lista de módulos
           return <ModuleObject key={m.id} mod={m} b={b} selected={m.id === selectedId} showSel={!renderMode} onDown={onDown}
             onMenu={renderMode || drawing || annotating ? null : onModuleMenu}
+            openState={openFronts[m.id]} onToggleFront={renderMode ? null : onToggleFront}
             onResizeDown={onResize ? onResizeDown : null} planta={planta} />;
         })}
       </group>
@@ -539,7 +555,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       <CameraRig view={view} room={room} controlsRef={controlsRef} />
       {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
       <Capturer captureRef={captureRef} photoreal={photoreal} />
-      <DevProbe project={project} origin={origin} />
+      <DevProbe project={project} origin={origin} openFronts={openFronts} />
       {pickRef && <Picker pickRef={pickRef} origin={origin} />}
       <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
     </Canvas>

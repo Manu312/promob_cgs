@@ -13,8 +13,9 @@ export function ToolsNav({ tool, onTool }) {
   );
   return (
     <nav className="tools-nav">
-      <div className="tools-title">Herramientas · {{ movimiento: 'Movimiento', modelos: 'Modelos', agregados: 'Agregados' }[tool] || 'Propiedades'}</div>
+      <div className="tools-title">Herramientas · {{ movimiento: 'Movimiento', modelos: 'Modelos', agregados: 'Agregados', aperturas: 'Aperturas' }[tool] || 'Propiedades'}</div>
       {item('agregados', 'Agregados', '⊕')}
+      {item('aperturas', 'Aperturas', '⇱')}
       {item('modelos', 'Modelos', '▦')}
       {item('movimiento', 'Movimiento', '✥')}
       {item('propiedades', 'Propiedades', '☰')}

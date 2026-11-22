@@ -10,6 +10,9 @@ import { CotaLabel } from './Cotas.jsx';
 const S = 0.001;
 const wallMat = new THREE.MeshStandardMaterial({ color: '#eeebe5', roughness: 0.95 });
 const wallSelMat = new THREE.MeshStandardMaterial({ color: '#bcd3f7', roughness: 0.9, emissive: '#1d4ed8', emissiveIntensity: 0.08 });
+// Pared transparente: se ve translúcida y deja ver los módulos (como "Transparente" en Promob).
+const wallTransMat = new THREE.MeshStandardMaterial({ color: '#eeebe5', roughness: 0.95, transparent: true, opacity: 0.22, depthWrite: false });
+const wallSelTransMat = new THREE.MeshStandardMaterial({ color: '#bcd3f7', roughness: 0.9, transparent: true, opacity: 0.35, depthWrite: false });
 const floorMat = new THREE.MeshStandardMaterial({ color: '#d8d1c4', roughness: 0.9 });
 const frameMat = new THREE.MeshStandardMaterial({ color: '#f7f7f5', roughness: 0.5 });
 const glassMat = new THREE.MeshStandardMaterial({ color: '#cfe6f3', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.28 });
@@ -65,7 +68,7 @@ function SlopedWall({ len, h0, h1, T, zc, openings, material }) {
 
 export const LOWERED_H = 100; // alto de una pared rebajada (mm)
 
-function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDown }) {
+function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDown, onMenu }) {
   const ref = useRef();
   const W = w.wall;
   const T = w.t;
@@ -73,7 +76,7 @@ function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDow
   const h0 = (W.lowered ? LOWERED_H : W.h0) - gap, h1 = (W.lowered ? LOWERED_H : W.h1) - gap;
   const H = Math.max(h0, h1);
   const ops = W.lowered ? [] : openings;
-  const mat = selected ? wallSelMat : wallMat;
+  const mat = W.transparent ? (selected ? wallSelTransMat : wallTransMat) : (selected ? wallSelMat : wallMat);
   const theta = Math.atan2(-w.u[1], w.u[0]);
   // Eje z local del grupo rotado = (-uz, ux). El espesor va hacia el lado de la normal exterior.
   const outSign = w.n[0] * -w.u[1] + w.n[1] * w.u[0];
@@ -94,7 +97,8 @@ function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDow
     onWallDown(e, w);
   };
   return (
-    <group ref={ref} position={[w.a[0] * S, gap * S, w.a[1] * S]} rotation={[0, theta, 0]} onPointerDown={onDown}>
+    <group ref={ref} position={[w.a[0] * S, gap * S, w.a[1] * S]} rotation={[0, theta, 0]} onPointerDown={onDown}
+      onContextMenu={(e) => { if (!onMenu || !ref.current?.visible) return; e.stopPropagation(); onMenu(e, w); }}>
       {sloped
         ? <SlopedWall len={w.len} h0={h0} h1={h1} T={T} zc={zc} openings={ops} material={mat} />
         : pieces.map((p, i) => (
@@ -111,7 +115,7 @@ function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDow
   );
 }
 
-export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown }) {
+export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu }) {
   const walls = useMemo(() => roomWalls(room).filter((w) => w.wall.visible), [room]);
   // Esquina de cada pared: la pared que llega a su vértice de inicio.
   const incomingOf = useMemo(() => new Map(wallCorners(room).map((c) => [c.outgoing.id, c.incoming])), [room]);
@@ -127,7 +131,7 @@ export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDo
       {walls.map((w) => (
         <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} origin={origin}
           openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide}
-          selected={w.id === selectedWallId} onDown={onWallDown} />
+          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu} />
       ))}
       {room.columns.map((c) => (
         <Box key={c.id} c={[(c.x + c.w / 2) * S, (H / 2) * S, (c.z + c.d / 2) * S]} s={[c.w * S, H * S, c.d * S]} m={wallMat} />

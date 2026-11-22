@@ -27,9 +27,9 @@ function MatSelect({ label, value, settings, onChange, allowInherit }) {
   return <SelField label={label} value={value || ''} onChange={(v) => onChange(v || undefined)} options={opts} />;
 }
 
-export default function Inspector({ project, settings, selected, selectedWallId, onSelectWall, onDrawWalls, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onProject }) {
+export default function Inspector({ project, settings, selected, selectedWallId, onSelectWall, onDrawWalls, onDeleteWall, onSplitWall, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onProject }) {
   if (selectedWallId && project.room.walls.some((w) => w.id === selectedWallId)) {
-    return <WallPanel room={project.room} wallId={selectedWallId} onBack={() => onSelectWall(null)}
+    return <WallPanel room={project.room} wallId={selectedWallId} onBack={() => onSelectWall(null)} onDelete={onDeleteWall} onSplit={onSplitWall}
       onRoom={(fn) => onProject((p) => ({ ...p, room: fn(p.room) }))} />;
   }
   if (!selected) {

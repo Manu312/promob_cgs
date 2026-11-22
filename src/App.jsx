@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
 import { newModule, footprint, snapPosition, resizeModule, uid } from './domain/modules.js';
-import { moveWall, moveNode, setWallLength } from './domain/wallEdit.js';
+import { moveWall, moveNode, setWallLength, updateWall, splitWall, deleteWalls } from './domain/wallEdit.js';
+import { WallContextMenu, WallDeleteDialog } from './ui/WallMenus.jsx';
 import { applyDimEdit } from './domain/dimensions.js';
 import { addWall, segmentEnd } from './domain/drawWalls.js';
 import { absAngle } from './domain/walls.js';
@@ -154,6 +155,30 @@ export default function App() {
     commitWall({ point: segmentEnd(from, len, abs) });
   };
 
+  // Menú contextual y eliminación de paredes. Cada acción es un paso de deshacer.
+  const [wallMenu, setWallMenu] = useState(null); // { wallId, offset, x, y }
+  const [deleteDlg, setDeleteDlg] = useState(null); // { wallId }
+  const onWallContext = (m) => { selectWall(m.wallId); setWallMenu(m); };
+  const doSplit = (wallId, offset) => {
+    const res = splitWall(projectRef.current.room, wallId, offset);
+    if (res.newWallId) setProject((p) => ({ ...p, room: res.room }));
+  };
+  const wallAction = (action) => {
+    const { wallId, offset } = wallMenu;
+    setWallMenu(null);
+    const w = projectRef.current.room.walls.find((x) => x.id === wallId);
+    if (!w) return;
+    if (action === 'lowered' || action === 'transparent') setProject((p) => ({ ...p, room: updateWall(p.room, wallId, { [action]: !w[action] }) }));
+    else if (action === 'split') doSplit(wallId, offset);
+    else if (action === 'delete') setDeleteDlg({ wallId });
+  };
+  const confirmDelete = (mode, withModules) => {
+    const { room, removedModuleIds } = deleteWalls(projectRef.current.room, deleteDlg.wallId, mode, projectRef.current.modules, { withModules });
+    setProject((p) => ({ ...p, room, modules: p.modules.filter((m) => !removedModuleIds.includes(m.id)) }));
+    setDeleteDlg(null);
+    setSelection(null);
+  };
+
   const addModule = (type) => {
     const m = newModule(type, project);
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));
@@ -190,6 +215,7 @@ export default function App() {
         return;
       }
       if (e.key === 'Escape') setSelectedId(null);
+      if (selectedWallId && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); setDeleteDlg({ wallId: selectedWallId }); return; }
       if (!selectedId) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); }
       else if (e.key === 'r' || e.key === 'R') rotateSelected();
@@ -248,6 +274,7 @@ export default function App() {
                 onDimEdit={onDimEdit} onWallLength={onWallLength}
                 onDragStart={onDragStart} onDragEnd={history.commit}
                 drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
+                onWallContext={onWallContext}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoHideWalls} />
             </ErrorBoundary>
@@ -290,6 +317,8 @@ export default function App() {
                 onCommit={commitTyped} onCancel={stopDrawWalls}
                 onClose={(yes) => (yes ? commitWall({ nodeId: drawing.chainStartId }) : setDrawing({ ...drawing, confirmClose: false }))} />
             )}
+            {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}
+            {deleteDlg && <WallDeleteDialog label={`Pared ${project.room.walls.findIndex((w) => w.id === deleteDlg.wallId) + 1}`} onConfirm={confirmDelete} onCancel={() => setDeleteDlg(null)} />}
             <div className="statusbar">
               <span className="sb-sel">{describeSelection(project, selection) || 'Sin selección'}</span>
               <span className="sb-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</span>
@@ -297,6 +326,7 @@ export default function App() {
           </section>
           <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
             selectedWallId={selectedWallId} onSelectWall={selectWall} onDrawWalls={startDrawWalls}
+            onDeleteWall={(id) => setDeleteDlg({ wallId: id })} onSplitWall={doSplit}
             onParams={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
             onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}

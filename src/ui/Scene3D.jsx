@@ -236,47 +236,64 @@ function NodeHandles({ room, onNodeDown }) {
   ));
 }
 
-// Arrastre en el plano horizontal: módulos (posición), paredes (desplazamiento sobre
-// su normal, redondeado al paso) y vértices (posición redondeada al paso).
-function DragController({ drag, setDrag, onMove, onMoveWall, onMoveNode, onResize, onDragEnd, controlsRef, origin }) {
+// Arrastre: módulos (posición), paredes (desplazamiento sobre su normal), vértices y
+// flechas de redimensionar. Los listeners están siempre registrados y el arrastre vive en
+// una ref que se carga en el mismo pointerdown: si se registraran al empezar (en un efecto),
+// un clic rápido soltaría el botón antes y el arrastre quedaría "pegado" al mouse.
+function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onResize, onDragEnd, controlsRef, origin }) {
   const { camera, gl } = useThree();
+  const live = useRef();
+  live.current = { camera, gl, onMove, onMoveWall, onMoveNode, onResize, onDragEnd, origin };
   useEffect(() => {
-    if (!drag) return;
-    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -drag.planeY);
-    if (drag.vertical) { // flecha de alto: plano vertical de frente a la cámara
-      const n = new THREE.Vector3();
-      camera.getWorldDirection(n);
-      n.y = 0;
-      if (n.lengthSq() < 1e-6) n.set(0, 0, 1);
-      plane.setFromNormalAndCoplanarPoint(n.normalize(), drag.p0);
-    }
     const ray = new THREE.Raycaster();
     const v = new THREE.Vector2();
     const pt = new THREE.Vector3();
-    const snap = (val) => Math.round(val / drag.step) * drag.step;
+    const planeOf = (drag, cam) => {
+      if (drag.plane) return drag.plane;
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -drag.planeY);
+      if (drag.vertical) { // flecha de alto: plano vertical de frente a la cámara
+        const n = new THREE.Vector3();
+        cam.getWorldDirection(n);
+        n.y = 0;
+        if (n.lengthSq() < 1e-6) n.set(0, 0, 1);
+        plane.setFromNormalAndCoplanarPoint(n.normalize(), drag.p0);
+      }
+      drag.plane = plane;
+      return plane;
+    };
     const move = (ev) => {
-      const r = gl.domElement.getBoundingClientRect();
+      const drag = dragRef.current;
+      if (!drag) return;
+      const { camera: cam, gl: g, origin: o, ...cb } = live.current;
+      const r = g.domElement.getBoundingClientRect();
       v.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
-      ray.setFromCamera(v, camera);
-      if (!ray.ray.intersectPlane(plane, pt)) return;
-      const rx = pt.x / S + origin.x, rz = pt.z / S + origin.z;
+      ray.setFromCamera(v, cam);
+      if (!ray.ray.intersectPlane(planeOf(drag, cam), pt)) return;
+      const snap = (val) => Math.round(val / drag.step) * drag.step;
+      const rx = pt.x / S + o.x, rz = pt.z / S + o.z;
       if (drag.kind === 'resize') {
         const delta = drag.vertical ? (pt.y - drag.p0.y) / S : (rx - drag.sx) * drag.dir[0] + (rz - drag.sz) * drag.dir[1];
-        onResize(drag.start, drag.handle, snap(delta));
+        cb.onResize(drag.start, drag.handle, snap(delta));
       } else if (drag.kind === 'wall') {
         const q = snap((rx - drag.sx) * drag.n[0] + (rz - drag.sz) * drag.n[1]);
-        onMoveWall(drag.id, drag.n[0] * q, drag.n[1] * q);
+        cb.onMoveWall(drag.id, drag.n[0] * q, drag.n[1] * q);
       } else if (drag.kind === 'node') {
-        onMoveNode(drag.id, snap(rx + drag.offX), snap(rz + drag.offZ));
+        cb.onMoveNode(drag.id, snap(rx + drag.offX), snap(rz + drag.offZ));
       } else {
-        onMove(drag.id, rx - drag.offX, rz - drag.offZ);
+        cb.onMove(drag.id, rx - drag.offX, rz - drag.offZ);
       }
     };
-    const up = () => { setDrag(null); onDragEnd?.(); if (controlsRef.current) controlsRef.current.enabled = true; };
+    const up = () => {
+      if (!dragRef.current) return;
+      dragRef.current = null;
+      setDrag(null);
+      live.current.onDragEnd?.();
+      if (controlsRef.current) controlsRef.current.enabled = true;
+    };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-  }, [drag, camera, gl, onMove, onMoveWall, onMoveNode, onResize, onDragEnd, setDrag, controlsRef, origin]);
+  }, [dragRef, setDrag, controlsRef]);
   return null;
 }
 
@@ -286,9 +303,10 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallContext, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
+  const dragRef = useRef(null);
   const { room } = project;
   const planta = view.name === 'planta';
   const selectedMod = project.modules.find((m) => m.id === selectedId) || null;
@@ -299,8 +317,10 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
   useEffect(() => setOrigin(roomCenter(room)), [view.tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const toRoom = (p) => [p.x / S + origin.x, p.z / S + origin.z];
 
+  const leftButton = (e) => (e.nativeEvent?.button ?? 0) === 0; // los arrastres son con el botón izquierdo
   const startDrag = (d) => {
     onDragStart?.(); // el arrastre completo es un solo paso de deshacer
+    dragRef.current = d;
     setDrag(d);
     if (controlsRef.current) controlsRef.current.enabled = false;
   };
@@ -318,20 +338,26 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
     e.stopPropagation();
     if (handleHit(e)) return;
     onSelect(mod.id);
+    if (!leftButton(e)) return;
     const [rx, rz] = toRoom(e.point);
     startDrag({ kind: 'module', id: mod.id, planeY: e.point.y, offX: rx - mod.x, offZ: rz - mod.z });
+  };
+  // Clic derecho en una pared: menú contextual en la posición del mouse (offset = punto sobre la pared).
+  const onWallMenu = (e, g) => {
+    const [rx, rz] = toRoom(e.point);
+    onWallContext?.({ wallId: g.id, offset: (rx - g.a[0]) * g.u[0] + (rz - g.a[1]) * g.u[1], x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
   };
   // Pared: se selecciona siempre; se arrastra en Planta, o en 3D si es movible.
   const onWallDown = (e, g) => {
     if (renderMode) return;
     if (handleHit(e)) return;
     onSelectWall(g.id);
-    if (!(planta || g.wall.movable)) return;
+    if (!leftButton(e) || !(planta || g.wall.movable)) return;
     const [rx, rz] = toRoom(e.point);
     startDrag({ kind: 'wall', id: g.id, planeY: e.point.y, sx: rx, sz: rz, n: g.n, step });
   };
   const onNodeDown = (e, n) => {
-    if (renderMode) return;
+    if (renderMode || !leftButton(e)) return;
     e.stopPropagation();
     const [rx, rz] = toRoom(e.point);
     startDrag({ kind: 'node', id: n.id, planeY: e.point.y, offX: n.x - rx, offZ: n.z - rz, step });
@@ -339,7 +365,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
   // Flecha de redimensionar: el arrastre se mide sobre el eje de la flecha (en el mundo),
   // siempre desde el módulo como estaba al empezar.
   function onResizeDown(e, mod, handle, point = e.point) {
-    if (renderMode) return;
+    if (renderMode || !leftButton(e)) return;
     e.stopPropagation();
     const h = RESIZE_HANDLES[handle];
     if (h.axis === 'y') return startDrag({ kind: 'resize', id: mod.id, handle, start: mod, vertical: true, p0: point.clone(), planeY: 0, step });
@@ -355,8 +381,8 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       dpr={renderMode ? [1, 2] : [1, 1.5]}
       gl={{ preserveDrawingBuffer: true, antialias: true }}
       camera={{ fov: 45, near: 0.05, far: 100, position: [1.6, 2.3, 4] }}
-      onPointerMissed={() => !drag && !drawing && onSelect(null)}
-      onContextMenu={(e) => drawing && e.preventDefault()}
+      onPointerMissed={() => !dragRef.current && !drawing && onSelect(null)}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <color attach="background" args={[renderMode ? '#e7e3dc' : '#f3f4f6']} />
       <ambientLight intensity={renderMode ? 0.25 : 0.6} />
@@ -384,7 +410,8 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
         </Environment>
       )}
       <group position={[-origin.x * S, 0, -origin.z * S]}>
-        <Room3D room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown} />
+        <Room3D room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown}
+          onWallMenu={renderMode || drawing ? null : onWallMenu} />
         {planta && !renderMode && <PlanGrid room={room} />}
         {planta && !renderMode && !drawing && <NodeHandles room={room} onNodeDown={onNodeDown} />}
         {planta && !renderMode && drawing && <DrawTool room={room} draw={drawing} origin={origin} cursorRef={drawCursorRef} onPoint={onDrawPoint} onFinish={onDrawFinish} />}
@@ -405,7 +432,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
       <Capturer captureRef={captureRef} photoreal={photoreal} />
       <DevProbe project={project} origin={origin} />
-      <DragController drag={drag} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
+      <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
     </Canvas>
   );
 }

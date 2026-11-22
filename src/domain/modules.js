@@ -46,11 +46,14 @@ export const PARAM_DEFS = {
   handlePos: { label: 'Manijas', type: 'sel', options: [['top', 'Arriba'], ['middle', 'Medio'], ['bottom', 'Abajo'], ['none', 'Sin manijas']] },
   mesada: { label: 'Mesada', type: 'sel', options: [['no', 'No'], ['si', 'Sí']] },
   mesadaT: { label: 'Espesor mesada', type: 'num', min: 10, max: 60, step: 1, unit: 'mm' },
-  mesadaOver: { label: 'Vuelo frontal mesada', type: 'num', min: 0, max: 100, step: 5, unit: 'mm' },
+  mesadaOver: { label: 'Vuelo frontal mesada', type: 'num', min: 0, max: 400, step: 5, unit: 'mm' },
+  nicheH: { label: 'Hueco p/ electrodoméstico (alto)', type: 'num', min: 0, max: 2200, step: 10, unit: 'mm' },
+  nicheY: { label: 'Hueco: altura desde abajo', type: 'num', min: 0, max: 2200, step: 10, unit: 'mm' },
+  bachas: { label: 'Bachas', type: 'num', min: 0, max: 2, step: 1 },
 };
 
-const CAJA_FIELDS = ['width', 'height', 'depth', 'plinth', 'top', 'dividers', 'shelves', 'interior', 'doorType', 'doors', 'drawers', 'drawerH', 'handlePos', 'mesada', 'mesadaT', 'mesadaOver'];
-const caja = (d) => ({ top: 'techo', dividers: 1, shelves: 1, interior: 'estantes', doorType: 'batientes', doors: 2, drawers: 0, drawerH: 180, handlePos: 'top', plinth: 0, mesada: 'no', mesadaT: 20, mesadaOver: 20, ...d });
+const CAJA_FIELDS = ['width', 'height', 'depth', 'plinth', 'top', 'dividers', 'shelves', 'interior', 'doorType', 'doors', 'drawers', 'drawerH', 'handlePos', 'mesada', 'mesadaT', 'mesadaOver', 'nicheH', 'nicheY'];
+const caja = (d) => ({ top: 'techo', dividers: 1, shelves: 1, interior: 'estantes', doorType: 'batientes', doors: 2, drawers: 0, drawerH: 180, handlePos: 'top', plinth: 0, mesada: 'no', mesadaT: 20, mesadaOver: 20, nicheH: 0, nicheY: 0, ...d });
 const conMesada = (d) => caja({ mesada: 'si', ...d });
 
 export const MODULE_TYPES = {
@@ -76,11 +79,22 @@ export const MODULE_TYPES = {
   cajonera: { label: 'Cajonera', cat: 'Oficina', kind: 'caja', y: 0, defaults: caja({ width: 400, height: 600, depth: 500, doors: 0, drawers: 3, shelves: 0, handlePos: 'middle' }) },
   biblioteca: { label: 'Biblioteca abierta', cat: 'Oficina', kind: 'caja', y: 0, defaults: caja({ width: 900, height: 1800, depth: 350, doorType: 'ninguna', doors: 0, shelves: 4, handlePos: 'none' }) },
   armario: { label: 'Armario de oficina', cat: 'Oficina', kind: 'caja', y: 0, defaults: caja({ width: 900, height: 1800, depth: 450, plinth: 80, doors: 2, shelves: 4, handlePos: 'middle' }) },
+  // Módulos para electrodomésticos: hueco libre (sin frentes) del alto del aparato.
+  bajo_horno: { label: 'Bajo p/ horno empotrable', cat: 'Cocina', kind: 'caja', y: 0, defaults: conMesada({ width: 600, height: 870, depth: 560, plinth: 150, top: 'travesanos', doors: 0, drawers: 1, shelves: 0, nicheH: 590, nicheY: 120, handlePos: 'middle' }) },
+  torre_horno: { label: 'Torre p/ horno y microondas', cat: 'Cocina', kind: 'caja', y: 0, defaults: caja({ width: 600, height: 2150, depth: 560, plinth: 150, doors: 1, drawers: 2, shelves: 1, nicheH: 980, nicheY: 520, handlePos: 'middle' }) },
+  torre_heladera: { label: 'Torre p/ heladera', cat: 'Cocina', kind: 'caja', y: 0, defaults: caja({ width: 800, height: 2150, depth: 600, plinth: 0, doors: 2, drawers: 0, shelves: 0, nicheH: 1800, nicheY: 0, handlePos: 'bottom' }) },
+  alacena_micro: { label: 'Alacena p/ microondas', cat: 'Cocina', kind: 'caja', y: 1300, defaults: caja({ width: 600, height: 850, depth: 380, doors: 2, shelves: 0, nicheH: 400, nicheY: 0, handlePos: 'bottom' }) },
+  // Piezas sueltas: tapa (mesada de piedra, con hueco de bacha), vista (panel lateral) y estante.
+  tapa: { label: 'Tapa / mesada', cat: 'Cocina', kind: 'tapa', y: 870, rest: true, defaults: { width: 1200, height: 20, depth: 600, mesadaT: 20, bachas: 0 } },
+  vista: { label: 'Vista (panel lateral)', cat: 'Cocina', kind: 'vista', y: 0, defaults: { width: 18, height: 870, depth: 580 } },
+  estante: { label: 'Estante', cat: 'Cocina', kind: 'estante', y: 1500, defaults: { width: 800, height: 18, depth: 250 } },
   mostrador: { label: 'Mostrador', cat: 'Oficina', kind: 'caja', y: 0, defaults: caja({ width: 1500, height: 1050, depth: 500, plinth: 100, dividers: 2, doorType: 'ninguna', doors: 0, shelves: 1, handlePos: 'none' }) },
 };
 
+const KIND_FIELDS = { escritorio: ['width', 'height', 'depth'], tapa: ['width', 'depth', 'mesadaT', 'bachas'], vista: ['height', 'depth'], estante: ['width', 'depth'] };
+
 export function fieldsFor(type) {
-  return MODULE_TYPES[type]?.kind === 'escritorio' ? ['width', 'height', 'depth'] : CAJA_FIELDS;
+  return KIND_FIELDS[MODULE_TYPES[type]?.kind] || CAJA_FIELDS;
 }
 
 export const hingesFor = (h) => (h <= 900 ? 2 : h <= 1600 ? 3 : h <= 2000 ? 4 : 5);
@@ -157,7 +171,37 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {} }) {
     : { x0: G / 2, x1: W - G / 2, y0: y0 + G / 2, y1: yTop - G / 2 };
   const fronts = [];
   let shelfTop = yIn1;
-  if (nDrawers > 0 || nDoors > 0) {
+  // Hueco libre para un electrodoméstico (horno, microondas, heladera): sin frentes, con
+  // divisores fijos arriba y abajo. Debajo van cajones (o puertas si no hay cajones); arriba, puertas.
+  const nicheH = n === 1 && !sliding ? Math.min(p.nicheH || 0, yIn1 - yIn0) : 0;
+  if (nicheH > 0) {
+    const nb = Math.min(yIn0 + (p.nicheY || 0), yIn1 - nicheH); // piso del hueco
+    const nt = nb + nicheH; // techo del hueco
+    if (nb > yIn0 + 1) parts.push(part('Divisor horizontal', 'cuerpo', t, nb - t, zIn, iw, t, dIn - dFront, { x: 1 }));
+    if (nt < yIn1 - 1) parts.push(part('Divisor horizontal', 'cuerpo', t, nt, zIn, iw, t, dIn - dFront, { x: 1 }));
+    const fw = zone.x1 - zone.x0;
+    const stack = (y0z, y1z, kind, count) => {
+      const h = y1z - y0z;
+      if (h < 80 || count < 1) return;
+      if (kind === 'drawer') {
+        const fh = (h - (count - 1) * G) / count;
+        for (let j = 0; j < count; j++) fronts.push({ kind: 'drawer', x: zone.x0, y: y1z - (j + 1) * fh - j * G, w: fw, h: fh });
+      } else {
+        const dw = (fw - (count - 1) * G) / count;
+        for (let i = 0; i < count; i++) fronts.push({ kind: 'door', x: zone.x0 + i * (dw + G), y: y0z, w: dw, h, idx: i, n: count });
+      }
+    };
+    const below = [zone.y0, nb - t - G / 2], above = [nt + t + G / 2, zone.y1];
+    if (nDrawers > 0) stack(below[0], below[1], 'drawer', nDrawers); else stack(below[0], below[1], 'door', nDoors);
+    stack(above[0], above[1], 'door', nDoors);
+    shelfTop = null;
+    // estantes solo en la parte de arriba (alacena sobre el hueco)
+    const s = Math.round(p.shelves);
+    for (let k = 1; k <= s && yIn1 - nt > 300; k++) {
+      parts.push(part('Estante', 'cuerpo', t + 1, nt + (k * (yIn1 - nt)) / (s + 1) - t / 2, zInt, iw - 2, t, D - zInt - dFront - 20, { x: 1 }));
+      add('soporte_estante', 4);
+    }
+  } else if (nDrawers > 0 || nDoors > 0) {
     let top = zone.y1;
     const bottom = zone.y0, fw = zone.x1 - zone.x0;
     if (nDrawers > 0 && nDoors === 0) {
@@ -268,13 +312,46 @@ function buildEscritorio(raw, { t }) {
   return { parts, decors: [], hardware: { kit_armado: 1 } };
 }
 
+// Tapa / mesada de piedra (se compra aparte: va al presupuesto por m², no al despiece),
+// con 0, 1 o 2 huecos de bacha.
+function buildTapa(raw) {
+  const p = sanitize(raw);
+  const W = p.width, D = p.depth, T = p.mesadaT;
+  const decors = [decor('mesada', 0, 0, 0, W, T, D)];
+  const nb = Math.round(p.bachas || 0);
+  for (let i = 0; i < nb; i++) {
+    const bw = Math.min(500, (W - 100 * (nb + 1)) / nb), bd = Math.min(400, D - 160);
+    if (bw < 200 || bd < 200) break;
+    const cx = (W * (i + 1)) / (nb + 1);
+    decors.push(decor('bacha', cx - bw / 2, -180, (D - bd) / 2, bw, 180 + T + 1, bd));
+  }
+  return { parts: [], decors, hardware: { mesada: Math.round((W * D) / 1e4) / 100, ...(nb ? { bacha: nb } : {}) } };
+}
+
+// Vista: panel lateral suelto del material de los frentes.
+function buildVista(raw, { tf }) {
+  const p = sanitize(raw);
+  return { parts: [part('Vista', 'frente', 0, 0, 0, tf, p.height, p.depth, { y: 2, z: 1 })], decors: [], hardware: {} };
+}
+
+// Estante suelto (de pared): una placa con canto al frente y dos soportes.
+function buildEstante(raw, { t }) {
+  const p = sanitize(raw);
+  return { parts: [part('Estante', 'cuerpo', 0, 0, 0, p.width, t, p.depth, { x: 1 })], decors: [], hardware: { soporte_estante: 2 } };
+}
+
+const BUILDERS = { escritorio: buildEscritorio, tapa: buildTapa, vista: buildVista, estante: buildEstante };
+
 export function buildModule(mod, ctx) {
   const def = MODULE_TYPES[mod.type];
   if (!def) return { parts: [], decors: [], hardware: {} };
-  return def.kind === 'escritorio' ? buildEscritorio(mod.params, ctx) : buildCaja(mod.params, ctx);
+  return (BUILDERS[def.kind] || buildCaja)(mod.params, ctx);
 }
 
 // ---- Ubicación en el ambiente ----
+
+// Nombre que se muestra: el del ítem del catálogo (p. ej. "Tapa p/ 2 bachas") o el del tipo.
+export const moduleName = (m) => m.name || MODULE_TYPES[m.type]?.label || m.type;
 
 export const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -356,11 +433,11 @@ export function snapPosition(mod, others, room, thr = 40, step = 10) {
 }
 
 // Módulo nuevo: a continuación de la fila apoyada en la pared del fondo (la de menor z).
-export function newModule(type, project, params = null) {
+export function newModule(type, project, params = null, y = null) {
   const def = MODULE_TYPES[type];
   const { room } = project;
   const b = room.nodes?.length ? bounds(room) : { minX: 0, minZ: 0, maxX: room.w, maxZ: room.d };
-  const m = { id: uid(), type, params: { ...def.defaults, ...(params || {}) }, x: b.minX, z: b.minZ, y: def.y || 0, rot: 0, mats: {} };
+  const m = { id: uid(), type, params: { ...def.defaults, ...(params || {}) }, x: b.minX, z: b.minZ, y: y ?? def.y ?? 0, rot: 0, mats: {}, ...(def.rest ? { rest: true } : {}) };
   const high = m.y >= 1000;
   const row = project.modules.filter((o) => (o.rot || 0) === 0 && o.z <= b.minZ + 10 && (o.y >= 1000) === high);
   const x = row.reduce((acc, o) => Math.max(acc, o.x + footprint(o).fw), b.minX);

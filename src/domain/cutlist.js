@@ -1,4 +1,4 @@
-import { buildModule, MODULE_TYPES, DEFAULT_RULES } from './modules.js';
+import { buildModule, moduleName, DEFAULT_RULES } from './modules.js';
 import { matById } from './catalog.js';
 
 const clean = (o) => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== undefined && v !== ''));
@@ -21,7 +21,7 @@ export function buildAll(project, settings) {
   return project.modules.map((mod, i) => {
     const mats = resolveMats(mod, project, settings);
     const b = buildModule(mod, { t: mats.cuerpo.t, tf: mats.frente.t, tb: mats.fondo.t, tc: mats.cajon.t, rules: resolveRules(mod, project) });
-    return { id: mod.id, tag: `M${i + 1}`, label: MODULE_TYPES[mod.type]?.label || mod.type, mats, ...b };
+    return { id: mod.id, tag: `M${i + 1}`, label: moduleName(mod), mats, ...b };
   });
 }
 

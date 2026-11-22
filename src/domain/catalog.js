@@ -20,6 +20,7 @@ export const DEFAULT_HARDWARE = [
   { code: 'kit_corrediza', name: 'Kit puerta corrediza (por hoja)', unit: 'u', price: 25000 },
   { code: 'kit_armado', name: 'Kit armado por módulo (minifix, tarugos, tornillos)', unit: 'u', price: 4000 },
   { code: 'mesada', name: 'Mesada (granito / cuarzo)', unit: 'm²', price: 150000 },
+  { code: 'bacha', name: 'Bacha de acero inoxidable', unit: 'u', price: 85000 },
 ];
 
 export const DEFAULT_SETTINGS = {

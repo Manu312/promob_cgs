@@ -126,6 +126,24 @@ try {
   check('Al soltar inserta contra la pared del fondo', p.modules.length === nBefore + 1 && dropped.type === 'bajo_cajones' && dropped.z === 0 && dropped.rot === 0 && !(await page.evaluate(() => window.__muebles.ghostShown)), '(' + dropped.x + ',' + dropped.z + ') rot ' + dropped.rot);
   await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(400);
   check('Deshacer saca el módulo arrastrado', (await project()).modules.length === nBefore);
+  // Módulos nuevos (#61): torre p/ horno y tapa p/ 2 bachas desde el catálogo
+  const dbl = (label) => page.evaluate((label) => {
+    const b = [...document.querySelectorAll('.mod-btn')].find((e) => e.querySelector('span')?.textContent.trim() === label);
+    if (b) b.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    return !!b;
+  }, label);
+  await clickText('.cb-libs .cb-tab', 'Cocinas'); await clickText('.cb-groups .cb-tab', 'Altos'); await clickText('.cb-subs .cb-tab', 'Módulos p/Electrodomésticos');
+  const okTorre = await dbl('Torre p/ horno y microondas'); await sleep(500);
+  await clickText('.cb-groups .cb-tab', 'Tapas/Estantes'); await clickText('.cb-subs .cb-tab', 'Tapas');
+  const tapas = await page.$$eval('.mod-btn span', (els) => els.map((e) => e.textContent.trim()));
+  const okTapa = await dbl('Tapa p/ 2 bachas'); await sleep(500);
+  p = await project();
+  const [torre, tapa] = p.modules.slice(-2);
+  check('Catálogo con módulos nuevos (torre p/ horno, tapas con bachas)', okTorre && okTapa && torre.type === 'torre_horno' && tapa.type === 'tapa' && tapa.params.bachas === 2 && tapas.length === 3, tapas.join(', '));
+  await shot('01f-modulos-nuevos');
+  check('El módulo toma el nombre del ítem', (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Tapa p/ 2 bachas');
+  for (let i = 0; i < 2; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300); }
+  check('Deshacer saca los módulos nuevos', (await project()).modules.length === nBefore);
   // Lista de Módulos (#60)
   await clickText('.side-tab', 'Lista de Módulos');
   const planes = await page.$$eval('.ml-plane-btn', (els) => els.map((e) => e.textContent.trim()));

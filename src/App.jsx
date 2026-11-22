@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
-import { newModule, footprint, snapPosition, resizeModule, uid, isSquare } from './domain/modules.js';
+import { newModule, footprint, snapPosition, resizeModule, uid, isSquare, MODULE_TYPES } from './domain/modules.js';
 import { insertPose } from './domain/insert.js';
 import { collideMove, collideLift } from './domain/collision.js';
 import { nudgeTarget, rotateAboutCenter, lockAxis, restingHeight } from './domain/movement.js';
+import { withItem } from './domain/library.js';
 import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
 import StatusToggles from './ui/StatusToggles.jsx';
 import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls, followWall } from './domain/wallEdit.js';
@@ -293,8 +294,8 @@ export default function App() {
     const pt = d && pickRef.current?.(clientX, clientY, 0);
     if (!pt) return null;
     const params = itemParams(d.item, d.variant);
-    const { wallId, ...pose } = insertPose(d.item.type, params, project.room, pt); // eslint-disable-line no-unused-vars
-    let m = { id: '__ghost', type: d.item.type, params, ...pose, mats: {} };
+    const { wallId, ...pose } = insertPose(d.item.type, params, project.room, pt, d.item.y); // eslint-disable-line no-unused-vars
+    let m = { id: '__ghost', type: d.item.type, params, ...pose, mats: {}, ...(MODULE_TYPES[d.item.type]?.rest ? { rest: true } : {}) };
     if (ui.magnets !== false && isSquare(m.rot)) m = { ...m, ...snapPosition(m, project.modules, project.room, 40, gridStep) };
     return m;
   };
@@ -315,7 +316,7 @@ export default function App() {
       dragItemRef.current = null;
       setGhost(null);
       if (!m) return;
-      const mod = { ...m, id: uid() };
+      const mod = withItem({ ...m, id: uid() }, d.item, project.modules);
       countUse(d.item);
       setProject((p) => ({ ...p, modules: [...p.modules, mod] }));
       setSelectedId(mod.id);
@@ -323,7 +324,7 @@ export default function App() {
   };
   const insertItem = (item, variant = null) => {
     countUse(item);
-    const m = newModule(item.type, project, itemParams(item, variant));
+    const m = withItem(newModule(item.type, project, itemParams(item, variant), item.y), item, project.modules);
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));
     setSelectedId(m.id);
     setTab('diseno');

@@ -459,6 +459,31 @@ try {
   await clickText('.tabs button', 'Diseño 3D'); await sleep(500);
   await shot('06d-tirador-320');
   await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+  // Estilos (#75): aplicar uno de fábrica, guardar uno propio con algunos modelos, renombrar y borrar
+  await clickText('.styles-bar button', 'Aplicar estilo');
+  await clickText('.style-menu .cm-item', 'Nogal y gris');
+  p = await project();
+  check('Aplicar estilo cambia los modelos de Todos', p.defaults.puertas === 'mel18_nogal' && p.defaults.tiradores === 'tir_barral_320' && p.defaults.tapas === 'cua_gris_concreto');
+  await shot('06e-estilo-nogal');
+  await page.click('.styles-bar button[aria-label="Guardar nuevo estilo"]'); await sleep(300);
+  await page.type('.style-dialog .sd-name input', 'Mi cocina');
+  for (const l of ['Cajas', 'Externo cajas', 'Frentes', 'Fondos', 'Cajones', 'Bisagras', 'Correderas', 'Patas', 'Acabado', 'Tiradores']) {
+    await page.evaluate((l) => [...document.querySelectorAll('.style-dialog .sd-check')].find((e) => e.textContent.trim() === l)?.querySelector('input').click(), l);
+  }
+  await clickText('.style-dialog .qf-foot button', 'Guardar');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mueblesapp.settings')).styles?.find((s) => s.name === 'Mi cocina'));
+  check('Guardar nuevo estilo con los modelos tildados', !!saved && JSON.stringify(saved.models) === JSON.stringify({ puertas: 'mel18_nogal', tapas: 'cua_gris_concreto' }), JSON.stringify(saved?.models));
+  await page.click('.styles-bar button[aria-label="Editar estilos"]'); await sleep(300);
+  const mine = await page.evaluateHandle(() => [...document.querySelectorAll('.style-dialog .sd-row')].find((r) => r.querySelector('input').value === 'Mi cocina'));
+  const inp = await mine.$('input'); await inp.click({ clickCount: 3 }); await inp.type('Cocina Pérez');
+  await page.evaluate((r) => [...r.querySelectorAll('button')].find((b) => b.textContent === 'Renombrar').click(), mine); await sleep(300);
+  let names = await page.evaluate(() => JSON.parse(localStorage.getItem('mueblesapp.settings')).styles.map((s) => s.name));
+  check('Editar estilos: renombrar', names.includes('Cocina Pérez') && !names.includes('Mi cocina'), names.join(', '));
+  await page.evaluate(() => [...document.querySelectorAll('.style-dialog .sd-row')].find((r) => r.querySelector('input').value === 'Cocina Pérez').querySelector('button.danger').click()); await sleep(300);
+  names = await page.evaluate(() => JSON.parse(localStorage.getItem('mueblesapp.settings')).styles.map((s) => s.name));
+  check('Editar estilos: borrar', !names.includes('Cocina Pérez') && names.length === 4, names.join(', '));
+  await page.keyboard.press('Escape'); await sleep(200);
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
   await page.keyboard.press('KeyE'); await page.keyboard.press('Escape'); await sleep(300);
   await shot('07-precios');
 

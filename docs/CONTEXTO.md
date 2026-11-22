@@ -52,7 +52,12 @@ diseño 3D, renderizado, plan de corte y presupuesto. Se quieren todas las funci
    de medida, insertar arrastrando con recuadro verde (plano de inserción pared/piso), Localizar Rápido (Ctrl+L), Lista de
    Módulos (visibilidad `O`, remover), módulos nuevos (cajoneros, especiales, p/electrodomésticos, islas, superiores, tapas
    con bachas, vistas, estantes) y esquineros L y oblicuos. Queda para después: módulos curvos (3.8, *Puede*).
-   Siguiente: Fase 4 (#17) — modelos y estilos (materiales).
+3e. ✅ **Paridad con Promob — Fase 4, modelos y estilos** (ver `docs/PLAN-FASE-4.md`, issues #71–#75): biblioteca
+   jerárquica de materiales (Colores, Maderas, Fondos, Granitos › color › nombre, Mármoles, Cuarzo) con precio y texturas
+   procedurales propias; material por tipo de pieza (cajas, externo, puertas, frentes, fondos, cajones, tapas) en 3D,
+   despiece y presupuesto (la mesada por m² de su piedra); panel Herramientas · Modelos con menú en cascada, Mostrar todos y
+   ámbito Todos / Selección; accesorios con modelos y precio (tiradores, bisagras, correderas, patas, acabado); estilos.
+   Siguiente: Fase 5 (#18) — agregados, inserción automática, aperturas y tiradores.
 4. ⏳ **Esquineros y especiales**: bajo esquinero L, alacena esquinera, horno/anafe, heladera, rebatibles, cajonera interna, alacena sobre heladera.
 5. ⏳ **Corte para taller**: orden de cortes, etiquetas por pieza imprimibles, sobrantes reutilizables.
 6. ⏳ **Módulo libre** a medida (editor por piezas).

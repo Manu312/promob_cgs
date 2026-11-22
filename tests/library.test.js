@@ -60,3 +60,22 @@ test('variantes: dentro del rango de cada medida e incluyen la medida del ítem'
   }
   assert.deepEqual(variantValues({ id: 'x', type: 'bajo' }), []);
 });
+
+// Localizar Rápido (#59)
+import { searchLibrary } from '../src/domain/library.js';
+
+test('Localizar: sin acentos ni mayúsculas, agrupado por ruta', () => {
+  const r = searchLibrary('BANO');
+  assert.ok(r.length >= 1);
+  assert.ok(r.every((g) => g.key.startsWith('Baños\\')));
+  const caj = searchLibrary('cajon');
+  assert.ok(caj.some((g) => g.items.some((i) => i.id === 'coc-inf-caj')));
+  assert.ok(caj.some((g) => g.key === 'Dormitorios\\Componentes\\Cajoneras\\'));
+});
+
+test('Localizar: todas las palabras y también por medida', () => {
+  assert.deepEqual(searchLibrary('alacena 1 puerta').flatMap((g) => g.items.map((i) => i.id)), ['coc-alt-1p']);
+  assert.ok(searchLibrary('450').flatMap((g) => g.items).length > 0);
+  assert.deepEqual(searchLibrary('   '), []);
+  assert.deepEqual(searchLibrary('heladera xyz'), []);
+});

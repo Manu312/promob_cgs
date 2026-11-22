@@ -116,3 +116,23 @@ export function paginate(items, page, size) {
   const p = Math.min(Math.max(0, page), pages - 1);
   return { page: p, pages, items: items.slice(p * size, p * size + size) };
 }
+
+// Localizar Rápido (como Promob): busca en nombre, ruta y medida, sin importar mayúsculas
+// ni acentos; todas las palabras tienen que aparecer. Resultados agrupados por ruta.
+const norm = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+export function searchLibrary(q, lib = LIBRARY) {
+  const words = norm(q).split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const hits = flatItems(lib).filter(({ item, names }) => {
+    const hay = norm([item.label, ...names, itemSize(item), ...(item.variants ? variantValues(item) : [])].join(' '));
+    return words.every((w) => hay.includes(w));
+  });
+  const groups = new Map();
+  for (const h of hits) {
+    const key = h.names.join('\\') + '\\';
+    if (!groups.has(key)) groups.set(key, { key, path: h.path, items: [] });
+    groups.get(key).items.push(h.item);
+  }
+  return [...groups.values()];
+}

@@ -126,6 +126,22 @@ try {
   check('Al soltar inserta contra la pared del fondo', p.modules.length === nBefore + 1 && dropped.type === 'bajo_cajones' && dropped.z === 0 && dropped.rot === 0 && !(await page.evaluate(() => window.__muebles.ghostShown)), '(' + dropped.x + ',' + dropped.z + ') rot ' + dropped.rot);
   await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(400);
   check('Deshacer saca el módulo arrastrado', (await project()).modules.length === nBefore);
+  // Localizar Rápido (#59)
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyL'); await page.keyboard.up('Control'); await sleep(400);
+  check('Ctrl+L abre Localizar Rápido', !!(await page.$('.quickfind')));
+  await page.type('.qf-search input', 'cajonera'); await page.keyboard.press('Enter'); await sleep(400);
+  const folders = await page.$$eval('.qf-folder', (els) => els.map((e) => e.textContent));
+  const foot = await page.$eval('.qf-foot', (e) => e.textContent);
+  check('Resultados agrupados por ruta con el total', folders.some((f) => f.includes('Dormitorios\\Componentes\\Cajoneras\\')) && /Se encontraron \d+ ítems/.test(foot), folders.join(' | ') + ' · ' + foot);
+  await shot('01d-localizar');
+  await clickText('.qf-item span', 'Cajonera interior');
+  const onLib = await page.$eval('.cb-libs .cb-tab.on', (e) => e.textContent.trim());
+  const pickedLbl = await page.$eval('.mod-btn.picked span', (e) => e.textContent.trim()).catch(() => '');
+  check('Clic en un resultado lo muestra en la barra', onLib === 'Dormitorios' && pickedLbl === 'Cajonera interior', onLib + ' / ' + pickedLbl);
+  await page.evaluate(() => [...document.querySelectorAll('.qf-item')].find((e) => e.textContent.includes('Cajonera interior')).dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))); await sleep(500);
+  p = await project();
+  check('Doble clic en un resultado lo inserta y cierra', p.modules.length === nBefore + 1 && p.modules.at(-1).type === 'cajonera_placard' && !(await page.$('.quickfind')));
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(400);
 
   // Seleccionar un bajo mesada con clic en 3D y arrastrarlo
   await page.keyboard.press('Escape');

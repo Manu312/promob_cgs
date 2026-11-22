@@ -67,3 +67,15 @@ export function download(filename, content, type) {
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
+
+// Íconos simples en SVG (los emojis dependen de las fuentes de cada máquina).
+export const IconSearch = () => (
+  <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" style={{ verticalAlign: '-2px' }}>
+    <circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M10 10l4.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+export const IconFolder = () => (
+  <svg width="14" height="12" viewBox="0 0 16 13" aria-hidden="true" style={{ verticalAlign: '-1px' }}>
+    <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1H6l1.5 1.5h6A1.5 1.5 0 0 1 15 4v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 10.5z" fill="#f2c14e" stroke="#c9952b" />
+  </svg>
+);

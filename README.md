@@ -25,7 +25,7 @@ Requisitos: Node 20+ (desarrollado con Node 24), Chrome para el e2e.
 | Presupuesto | Placas usadas + tapacanto + herrajes + mesada (m²) + mano de obra % + margen % + IVA, imprimible |
 | Precios | Placas, colores, herrajes y costos editables (los valores iniciales son de prueba) |
 
-Atajos en el 3D: `R` rotar · `Supr` borrar · flechas mover 10 mm (Shift 100 mm) · `Esc` deseleccionar.
+Atajos en el 3D: `R` rotar · `Supr` borrar · flechas mover 10 mm (Shift 100 mm) · `Esc` deseleccionar · `Ctrl+Z` deshacer · `Ctrl+Y` / `Ctrl+Shift+Z` rehacer (un arrastre completo es un solo paso).
 
 ## Estructura
 

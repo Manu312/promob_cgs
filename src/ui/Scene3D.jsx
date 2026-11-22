@@ -158,7 +158,7 @@ function DevProbe({ project }) {
   return null;
 }
 
-function DragController({ drag, setDrag, onMove, controlsRef, room }) {
+function DragController({ drag, setDrag, onMove, onDragEnd, controlsRef, room }) {
   const { camera, gl } = useThree();
   useEffect(() => {
     if (!drag) return;
@@ -174,15 +174,15 @@ function DragController({ drag, setDrag, onMove, controlsRef, room }) {
         onMove(drag.id, pt.x / S + room.w / 2 - drag.offX, pt.z / S + room.d / 2 - drag.offZ);
       }
     };
-    const up = () => { setDrag(null); if (controlsRef.current) controlsRef.current.enabled = true; };
+    const up = () => { setDrag(null); onDragEnd?.(); if (controlsRef.current) controlsRef.current.enabled = true; };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-  }, [drag, camera, gl, onMove, setDrag, controlsRef, room]);
+  }, [drag, camera, gl, onMove, onDragEnd, setDrag, controlsRef, room]);
   return null;
 }
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, onMove, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, onMove, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const { room } = project;
@@ -193,6 +193,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, onMo
     e.stopPropagation();
     onSelect(mod.id);
     const rx = e.point.x / S + room.w / 2, rz = e.point.z / S + room.d / 2;
+    onDragStart?.(); // el arrastre completo es un solo paso de deshacer
     setDrag({ id: mod.id, planeY: e.point.y, offX: rx - mod.x, offZ: rz - mod.z });
     if (controlsRef.current) controlsRef.current.enabled = false;
   };
@@ -245,7 +246,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, onMo
       {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
       <Capturer captureRef={captureRef} photoreal={photoreal} />
       <DevProbe project={project} />
-      <DragController drag={drag} setDrag={setDrag} onMove={onMove} controlsRef={controlsRef} room={room} />
+      <DragController drag={drag} setDrag={setDrag} onMove={onMove} onDragEnd={onDragEnd} controlsRef={controlsRef} room={room} />
     </Canvas>
   );
 }

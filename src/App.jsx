@@ -13,6 +13,7 @@ import Budget from './ui/Budget.jsx';
 import Settings from './ui/Settings.jsx';
 import ErrorBoundary from './ui/ErrorBoundary.jsx';
 import { download, money } from './ui/fields.jsx';
+import { useHistoryState } from './ui/useHistoryState.js';
 
 function usePersistent(key, init, migrate = (x) => x) {
   const [v, setV] = useState(() => {
@@ -26,7 +27,7 @@ function usePersistent(key, init, migrate = (x) => x) {
 const TABS = [['diseno', 'Diseño 3D'], ['corte', 'Plan de corte'], ['presupuesto', 'Presupuesto'], ['precios', 'Precios']];
 
 export default function App() {
-  const [project, setProject] = usePersistent('mueblesapp.project', sampleProject, normalizeProject);
+  const [project, setProject, history] = useHistoryState('mueblesapp.project', sampleProject, normalizeProject);
   const [showDims, setShowDims] = useState(false);
   const [autoHideWalls, setAutoHideWalls] = useState(true);
   const [rawSettings, setSettings] = usePersistent('mueblesapp.settings', DEFAULT_SETTINGS);
@@ -84,7 +85,13 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (tab !== 'diseno' || ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      const inField = ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName);
+      if ((e.ctrlKey || e.metaKey) && !inField) {
+        const k = e.key.toLowerCase();
+        if (k === 'z' && !e.shiftKey) { e.preventDefault(); history.undo(); return; }
+        if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); history.redo(); return; }
+      }
+      if (tab !== 'diseno' || inField) return;
       if (e.key === 'Escape') setSelectedId(null);
       if (!selectedId) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); }
@@ -124,6 +131,8 @@ export default function App() {
         </nav>
         <div className="top-actions">
           <span className="total-pill" title="Total del presupuesto">{money(budget.total)}</span>
+          <button onClick={history.undo} disabled={!history.canUndo} title="Deshacer (Ctrl+Z)">↶ Deshacer</button>
+          <button onClick={history.redo} disabled={!history.canRedo} title="Rehacer (Ctrl+Y)">↷ Rehacer</button>
           <button onClick={newProject}>Nuevo</button>
           <button onClick={() => fileRef.current?.click()}>Abrir</button>
           <button onClick={exportProject}>Guardar archivo</button>
@@ -137,6 +146,7 @@ export default function App() {
           <section className="viewport">
             <ErrorBoundary onReset={() => { setPhotoreal(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
+                onDragStart={history.begin} onDragEnd={history.commit}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoHideWalls} />
             </ErrorBoundary>

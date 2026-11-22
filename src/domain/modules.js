@@ -272,9 +272,11 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null }) {
     }
   });
 
-  // Puertas y cajones
+  // Puertas y cajones. Cada pieza de un frente lleva `front` (índice) para las aperturas;
+  // las puertas, además, `hinge` (lado de la bisagra; `params.hinges` lo invierte por puerta).
   const hp = p.handlePos;
-  for (const f of fronts) {
+  fronts.forEach((f, k) => {
+    const n0 = parts.length, d0 = decors.length;
     if (f.kind === 'drawer') {
       parts.push(part('Frente cajón', 'frente', f.x, f.y, zf, f.w, f.h, tf, { x: 2, y: 2 }));
       const L = slideFor(D - zInt - dFront - 10);
@@ -294,17 +296,20 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null }) {
         add('manija', 1);
       }
     } else {
-      parts.push(part('Puerta', 'frente', f.x, f.y, zf, f.w, f.h, tf, { x: 2, y: 2 }));
+      const hinge = p.hinges?.[k] || (f.n === 1 || f.idx < f.n / 2 ? 'izq' : 'der');
+      parts.push({ ...part('Puerta', 'frente', f.x, f.y, zf, f.w, f.h, tf, { x: 2, y: 2 }), hinge });
       add('bisagra', hingesFor(f.h));
       if (hp !== 'none') {
-        const hingeLeft = f.n === 1 ? true : f.idx < f.n / 2;
+        const hingeLeft = hinge === 'izq';
         const hx = hingeLeft ? f.x + f.w - 46 : f.x + 34;
         const hy = hp === 'top' ? f.y + f.h - 168 : hp === 'bottom' ? f.y + 40 : f.y + f.h / 2 - 64;
         decors.push(decor('manija', hx, hy, zf + tf, 12, 128, 25));
         add('manija', 1);
       }
     }
-  }
+    for (let i = n0; i < parts.length; i++) parts[i].front = k;
+    for (let i = d0; i < decors.length; i++) decors[i].front = k;
+  });
 
   // Mesada (se compra aparte: va al presupuesto por m², no al plan de corte)
   if (p.mesada === 'si') {

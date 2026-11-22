@@ -231,3 +231,9 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .ai-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 1px 0 1px 14px; }
 .ai-only { padding-left: 0; margin: 10px 0 6px; }
 .ai-btns { margin: 6px 0; }
+
+/* Herramientas · Aperturas */
+.ap-tools { margin-bottom: 8px; }
+.ap-tools button { font-size: 12px; padding: 3px 8px; }
+.ap-diagram { display: block; margin: 6px auto; cursor: pointer; }
+.ap-front:hover rect { stroke: #2563eb; }

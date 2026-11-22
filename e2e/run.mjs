@@ -406,6 +406,20 @@ try {
   await page.keyboard.press('Enter'); await sleep(500);
   const total2 = await page.$eval('.total-pill', (e) => e.textContent);
   check('Cambiar precio actualiza total', total1 !== total2, `${total1} → ${total2}`);
+  // Tipos de pieza (#72): la mesada se cobra por m² de su piedra
+  await clickText('.tabs button', 'Presupuesto'); await sleep(400);
+  const tapaLines = await page.$$eval('.page table tbody tr td:first-child', (els) => els.map((e) => e.textContent.trim()).filter((t) => t.startsWith('Tapa ')));
+  check('Presupuesto con la mesada por m² de su piedra', tapaLines.includes('Tapa Granitos > Gris > Gris Mara'), tapaLines.join(' | '));
+  await clickText('.tabs button', 'Diseño 3D'); await sleep(600);
+  await page.keyboard.press('Escape'); await sleep(200);
+  const tapasSel = await fieldInput('Tapas');
+  await tapasSel.select('gra_negro_absoluto'); await sleep(500);
+  p = await project();
+  await clickText('.tabs button', 'Presupuesto'); await sleep(400);
+  const tapaLines2 = await page.$$eval('.page table tbody tr td:first-child', (els) => els.map((e) => e.textContent.trim()).filter((t) => t.startsWith('Tapa ')));
+  check('Cambiar la piedra de las tapas cambia el presupuesto', p.defaults.tapas === 'gra_negro_absoluto' && tapaLines2.includes('Tapa Granitos > Negro > Negro Absoluto'), tapaLines2.join(' | '));
+  await clickText('.tabs button', 'Diseño 3D'); await sleep(400);
+  await shot('06b-granito-negro');
   await shot('07-precios');
 
   // Reglas de construcción del proyecto: fondo en ranura cambia el despiece

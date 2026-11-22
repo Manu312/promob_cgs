@@ -1,16 +1,12 @@
 import { buildModule, moduleName, DEFAULT_RULES } from './modules.js';
-import { matById } from './catalog.js';
+import { matById, stoneById, slotIds, slotOf, SLOTS, pathLabel } from './catalog.js';
 
 const clean = (o) => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== undefined && v !== ''));
 
+// Material de cada tipo de pieza: el del módulo (Selección) o el del proyecto (Todos).
 export function resolveMats(mod, project, settings) {
-  const ids = { ...clean(project.defaults), ...clean(mod.mats) };
-  return {
-    cuerpo: matById(settings, ids.cuerpo),
-    frente: matById(settings, ids.frente),
-    fondo: matById(settings, ids.fondo),
-    cajon: matById(settings, ids.cajon || ids.cuerpo),
-  };
+  const ids = { ...slotIds(project.defaults, { fill: true }), ...slotIds(mod.mats) };
+  return Object.fromEntries(SLOTS.map((s) => [s.id, s.kind === 'piedra' ? stoneById(settings, ids[s.id]) : matById(settings, ids[s.id])]));
 }
 
 export function resolveRules(mod, project) {
@@ -20,8 +16,9 @@ export function resolveRules(mod, project) {
 export function buildAll(project, settings) {
   return project.modules.map((mod, i) => {
     const mats = resolveMats(mod, project, settings);
-    const b = buildModule(mod, { t: mats.cuerpo.t, tf: mats.frente.t, tb: mats.fondo.t, tc: mats.cajon.t, rules: resolveRules(mod, project) });
-    return { id: mod.id, tag: `M${i + 1}`, label: moduleName(mod), mats, ...b };
+    const b = buildModule(mod, { t: mats.cajas.t, tf: mats.puertas.t, tb: mats.fondos.t, tc: mats.cajones.t, rules: resolveRules(mod, project) });
+    const parts = b.parts.map((p) => ({ ...p, slot: slotOf(p) }));
+    return { id: mod.id, tag: `M${i + 1}`, label: moduleName(mod), mats, ...b, parts };
   });
 }
 
@@ -42,10 +39,17 @@ export function computeCutList(built) {
   const map = new Map();
   const hardware = {};
   const edgeMeters = {};
+  const stones = {};
   for (const b of built) {
-    for (const [c, q] of Object.entries(b.hardware)) hardware[c] = (hardware[c] || 0) + q;
+    for (const [c, q] of Object.entries(b.hardware)) {
+      if (c === 'mesada') { // tapas: m² por piedra
+        const st = b.mats.tapas;
+        stones[st.id] = stones[st.id] || { name: pathLabel(st), m2: 0, priceM2: st.priceM2 };
+        stones[st.id].m2 += q;
+      } else hardware[c] = (hardware[c] || 0) + q;
+    }
     for (const p of b.parts) {
-      const mat = b.mats[p.role];
+      const mat = b.mats[p.slot || slotOf(p)];
       const d = partDims(p);
       if (!mat.edge) { d.edgesL = 0; d.edgesW = 0; }
       const key = [mat.id, p.name, d.length, d.width, d.edgesL, d.edgesW].join('|');
@@ -64,5 +68,5 @@ export function computeCutList(built) {
       edgeMeters[r.matId].m += m;
     }
   });
-  return { rows, hardware, edgeMeters };
+  return { rows, hardware, edgeMeters, stones };
 }

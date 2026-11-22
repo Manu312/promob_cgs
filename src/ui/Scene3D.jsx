@@ -31,7 +31,7 @@ function PartMesh({ p, material }) {
   );
 }
 
-function DecorMesh({ d }) {
+function DecorMesh({ d, stoneMat }) {
   const pos = [(d.x + d.sx / 2) * S, (d.y + d.sy / 2) * S, (d.z + d.sz / 2) * S];
   if (d.decor === 'barral') {
     return (
@@ -41,7 +41,7 @@ function DecorMesh({ d }) {
     );
   }
   return (
-    <mesh position={pos} rotation={[0, d.ry || 0, 0]} material={d.decor === 'mesada' ? stone : metal} castShadow receiveShadow>
+    <mesh position={pos} rotation={[0, d.ry || 0, 0]} material={d.decor === 'mesada' ? stoneMat || stone : metal} castShadow receiveShadow>
       <boxGeometry args={[d.sx * S, d.sy * S, d.sz * S]} />
     </mesh>
   );
@@ -95,8 +95,8 @@ function ModuleObject({ mod, b, selected, showSel, onDown, onMenu, onResizeDown,
     <group position={[(mod.x + fw / 2) * S, (mod.y || 0) * S, (mod.z + fd / 2) * S]} rotation={[0, ((mod.rot || 0) * Math.PI) / 180, 0]} onPointerDown={(e) => onDown(e, mod)}
       onContextMenu={onMenu ? (e) => onMenu(e, mod) : undefined}>
       <group position={[(-W / 2) * S, 0, (-D / 2) * S]}>
-        {b.parts.map((p, i) => <PartMesh key={i} p={p} material={mat3d(b.mats[p.role])} />)}
-        {b.decors.map((d, i) => <DecorMesh key={'d' + i} d={d} />)}
+        {b.parts.map((p, i) => <PartMesh key={i} p={p} material={mat3d(b.mats[p.slot])} />)}
+        {b.decors.map((d, i) => <DecorMesh key={'d' + i} d={d} stoneMat={b.mats.tapas ? mat3d(b.mats.tapas) : null} />)}
       </group>
       {selected && showSel && <SelBox w={W} h={H} d={D} />}
       {selected && showSel && onResizeDown && <ResizeHandles W={W} H={H} D={D} planta={planta} onDown={(e, k) => onResizeDown(e, mod, k)} />}

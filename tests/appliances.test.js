@@ -51,3 +51,25 @@ test('con precio, el aparato va al presupuesto (Electrodomésticos); sin precio,
   const e = b.lines.filter((l) => l.group === 'Electrodomésticos');
   assert.deepEqual(e.map((l) => [l.desc, l.qty, l.total]), [['Cocina 56 cm', 1, 450000]]);
 });
+
+// Refrigeración, microondas y lavado (#92)
+test('heladeras: simple, no frost (dos puertas) y side by side (dos puertas verticales)', () => {
+  const doors = (tipo) => build('heladera', { tipo }).decors.filter((d) => d.sz === 40 && d.finish !== 'cromo').length;
+  assert.equal(doors('simple'), 1);
+  assert.equal(doors('nofrost'), 2);
+  assert.equal(doors('side'), 2);
+  assert.deepEqual(['width', 'height', 'depth'].map((k) => itemParams(findItem('ele-heladera-side').item)[k]), [912, 1780, 716]);
+});
+
+test('lavarropas frontal con ojo de buey; superior con tapa arriba', () => {
+  assert.ok(build('lavarropas').decors.some((d) => d.shape === 'cyl' && d.finish === 'vidrio'));
+  const sup = build('lavarropas', { tipo: 'superior' });
+  assert.ok(sup.decors.some((d) => d.y >= MODULE_TYPES.lavarropas.defaults.height));
+  assert.ok(!sup.decors.some((d) => d.shape === 'cyl' && d.finish === 'vidrio'));
+});
+
+test('microondas de apoyo se apoya; el empotrable va alto', () => {
+  assert.equal(MODULE_TYPES.microondas.rest, true);
+  assert.equal(findItem('ele-micro-emp').item.y, 1450);
+  assert.deepEqual(['width', 'height', 'depth'].map((k) => MODULE_TYPES.lavavajillas.defaults[k]), [600, 850, 600]);
+});

@@ -179,6 +179,20 @@ try {
     await clickText('.tabs button', 'Diseño 3D'); await sleep(400);
     for (let i = 0; i < 3; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300); }
     check('Deshacer saca los electrodomésticos', (await project()).modules.length === nBefore);
+    // Refrigeración, microondas y lavado (#92)
+    await clickText('.cb-libs .cb-tab', 'Electrodomésticos');
+    await clickText('.cb-groups .cb-tab', 'Refrigeración'); await dbl('Heladera side by side'); await sleep(400);
+    await clickText('.cb-groups .cb-tab', 'Lavado'); await clickText('.cb-subs .cb-tab', 'Lavarropas'); await dbl('Lavarropas carga frontal'); await sleep(400);
+    await clickText('.cb-groups .cb-tab', 'Microondas'); await dbl('Microondas empotrable'); await sleep(400);
+    await clickText('.cb-groups .cb-tab', 'Cocción'); await clickText('.cb-subs .cb-tab', 'Cocinas'); await dbl('Cocina 60 cm'); await sleep(400);
+    p = await project();
+    const [hel, lav, mic, coc2] = p.modules.slice(-4);
+    check('Heladera side by side, lavarropas y microondas empotrable', hel.type === 'heladera' && hel.params.tipo === 'side' && hel.params.width === 912 && lav.type === 'lavarropas' && mic.type === 'microondas' && mic.y === 1450 && !mic.rest && coc2.type === 'cocina', JSON.stringify([hel.params.tipo, mic.y, mic.rest]));
+    await clickText('.vp-toolbar button', 'Frente'); await sleep(900);
+    await shot('01j-electrodomesticos');
+    await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(600);
+    for (let i = 0; i < 4; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300); }
+    check('Deshacer saca heladera, lavarropas, microondas y cocina', (await project()).modules.length === nBefore);
     await page.keyboard.press('Escape'); await sleep(200);
   }
   // Lista de Módulos (#60)

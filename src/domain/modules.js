@@ -4,7 +4,7 @@
 // alineada a ejes; la misma geometría alimenta el 3D y el despiece.
 
 import { snapCandidates } from './room.js';
-import { buildAparato, FINISHES } from './appliances.js';
+import { buildAparato, FINISHES, TIPOS } from './appliances.js';
 import { bounds } from './walls.js';
 
 const SLIDES = [250, 300, 350, 400, 450, 500, 550, 600];
@@ -54,6 +54,7 @@ export const PARAM_DEFS = {
   nicheY: { label: 'Hueco: altura desde abajo', type: 'num', min: 0, max: 2200, step: 10, unit: 'mm' },
   bachas: { label: 'Bachas', type: 'num', min: 0, max: 2, step: 1 },
   hornallas: { label: 'Hornallas', type: 'num', min: 2, max: 6, step: 1 },
+  tipo: { label: 'Tipo', type: 'sel', options: TIPOS },
   finish: { label: 'Terminación', type: 'sel', options: FINISHES },
   chimneyH: { label: 'Chimenea (alto)', type: 'num', min: 0, max: 1500, step: 10, unit: 'mm' },
   price: { label: 'Precio (opcional, al presupuesto)', type: 'num', min: 0, max: 1e9, step: 1000, unit: '$' },
@@ -107,6 +108,10 @@ export const MODULE_TYPES = {
   anafe: { label: 'Anafe', cat: 'Electrodomésticos', kind: 'aparato', ap: 'anafe', y: 870, rest: true, cut: { w: 560, d: 490 }, fields: ['width', 'depth', 'hornallas', 'finish', 'price'], defaults: { width: 585, height: 50, depth: 520, hornallas: 4, finish: 'vidrio', price: 0 } },
   horno: { label: 'Horno empotrable', cat: 'Electrodomésticos', kind: 'aparato', ap: 'horno', y: 850, fields: ['width', 'height', 'depth', 'finish', 'price'], defaults: { width: 595, height: 595, depth: 575, finish: 'inox', price: 0 } },
   campana: { label: 'Campana', cat: 'Electrodomésticos', kind: 'aparato', ap: 'campana', y: 1650, fields: ['width', 'height', 'depth', 'chimneyH', 'finish', 'price'], defaults: { width: 600, height: 300, depth: 480, chimneyH: 600, finish: 'inox', price: 0 } },
+  heladera: { label: 'Heladera', cat: 'Electrodomésticos', kind: 'aparato', ap: 'heladera', y: 0, fields: ['width', 'height', 'depth', 'tipo', 'finish', 'price'], defaults: { width: 700, height: 1845, depth: 755, tipo: 'nofrost', finish: 'inox', price: 0 } },
+  microondas: { label: 'Microondas', cat: 'Electrodomésticos', kind: 'aparato', ap: 'microondas', y: 890, rest: true, fields: ['width', 'height', 'depth', 'finish', 'price'], defaults: { width: 440, height: 260, depth: 340, finish: 'inox', price: 0 } },
+  lavavajillas: { label: 'Lavavajillas', cat: 'Electrodomésticos', kind: 'aparato', ap: 'lavavajillas', y: 0, fields: ['width', 'height', 'depth', 'finish', 'price'], defaults: { width: 600, height: 850, depth: 600, finish: 'inox', price: 0 } },
+  lavarropas: { label: 'Lavarropas', cat: 'Electrodomésticos', kind: 'aparato', ap: 'lavarropas', y: 0, fields: ['width', 'height', 'depth', 'tipo', 'finish', 'price'], defaults: { width: 595, height: 850, depth: 550, tipo: 'frontal', finish: 'blanco', price: 0 } },
   mostrador: { label: 'Mostrador', cat: 'Oficina', kind: 'caja', y: 0, defaults: caja({ width: 1500, height: 1050, depth: 500, plinth: 100, dividers: 2, doorType: 'ninguna', doors: 0, shelves: 1, handlePos: 'none' }) },
 };
 

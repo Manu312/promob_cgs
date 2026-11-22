@@ -345,15 +345,21 @@ try {
     for (let i = 1; i <= 8; i++) { await page.mouse.move(pt.x + (dx * i) / 8, pt.y + (dy * i) / 8); await sleep(30); }
     await page.mouse.up(); await sleep(500);
   };
+  await clickText('.catalog button', 'Bajo mesada puertas'); await page.keyboard.press('Escape'); await sleep(300); // uno apoyado en el fondo
+  p = await project();
+  const onBack = p.modules.filter((m) => m.z === 0 && !m.rot).map((m) => m.id); // apoyados en la pared del fondo
   const bp = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2000, 75), p.room.walls[0].id);
   await dragFrom(bp, 0, -50);
   p = await project();
   const zBack = p.room.points[0][1];
+  check('Los módulos apoyados acompañan a la pared que se mueve', onBack.length > 0 && onBack.every((id) => p.modules.find((m) => m.id === id).z === zBack), `${onBack.length} módulos → z=${onBack.map((id) => p.modules.find((m) => m.id === id).z)}`);
   check('Arrastrar la pared del fondo la corre en paralelo y estira las vecinas', zBack < 0 && zBack % 50 === 0 && p.room.points[1][1] === zBack && p.room.points.length === 6, `z=${zBack}`);
   await shot('15-planta-pared-arrastrada');
   await ctrl('KeyZ');
   p = await project();
   check('Deshacer el arrastre de pared en un paso', p.room.points[0][1] === 0, `z=${p.room.points[0][1]}`);
+  check('Deshacer también devuelve los módulos', onBack.every((id) => p.modules.find((m) => m.id === id).z === 0));
+  await ctrl('KeyZ'); p = await project(); // saca el bajo de prueba
   const corner = p.room.nodes[1];
   const cp = await page.evaluate((id) => window.__muebles.screenOfNode(id), corner.id);
   await dragFrom(cp, 40, 0);

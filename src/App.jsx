@@ -5,7 +5,7 @@ import { collideMove, collideLift } from './domain/collision.js';
 import { nudgeTarget, rotateAboutCenter, lockAxis } from './domain/movement.js';
 import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
 import StatusToggles from './ui/StatusToggles.jsx';
-import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls } from './domain/wallEdit.js';
+import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls, followWall } from './domain/wallEdit.js';
 import { WallContextMenu, WallDeleteDialog } from './ui/WallMenus.jsx';
 import { applyDimEdit } from './domain/dimensions.js';
 import { updateOpening, setOpeningDim, moveColumn, removeOpening, removeColumn } from './domain/openings.js';
@@ -120,9 +120,13 @@ export default function App() {
   // empezar el arrastre (sin acumular errores) y todo el arrastre es un paso de deshacer.
   const projectRef = useRef(project);
   projectRef.current = project;
-  const baseRoomRef = useRef(null);
-  const onDragStart = useCallback(() => { baseRoomRef.current = projectRef.current.room; history.begin(); }, [history.begin]);
-  const onMoveWall = useCallback((id, dx, dz) => setProject((p) => ({ ...p, room: moveWall(baseRoomRef.current || p.room, id, dx, dz) })), [setProject]);
+  const baseRoomRef = useRef(null), baseModsRef = useRef(null);
+  const onDragStart = useCallback(() => { baseRoomRef.current = projectRef.current.room; baseModsRef.current = projectRef.current.modules; history.begin(); }, [history.begin]);
+  // Los módulos apoyados en la pared la acompañan.
+  const onMoveWall = useCallback((id, dx, dz) => setProject((p) => {
+    const base = baseRoomRef.current || p.room;
+    return { ...p, room: moveWall(base, id, dx, dz), modules: followWall(base, id, baseModsRef.current || p.modules, dx, dz, p.modules) };
+  }), [setProject]);
   const onMoveNode = useCallback((id, x, z) => setProject((p) => ({ ...p, room: moveNode(p.room, id, x, z) })), [setProject]);
   const recenter = () => setView((v) => ({ ...v, tick: v.tick + 1 }));
   // Aberturas (a lo largo de su pared) y columnas (imán a paredes y grilla).

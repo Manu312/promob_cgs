@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, pathLabel } from '../domain/catalog.js';
+import { DEFAULT_SETTINGS, pathLabel, ACC_FAMILIES } from '../domain/catalog.js';
 import { uid } from '../domain/modules.js';
 import { NumField } from './fields.jsx';
 
@@ -20,6 +20,9 @@ export default function Settings({ settings, setSettings }) {
   const placas = settings.materials.filter((m) => m.kind !== 'piedra').sort(byPath);
   const piedras = settings.materials.filter((m) => m.kind === 'piedra').sort(byPath);
   const onPath = (id, path) => setMat(id, { path });
+  const setAcc = (fam, id, patch) => set({ accessories: { ...settings.accessories, [fam]: settings.accessories[fam].map((a) => (a.id === id ? { ...a, ...patch } : a)) } });
+  const delAcc = (fam, id) => set({ accessories: { ...settings.accessories, [fam]: settings.accessories[fam].filter((a) => a.id !== id) } });
+  const addAcc = (fam) => set({ accessories: { ...settings.accessories, [fam]: [...settings.accessories[fam], { id: 'acc_' + uid(), path: ['Otros', 'Nuevo'], name: 'Nuevo', price: 0, ...(fam === 'tiradores' ? { shape: 'barral', len: 128 } : {}) }] } });
   const setHw = (i, patch) => set({ hardware: settings.hardware.map((h, j) => (j === i ? { ...h, ...patch } : h)) });
 
   return (
@@ -80,7 +83,27 @@ export default function Settings({ settings, setSettings }) {
       </div>
       <button onClick={() => set({ materials: [...settings.materials, { id: 'pie_' + uid(), kind: 'piedra', path: ['Granitos', 'Gris', 'Nuevo granito'], name: 'Nuevo granito', color: '#9a9893', grain: '#3a3a3a', pattern: 'granito', priceM2: 150000 }] })}>+ Agregar piedra</button>
 
-      <h3>Herrajes</h3>
+      <h3>Accesorios (modelos del panel Modelos)</h3>
+      <div className="table-wrap">
+        <table className="edit acc-table">
+          <thead><tr><th>Familia</th><th>Biblioteca</th><th>Precio</th><th></th></tr></thead>
+          <tbody>
+            {ACC_FAMILIES.flatMap((f) => (settings.accessories?.[f.id] || []).map((a, i) => (
+              <tr key={f.id + a.id}>
+                <td>{i === 0 ? <b>{f.label}</b> : ''}</td>
+                <td><PathInput m={a} onPath={(id, path) => setAcc(f.id, id, { path, name: path.join(' ') })} /></td>
+                <td><NumField compact value={a.price} min={0} max={1e9} step={10} unit={f.unit === 'm' ? '$/m' : `$/${f.unit}`} onChange={(v) => setAcc(f.id, a.id, { price: v })} /></td>
+                <td>
+                  {i === settings.accessories[f.id].length - 1 && <button className="small" onClick={() => addAcc(f.id)} title={`Agregar ${f.one.toLowerCase()}`}>+</button>}
+                  {settings.accessories[f.id].length > 1 && <button className="danger small" onClick={() => delAcc(f.id, a.id)}>✕</button>}
+                </td>
+              </tr>
+            )))}
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Otros herrajes</h3>
       <div className="table-wrap">
         <table className="edit">
           <thead><tr><th>Herraje</th><th>Unidad</th><th>Precio</th></tr></thead>
@@ -98,7 +121,6 @@ export default function Settings({ settings, setSettings }) {
 
       <h3>Costos y corte</h3>
       <div className="grid-fields">
-        <NumField label="Tapacanto $/m" value={settings.edgePerM} min={0} max={1e6} step={10} onChange={(v) => set({ edgePerM: v })} />
         <NumField label="Desperdicio tapacanto" unit="%" value={Math.round(settings.edgeWaste * 100)} min={0} max={100} onChange={(v) => set({ edgeWaste: v / 100 })} />
         <NumField label="Mano de obra" unit="%" value={settings.laborPct} min={0} max={500} onChange={(v) => set({ laborPct: v })} />
         <NumField label="Margen" unit="%" value={settings.marginPct} min={0} max={500} onChange={(v) => set({ marginPct: v })} />

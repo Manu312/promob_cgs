@@ -445,6 +445,20 @@ try {
   check('Mostrar todos… busca y aplica', p.modules.find((m) => m.id === selMod.id).mats?.frentes === 'mel18_nogal' && !(await page.$('.showall')));
   await shot('06c-modelos-seleccion');
   for (let i = 0; i < 2; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300); }
+  // Accesorios con modelos (#74): tirador barral 320 para todos → 3D y presupuesto
+  await page.keyboard.press('Escape'); await sleep(200);
+  await clickText('.tools-item', '▦Modelos');
+  const accRows = await page.$$eval('.md-row .md-label', (els) => els.map((e) => e.textContent));
+  check('Modelos tiene el grupo Accesorios', ['Tiradores:', 'Bisagras:', 'Correderas:', 'Patas:', 'Acabado:'].every((l) => accRows.includes(l)), accRows.join(' '));
+  await (await mdRow('Tiradores')).click(); await sleep(300);
+  await pick('Barrales', '320 mm');
+  p = await project();
+  await clickText('.tabs button', 'Presupuesto'); await sleep(400);
+  const herr = await page.$$eval('.page table tbody tr td:first-child', (els) => els.map((e) => e.textContent.trim()));
+  check('El tirador elegido va al presupuesto con su precio', p.defaults.tiradores === 'tir_barral_320' && herr.includes('Tirador Barrales > 320 mm') && herr.some((t) => t.startsWith('Bisagra Cazoleta 35 mm')), herr.filter((t) => /^(Tirador|Bisagra|Corredera|Pata)/.test(t)).join(' | '));
+  await clickText('.tabs button', 'Diseño 3D'); await sleep(500);
+  await shot('06d-tirador-320');
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
   await page.keyboard.press('KeyE'); await page.keyboard.press('Escape'); await sleep(300);
   await shot('07-precios');
 

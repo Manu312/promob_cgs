@@ -31,11 +31,53 @@ export const DEFAULT_MATERIALS = [
   piedra('cua_gris_concreto', ['Cuarzo', 'Gris Concreto'], '#9a9893', '#6f6d69', 'cuarzo', 300000),
 ];
 
+// Accesorios con modelos (filas "Accesorios" del panel Modelos, como Promob): cada familia
+// reemplaza a un herraje (`code`) y cada modelo tiene ruta y precio. Acabado = tapacanto ($/m).
+export const ACC_FAMILIES = [
+  { id: 'tiradores', label: 'Tiradores', one: 'Tirador', code: 'manija', unit: 'u' },
+  { id: 'bisagras', label: 'Bisagras', one: 'Bisagra', code: 'bisagra', unit: 'u' },
+  { id: 'correderas', label: 'Correderas', one: 'Corredera', code: 'corredera', unit: 'par' },
+  { id: 'patas', label: 'Patas', one: 'Pata', code: 'pata', unit: 'u' },
+  { id: 'acabado', label: 'Acabado', one: 'Tapacanto', code: null, unit: 'm' },
+];
+const acc = (id, path, price, extra = {}) => ({ id, path, name: path.join(' '), price, ...extra });
+export const DEFAULT_ACCESSORIES = {
+  tiradores: [
+    acc('tir_barral_128', ['Barrales', '128 mm'], 2500, { shape: 'barral', len: 128 }),
+    acc('tir_barral_192', ['Barrales', '192 mm'], 3500, { shape: 'barral', len: 192 }),
+    acc('tir_barral_320', ['Barrales', '320 mm'], 5200, { shape: 'barral', len: 320 }),
+    acc('tir_boton', ['Botones', 'Redondo'], 1500, { shape: 'boton' }),
+    acc('tir_sin', ['Sin tirador', 'Push / uñero'], 0, { shape: 'sin' }),
+  ],
+  bisagras: [
+    acc('bis_comun', ['Cazoleta 35 mm', 'Común'], 1800),
+    acc('bis_suave', ['Cazoleta 35 mm', 'Cierre suave'], 3500),
+  ],
+  correderas: [
+    acc('cor_tele', ['Telescópicas', 'Común'], 8000),
+    acc('cor_tele_suave', ['Telescópicas', 'Cierre suave'], 12000),
+    acc('cor_oculta', ['Ocultas', 'Cierre suave'], 22000),
+    acc('cor_push', ['Ocultas', 'Push'], 26000),
+  ],
+  patas: [
+    acc('pata_plastica', ['Regulables', 'Plástica'], 900),
+    acc('pata_metal', ['Regulables', 'Metálica cromada'], 2500),
+  ],
+  acabado: [
+    acc('tc_pvc045', ['PVC', '0,45 mm'], 400),
+    acc('tc_pvc2', ['PVC', '2 mm'], 600),
+    acc('tc_abs2', ['ABS', '2 mm'], 900),
+  ],
+};
+const ACC_DEFAULT = { tiradores: 'tir_barral_128', bisagras: 'bis_suave', correderas: 'cor_tele_suave', patas: 'pata_plastica', acabado: 'tc_pvc2' };
+const ACC_CODES = new Set(ACC_FAMILIES.map((f) => f.code).filter(Boolean));
+
+export function accById(settings, fam, id) {
+  const list = settings.accessories?.[fam] || DEFAULT_ACCESSORIES[fam];
+  return list.find((a) => a.id === id) || list.find((a) => a.id === ACC_DEFAULT[fam]) || list[0];
+}
+
 export const DEFAULT_HARDWARE = [
-  { code: 'bisagra', name: 'Bisagra cazoleta 35mm cierre suave', unit: 'u', price: 3500 },
-  { code: 'corredera', name: 'Par correderas telescópicas', unit: 'par', price: 12000 },
-  { code: 'manija', name: 'Manija 128mm', unit: 'u', price: 2500 },
-  { code: 'pata', name: 'Pata regulable', unit: 'u', price: 900 },
   { code: 'barral', name: 'Barral oval + soportes', unit: 'm', price: 6000 },
   { code: 'soporte_estante', name: 'Soporte de estante', unit: 'u', price: 80 },
   { code: 'kit_corrediza', name: 'Kit puerta corrediza (por hoja)', unit: 'u', price: 25000 },
@@ -45,6 +87,7 @@ export const DEFAULT_HARDWARE = [
 
 export const DEFAULT_SETTINGS = {
   materials: DEFAULT_MATERIALS,
+  accessories: DEFAULT_ACCESSORIES,
   hardware: DEFAULT_HARDWARE,
   edgePerM: 600, // $ por metro de tapacanto
   edgeWaste: 0.1, // 10% desperdicio de tapacanto
@@ -61,7 +104,9 @@ export function mergeSettings(s) {
   base.materials = migrateMaterials(base.materials);
   const hw = Array.isArray(base.hardware) ? [...base.hardware] : [];
   for (const d of DEFAULT_HARDWARE) if (!hw.find((h) => h.code === d.code)) hw.push(d);
-  base.hardware = hw.filter((h) => h.code !== 'mesada'); // la mesada ahora se cobra por m² de su piedra
+  // la mesada se cobra por m² de su piedra y bisagras/correderas/tiradores/patas por su modelo
+  base.hardware = hw.filter((h) => h.code !== 'mesada' && !ACC_CODES.has(h.code));
+  base.accessories = Object.fromEntries(ACC_FAMILIES.map((f) => [f.id, Array.isArray(base.accessories?.[f.id]) && base.accessories[f.id].length ? base.accessories[f.id] : DEFAULT_ACCESSORIES[f.id]]));
   return base;
 }
 
@@ -97,10 +142,12 @@ export function slotIds(o = {}, { fill = false } = {}) {
     fondos: v(o.fondos) ?? v(o.fondo),
     cajones: v(o.cajones) ?? v(o.cajon),
     tapas: v(o.tapas),
+    ...Object.fromEntries(ACC_FAMILIES.map((f) => [f.id, v(o[f.id])])),
   };
   if (fill) {
     out.cajas ??= 'mel18_blanco'; out.externo ??= out.cajas; out.puertas ??= 'mel18_roble'; out.frentes ??= out.puertas;
     out.fondos ??= 'fibro3_blanco'; out.cajones ??= out.cajas; out.tapas ??= 'gra_gris_mara';
+    for (const f of ACC_FAMILIES) out[f.id] ??= ACC_DEFAULT[f.id];
   }
   return Object.fromEntries(Object.entries(out).filter(([, x]) => x !== undefined));
 }

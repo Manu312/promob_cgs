@@ -21,8 +21,8 @@ test('tipo de cada pieza por rol y nombre', () => {
 });
 
 test('proyectos viejos: cuerpo/frente/fondo/cajon pasan a tipos de pieza', () => {
-  const ids = slotIds({ cuerpo: 'a', frente: 'b', fondo: 'c' }, { fill: true });
-  assert.deepEqual(ids, { cajas: 'a', externo: 'a', puertas: 'b', frentes: 'b', fondos: 'c', cajones: 'a', tapas: 'gra_gris_mara' });
+  const { cajas, externo, puertas, frentes, fondos, cajones, tapas } = slotIds({ cuerpo: 'a', frente: 'b', fondo: 'c' }, { fill: true });
+  assert.deepEqual({ cajas, externo, puertas, frentes, fondos, cajones, tapas }, { cajas: 'a', externo: 'a', puertas: 'b', frentes: 'b', fondos: 'c', cajones: 'a', tapas: 'gra_gris_mara' });
   assert.deepEqual(slotIds({ frente: 'x' }), { puertas: 'x', frentes: 'x' }, 'en el módulo lo demás se hereda');
   const p = normalizeProject({ ...sampleProject(), defaults: { cuerpo: 'mel18_negro', frente: 'mel18_nogal', fondo: 'fibro3_blanco', cajon: 'mel18_negro' } });
   assert.equal(p.defaults.puertas, 'mel18_nogal');

@@ -86,22 +86,24 @@ room = {
 
 ## Rebanadas (= issues)
 
-| # | Rebanada | PRD | Depende de |
-|---|---|---|---|
-| S1 | Historial deshacer/rehacer con transacciones | 1.15 | — |
-| S2 | Modelo de paredes v2 + migración + render equivalente (sin cambios visibles) | base | — |
-| S3 | Selección de paredes, panel *Propiedades de pared*, barra de estado | 1.3, 1.16 | S2 |
-| S4 | Vista Planta ortográfica + grilla magnética | 1.17 | — |
-| S5 | Arrastrar paredes y vértices (regla Movible) | 1.4, 1.5 | S2, S3, S4 |
-| S6 | Construir paredes (clics + teclado largo/ángulo) + plantillas | 1.1, 1.2 | S2, S4 |
-| S7 | Eliminar y dividir paredes + menú contextual | 1.6, 1.7 | S3 |
-| S8 | Aberturas y columnas arrastrables, abertura ligada a `wallId` | 1.8 | S2, S3 |
-| S9 | Rebajar / Transparente / Auto Rebajar | 1.9 | S2, S3 |
-| S10 | Cotas automáticas de paredes (lineales + angulares) | 1.10 | S2 |
-| S11 | Cotas de módulos a obstáculo más cercano + cotas editables | 1.11, 1.13 | S10 |
-| S12 | Regla de alturas en vista Frente | 1.12 | S2 |
-| S13 | Cotas manuales lineales/angulares | 1.14 | S11 |
-| S14 | Importar imagen de plano con escala por 2 puntos | 1.18 | S4, S6 |
+| # | Issue | Rebanada | PRD | Depende de |
+|---|---|---|---|---|
+| S1 | #1 | Historial deshacer/rehacer con transacciones | 1.15 | — |
+| S2 | #2 | Modelo de paredes v2 + migración + render equivalente (sin cambios visibles) | base | — |
+| S3 | #4 | Selección de paredes, panel *Propiedades de pared*, barra de estado | 1.3, 1.16 | S2 |
+| S4 | #3 | Vista Planta ortográfica + grilla magnética | 1.17 | — |
+| S5 | #5 | Arrastrar paredes y vértices (regla Movible) | 1.4, 1.5 | S2, S3, S4 |
+| S6 | #6 | Construir paredes (clics + teclado largo/ángulo) + plantillas | 1.1, 1.2 | S2, S4 |
+| S7 | #7 | Eliminar y dividir paredes + menú contextual | 1.6, 1.7 | S3 |
+| S8 | #10 | Aberturas y columnas arrastrables, abertura ligada a `wallId` | 1.8 | S2, S3 |
+| S9 | #11 | Rebajar / Transparente / Auto Rebajar | 1.9 | S2, S3 |
+| S10 | #8 | Cotas automáticas de paredes (lineales + angulares) | 1.10 | S2 |
+| S11 | #9 | Cotas de módulos a obstáculo más cercano + cotas editables | 1.11, 1.13 | S10 |
+| S12 | #12 | Regla de alturas en vista Frente | 1.12 | S2 |
+| S13 | #13 | Cotas manuales lineales/angulares | 1.14 | S11 |
+| S14 | #14 | Importar imagen de plano con escala por 2 puntos | 1.18 | S4, S6 |
+
+Fases 2–9: issues generales #15–#22 (etiquetas `fase-2` … `fase-9`).
 
 Orden sugerido: **S1 → S2 → S4 → S3 → S5 → S6 → S7 → S10 → S11 → S8 → S9 → S12 → S13 → S14**.
 

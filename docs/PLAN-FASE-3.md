@@ -9,7 +9,7 @@ De las fotos en uso (07 y 10, fuera del repo) y de la ayuda pública (`suporte.p
 - **Barra de modulación** acoplada **arriba del 3D** (no a un costado). Jerarquía de pestañas: **biblioteca** (Cocinas, Dormitorios, Baños, Oficinas…) → **familia** (Inferiores, Altos, Islas, Superiores bajos/medios/altos, Tapas/Estantes, Componentes…) → **subfamilia** (Especiales, Cajoneros, Módulos p/Electrodomésticos, Lavaplatos, Diagonales, Esquineros…). Flechas **atrás/adelante**; flecha ▾ para ver la lista completa. Pestaña **Más usados** (los 30 más usados).
 - Miniaturas con nombre + medida ("Mod 2P 800mm"), paginado ("7/17").
 - **Insertar**: arrastrar la miniatura al 3D hasta que aparece el **recuadro verde** de posición de inserción y soltar; o **doble clic** (inserta en la posición siguiente).
-- **Localizar Rápido** (`Ctrl+L`): campo *Buscar por* + *Localizar*; resultados agrupados por ruta de biblioteca, con *Expandir/Recolher todo*; elegir un resultado lo selecciona en la barra. Pie: "Se encontraron N ítems en X s".
+- **Localizar Rápido** (`Ctrl+L`): campo *Buscar por* + *Localizar*; resultados agrupados por ruta de biblioteca, con *Expandir/Contraer todo*; elegir un resultado lo selecciona en la barra. Pie: "Se encontraron N ítems en X s".
 - **Lista de Módulos** (pestaña vertical a la izquierda, junto a *Ítems extras* e *Inserción automática*): jerárquica por **plano de inserción** (piso o pared); seleccionar, **visibilidad** (lamparita; tecla `O`), **Remover** (Ctrl+clic para varios).
 - Las marcas reales (Bosch, Blum, Smeg…) quedan fuera: el PRD excluye logos y modelos de marcas.
 

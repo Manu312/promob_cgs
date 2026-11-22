@@ -22,6 +22,7 @@ import { computeBudget } from './domain/budget.js';
 import { sampleProject, emptyProject, normalizeProject } from './domain/project.js';
 import Scene3D from './ui/Scene3D.jsx';
 import CatalogBar from './ui/CatalogBar.jsx';
+import QuickFind from './ui/QuickFind.jsx';
 import { itemParams } from './domain/library.js';
 import Inspector from './ui/Inspector.jsx';
 import CutPlan from './ui/CutPlan.jsx';
@@ -284,6 +285,7 @@ export default function App() {
   const pickRef = useRef(null);
   const dragItemRef = useRef(null);
   const [ghost, setGhost] = useState(null);
+  const [quickFind, setQuickFind] = useState(false); // Localizar Rápido (Ctrl+L)
   const ghostAt = (clientX, clientY) => {
     const d = dragItemRef.current;
     const pt = d && pickRef.current?.(clientX, clientY, 0);
@@ -346,6 +348,7 @@ export default function App() {
         if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); history.redo(); return; }
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startDrawWalls(); return; }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'l' && tab === 'diseno') { e.preventDefault(); setQuickFind(true); return; }
       if (tab !== 'diseno' || inField) return;
       const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
       const key = e.key.toLowerCase();
@@ -431,7 +434,10 @@ export default function App() {
         <main className="design">
           <section className="viewport">
             <CatalogBar nav={ui.catalogPath} setNav={(p) => setUi((u) => ({ ...u, catalogPath: p }))} counts={ui.catalogUse} onInsert={insertItem} thumbCtx={thumbCtx}
-              onDragItem={(item, variant) => { dragItemRef.current = item ? { item, variant } : null; if (!item) setGhost(null); }} />
+              onDragItem={(item, variant) => { dragItemRef.current = item ? { item, variant } : null; if (!item) setGhost(null); }}
+              onFind={() => setQuickFind(true)} />
+            {quickFind && <QuickFind thumbCtx={thumbCtx} onClose={() => setQuickFind(false)} onInsert={insertItem}
+              onShow={(path, item) => setUi((u) => ({ ...u, catalogPath: [...path, item.id] }))} />}
             <div className="vp-area" {...vpDrag}>
             <ErrorBoundary onReset={() => { setPhotoreal(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}

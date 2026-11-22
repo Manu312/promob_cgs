@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { LIBRARY, resolvePath, mostUsed, paginate, itemSize, variantValues } from '../domain/library.js';
 import { ModelThumb, Silhouette } from './thumbnails.jsx';
+import { IconSearch } from './fields.jsx';
 
 const MAS = '__mas'; // pestaña "Más usados"
 const ITEM_W = 122; // ancho de cada miniatura (px) para el paginado
 
 // Barra de modulación, arriba del visor como en Promob: biblioteca → familia → ítems →
 // subfamilia, con atrás/adelante y "Más usados". Clic elige el ítem; doble clic lo inserta.
-export default function CatalogBar({ nav, setNav, counts = {}, onInsert, onDragItem, thumbCtx }) {
+export default function CatalogBar({ nav, setNav, counts = {}, onInsert, onDragItem, onFind, thumbCtx }) {
   const masUsados = nav?.[0] === MAS;
   const r = resolvePath(masUsados ? [] : nav || []);
   const path = masUsados ? [MAS] : r.path;
@@ -25,6 +26,13 @@ export default function CatalogBar({ nav, setNav, counts = {}, onInsert, onDragI
     return () => ro.disconnect();
   }, []);
   useEffect(() => setPage(0), [path.join('/')]);
+  // Localizar Rápido puede pedir un ítem puntual (4º elemento de la ruta): se marca y se va a su página.
+  const focusId = masUsados ? null : nav?.[3];
+  useEffect(() => {
+    if (!focusId) return;
+    const i = r.sub.items.findIndex((x) => x.id === focusId);
+    if (i >= 0) { setPicked(focusId); setPage(Math.floor(i / perPage)); }
+  }, [focusId, perPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = (p) => {
     if (p.join('/') === path.join('/')) return;
@@ -81,6 +89,7 @@ export default function CatalogBar({ nav, setNav, counts = {}, onInsert, onDragI
       <div className="cb-row cb-subs">
         <button className="cb-nav" disabled={!hist.back.length} onClick={back} title="Atrás" aria-label="Atrás">⟵</button>
         <button className="cb-nav" disabled={!hist.fwd.length} onClick={fwd} title="Adelante" aria-label="Adelante">⟶</button>
+        {onFind && <button className="cb-nav" onClick={onFind} title="Localizar Rápido (Ctrl+L)" aria-label="Localizar Rápido"><IconSearch /></button>}
         {!masUsados && r.group.subgroups.map((s) => tab(s.id === r.sub.id, s.label, () => go([r.lib.id, r.group.id, s.id]), s.id))}
       </div>
     </div>

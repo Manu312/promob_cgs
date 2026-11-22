@@ -3,41 +3,46 @@
 // Un ítem es un tipo de módulo con medidas propias: el mismo tipo da varios ítems.
 import { MODULE_TYPES } from './modules.js';
 
-const it = (id, type, label, params) => ({ id, type, label: label ?? MODULE_TYPES[type].label, ...(params ? { params } : {}) });
+const it = (id, type, label, params, variants) => ({ id, type, label: label ?? MODULE_TYPES[type].label, ...(params ? { params } : {}), ...(variants ? { variants } : {}) });
+// Desplegable de medidas (anchos de fábrica habituales).
+const W = (...values) => ({ param: 'width', values });
+const W_BAJO = W(300, 350, 400, 450, 500, 600, 700, 800, 900, 1000);
+const W_CAJ = W(300, 400, 450, 500, 600, 800);
+const W_ALTO = W(300, 350, 400, 450, 500, 600, 700, 800, 900);
 
 export const LIBRARY = [
   {
     id: 'cocinas', label: 'Cocinas', groups: [
       { id: 'inferiores', label: 'Inferiores', subgroups: [
-        { id: 'puertas', label: 'Puertas', items: [it('coc-inf-2p', 'bajo')] },
-        { id: 'cajoneros', label: 'Cajoneros', items: [it('coc-inf-caj', 'bajo_cajones')] },
-        { id: 'especiales', label: 'Especiales', items: [it('coc-inf-mixto', 'bajo_mixto')] },
-        { id: 'lavaplatos', label: 'Lavaplatos', items: [it('coc-inf-bacha', 'bajo_bacha')] },
+        { id: 'puertas', label: 'Puertas', items: [it('coc-inf-2p', 'bajo', null, null, W_BAJO)] },
+        { id: 'cajoneros', label: 'Cajoneros', items: [it('coc-inf-caj', 'bajo_cajones', null, null, W_CAJ)] },
+        { id: 'especiales', label: 'Especiales', items: [it('coc-inf-mixto', 'bajo_mixto', null, null, W(600, 700, 800, 900, 1000))] },
+        { id: 'lavaplatos', label: 'Lavaplatos', items: [it('coc-inf-bacha', 'bajo_bacha', null, null, W(600, 800, 900, 1000, 1200))] },
       ] },
       { id: 'altos', label: 'Altos', subgroups: [
-        { id: 'alacenas', label: 'Alacenas', items: [it('coc-alt-2p', 'alacena'), it('coc-alt-1p', 'alacena_1p')] },
+        { id: 'alacenas', label: 'Alacenas', items: [it('coc-alt-2p', 'alacena', null, null, W_ALTO), it('coc-alt-1p', 'alacena_1p', null, null, W(300, 350, 400, 450, 500))] },
       ] },
       { id: 'columnas', label: 'Columnas', subgroups: [
-        { id: 'torres', label: 'Torres', items: [it('coc-col-torre', 'columna')] },
+        { id: 'torres', label: 'Torres', items: [it('coc-col-torre', 'columna', null, null, W(450, 500, 600, 700))] },
       ] },
     ],
   },
   {
     id: 'dormitorios', label: 'Dormitorios', groups: [
       { id: 'placares', label: 'Placares', subgroups: [
-        { id: 'batientes', label: 'Batientes', items: [it('dor-pla-bat', 'placard_bat')] },
-        { id: 'corredizos', label: 'Corredizos', items: [it('dor-pla-corr', 'placard_corr')] },
+        { id: 'batientes', label: 'Batientes', items: [it('dor-pla-bat', 'placard_bat', null, null, W(900, 1200, 1500, 1800, 2100, 2400))] },
+        { id: 'corredizos', label: 'Corredizos', items: [it('dor-pla-corr', 'placard_corr', null, null, W(1200, 1500, 1800, 2100, 2400))] },
         { id: 'vestidores', label: 'Vestidores', items: [it('dor-pla-vest', 'vestidor')] },
       ] },
       { id: 'componentes', label: 'Componentes', subgroups: [
-        { id: 'cajoneras', label: 'Cajoneras', items: [it('dor-com-caj', 'cajonera_placard')] },
+        { id: 'cajoneras', label: 'Cajoneras', items: [it('dor-com-caj', 'cajonera_placard', null, null, W(400, 450, 500, 600, 800))] },
       ] },
     ],
   },
   {
     id: 'banos', label: 'Baños', groups: [
       { id: 'inferiores', label: 'Inferiores', subgroups: [
-        { id: 'vanitory', label: 'Vanitory', items: [it('ban-inf-van', 'vanitory'), it('ban-inf-vancaj', 'vanitory_cajones')] },
+        { id: 'vanitory', label: 'Vanitory', items: [it('ban-inf-van', 'vanitory', null, null, W(500, 600, 700, 800, 1000, 1200)), it('ban-inf-vancaj', 'vanitory_cajones', null, null, W(500, 600, 800, 1000))] },
       ] },
       { id: 'altos', label: 'Altos', subgroups: [
         { id: 'botiquines', label: 'Botiquines', items: [it('ban-alt-bot', 'botiquin')] },
@@ -50,7 +55,7 @@ export const LIBRARY = [
   {
     id: 'oficinas', label: 'Oficinas', groups: [
       { id: 'escritorios', label: 'Escritorios', subgroups: [
-        { id: 'escritorios', label: 'Escritorios', items: [it('ofi-esc', 'escritorio'), it('ofi-esc-caj', 'cajonera')] },
+        { id: 'escritorios', label: 'Escritorios', items: [it('ofi-esc', 'escritorio', null, null, W(900, 1000, 1200, 1400, 1600)), it('ofi-esc-caj', 'cajonera')] },
       ] },
       { id: 'guardado', label: 'Guardado', subgroups: [
         { id: 'bibliotecas', label: 'Bibliotecas', items: [it('ofi-bib', 'biblioteca')] },
@@ -83,6 +88,13 @@ export function itemParams(item, variant = null) {
 
 // Texto de medida para la miniatura (ancho × alto × profundidad).
 export const itemSize = (item, variant) => { const p = itemParams(item, variant); return `${p.width}×${p.height}×${p.depth}`; };
+
+// Medidas para el desplegable: las de fábrica más la del ítem, ordenadas y sin repetir.
+export function variantValues(item) {
+  if (!item.variants) return [];
+  const d = itemParams(item)[item.variants.param];
+  return [...new Set([...item.variants.values, d])].sort((a, b) => a - b);
+}
 
 // Navegación: completa una ruta parcial con la primera familia / subfamilia.
 export function resolvePath([libId, groupId, subId] = [], lib = LIBRARY) {

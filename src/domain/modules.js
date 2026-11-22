@@ -288,7 +288,8 @@ export function clampToRoom(mod, room) {
   return { ...mod, x: Math.max(0, Math.min(room.w - fw, mod.x)), z: Math.max(0, Math.min(room.d - fd, mod.z)) };
 }
 
-export function snapPosition(mod, others, room, thr = 40) {
+// `step`: paso al que se redondea cuando no hay imán cerca (10 mm, o la grilla magnética en Planta).
+export function snapPosition(mod, others, room, thr = 40, step = 10) {
   const { fw, fd } = footprint(mod);
   const walls = room.walls?.length ? snapCandidates(room, fw, fd) : { xs: [0, room.w - fw], zs: [0, room.d - fd] };
   const cx = [...walls.xs], cz = [...walls.zs];
@@ -298,7 +299,7 @@ export function snapPosition(mod, others, room, thr = 40) {
     cz.push(o.z + f.fd, o.z - fd, o.z, o.z + f.fd - fd);
   }
   const near = (v, cands) => {
-    let best = Math.round(v / 10) * 10, bd = thr;
+    let best = Math.round(v / step) * step, bd = thr;
     for (const c of cands) { const d = Math.abs(c - v); if (d < bd) { bd = d; best = c; } }
     return best;
   };

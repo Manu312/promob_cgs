@@ -1,5 +1,7 @@
 import { OPENING_TYPES, roomWalls, rid, rebuildFromShape, setWallDefaults } from '../domain/room.js';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { placePlanImage, dataUrlTooBig } from '../domain/planImage.js';
+import { bounds } from '../domain/walls.js';
 import { NumField, SelField, ListField } from './fields.jsx';
 import { parseHeights } from '../domain/dimensions.js';
 import { TEMPLATES, applyTemplate } from '../domain/drawWalls.js';
@@ -8,7 +10,20 @@ const SHAPES = [['rect', 'Rectangular'], ['L', 'En L'], ['libre', 'Libre (puntos
 
 // Editor numérico del ambiente. Las formas regeneran las paredes conservando sus ids
 // (las aberturas siguen en su pared). Se reemplaza por la edición interactiva de la Fase 1.
-export default function RoomEditor({ room, onChange, onSelectWall, onDrawWalls, onSelectItem }) {
+export default function RoomEditor({ room, onChange, onSelectWall, onDrawWalls, onSelectItem, planImage, onPlanImage, onScaleImage }) {
+  const fileRef = useRef(null);
+  // Plano de referencia: la imagen arranca ocupando el ancho del ambiente; después se escala con 2 puntos.
+  const loadImage = (file) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const src = String(fr.result);
+      if (dataUrlTooBig(src)) window.alert('La imagen pesa más de 2 MB: el proyecto va a quedar pesado. Conviene achicarla.');
+      const im = new Image();
+      im.onload = () => onPlanImage(() => placePlanImage(src, im.naturalWidth, im.naturalHeight, bounds(room)));
+      im.src = src;
+    };
+    fr.readAsDataURL(file);
+  };
   const [tpl, setTpl] = useState({ kind: 'dos', w: 3600, d: 3000 });
   const set = (patch) => onChange({ ...room, ...patch });
   const rebuild = (patch) => onChange(rebuildFromShape(room, patch));
@@ -93,6 +108,27 @@ export default function RoomEditor({ room, onChange, onSelectWall, onDrawWalls, 
               </button>
             ))}
           </div>
+        </>
+      )}
+
+      {onPlanImage && (
+        <>
+          <h4>Plano de referencia</h4>
+          <input ref={fileRef} type="file" accept="image/png,image/jpeg" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) loadImage(f); e.target.value = ''; }} />
+          {!planImage ? (
+            <div className="row-btns"><button onClick={() => fileRef.current?.click()} title="Imagen del plano para dibujar las paredes encima">Cargar imagen…</button></div>
+          ) : (
+            <>
+              <NumField label="Opacidad" unit="%" value={Math.round(planImage.opacity * 100)} min={5} max={100} step={5} onChange={(v) => onPlanImage((img) => ({ ...img, opacity: v / 100 }))} />
+              <SelField label="Visible" value={planImage.visible ? 'si' : 'no'} options={[['si', 'Sí'], ['no', 'No']]} onChange={(v) => onPlanImage((img) => ({ ...img, visible: v === 'si' }))} />
+              <div className="row-btns">
+                <button onClick={onScaleImage} title="Marcá dos puntos de un tramo conocido y escribí su medida real">Escalar con 2 puntos</button>
+                <button onClick={() => fileRef.current?.click()}>Cambiar</button>
+                <button className="danger" onClick={() => onPlanImage(() => null)}>Quitar</button>
+              </div>
+              <p className="hint">Se ve en Planta, debajo de la grilla. No sale en el render ni en la imagen exportada.</p>
+            </>
+          )}
         </>
       )}
 

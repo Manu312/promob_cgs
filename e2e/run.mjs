@@ -514,6 +514,31 @@ try {
   p = await project();
   check('Deshacer el borrado de la cota', p.annotations.length === 2);
   check('Sin errores de consola tras cotas manuales', errors.length === 0, errors.slice(-3).join(' | '));
+
+  // Plano de referencia como imagen, escalado con 2 puntos (#14)
+  await page.keyboard.press('Escape'); await sleep(200);
+  await page.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 200; c.height = 100;
+    const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, 200, 100); g.strokeStyle = '#000'; g.lineWidth = 3; g.strokeRect(10, 10, 180, 80);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    const dt = new DataTransfer(); dt.items.add(new File([blob], 'plano.png', { type: 'image/png' }));
+    const input = document.querySelector('.room-editor input[type=file]');
+    input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await sleep(1200);
+  p = await project();
+  check('Cargar plano de referencia (ocupa el ancho del ambiente)', p.planImage?.wPx === 200 && Math.abs(p.planImage.mmPerPx - 18) < 0.01, JSON.stringify({ ...p.planImage, src: undefined }));
+  check('El plano se ve en Planta', await page.evaluate(() => window.__muebles.planImageShown));
+  await clickText('.room-editor button', 'Escalar con 2 puntos'); await sleep(1200);
+  let sq = await page.evaluate(() => window.__muebles.screenOfPoint(0, 1500)); await page.mouse.click(sq.x, sq.y); await sleep(300);
+  sq = await page.evaluate(() => window.__muebles.screenOfPoint(1800, 1500)); await page.mouse.click(sq.x, sq.y); await sleep(400);
+  await page.keyboard.type('3000'); await page.keyboard.press('Enter'); await sleep(600);
+  p = await project();
+  check('Escalar con 2 puntos: el tramo marcado pasa a medir 3000', Math.abs(p.planImage.mmPerPx - 30) < 0.5 && Math.abs(p.planImage.x) < 20, `mm/px=${p.planImage.mmPerPx.toFixed(2)}, x=${Math.round(p.planImage.x)}`);
+  await shot('27-plano-referencia');
+  await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(1200);
+  check('El plano de referencia no aparece fuera de Planta', !(await page.evaluate(() => window.__muebles.planImageShown)));
+  check('Sin errores de consola tras plano de referencia', errors.length === 0, errors.slice(-3).join(' | '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

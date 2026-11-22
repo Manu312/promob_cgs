@@ -7,6 +7,7 @@ import { applyDimEdit } from './domain/dimensions.js';
 import { updateOpening, setOpeningDim, moveColumn, removeOpening, removeColumn } from './domain/openings.js';
 import { addWall, segmentEnd } from './domain/drawWalls.js';
 import { addAnnotation, removeAnnotation } from './domain/annotations.js';
+import { scalePlanImage } from './domain/planImage.js';
 import { absAngle } from './domain/walls.js';
 import DrawHud from './ui/DrawHud.jsx';
 import { buildAll, computeCutList } from './domain/cutlist.js';
@@ -131,8 +132,27 @@ export default function App() {
       setAnnotating({ ...annotating, points: [] });
     } else setAnnotating({ ...annotating, points: pts });
   };
+  // Escalar el plano de referencia: 2 clics libres + medida real.
+  const [scaling, setScaling] = useState(null); // { points }
+  const [scaleLen, setScaleLen] = useState('');
+  const scaleRef = useRef(null);
+  const startScale = () => { setDrawing(null); setAnnotating(null); setScaling({ points: [] }); setScaleLen(''); toPlanta(); };
+  const stopScale = () => setScaling(null);
+  const onScalePoint = (pt) => {
+    if (scaling.points.length >= 2) return;
+    setScaling({ points: [...scaling.points, pt] });
+    // el clic en el visor se queda con el foco después del render: enfocar la medida después
+    if (scaling.points.length === 1) setTimeout(() => scaleRef.current?.focus(), 50);
+  };
+  const applyScale = () => {
+    const v = Number(String(scaleLen).replace(',', '.'));
+    if (scaling.points.length === 2 && v > 0) setProject((p) => ({ ...p, planImage: scalePlanImage(p.planImage, scaling.points[0], scaling.points[1], v) }));
+    stopScale();
+  };
+  const annTool = annotating ?? (scaling ? { mode: 'lin', points: scaling.points, free: true } : null);
+
   const startDrawWalls = () => {
-    setAnnotating(null);
+    setAnnotating(null); setScaling(null);
     setDrawing(freshDraw); setDrawLen(''); setDrawAng(''); setSelection(null);
     if (view.name !== 'planta') { setView((v) => ({ name: 'planta', tick: v.tick + 1 })); setShowDims(true); }
     setTimeout(() => lenRef.current?.focus(), 50);
@@ -235,6 +255,12 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startDrawWalls(); return; }
       if (tab !== 'diseno' || inField) return;
       if (annotating) { if (e.key === 'Escape') stopAnnotate(); return; }
+      if (scaling) {
+        if (e.key === 'Escape') stopScale();
+        else if (scaling.points.length === 2 && /^[0-9.,]$/.test(e.key)) { e.preventDefault(); setScaleLen((v) => v + e.key); scaleRef.current?.focus(); }
+        else if (scaling.points.length === 2 && e.key === 'Enter') applyScale();
+        return;
+      }
       if (selectedDimId && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); setProject((p) => removeAnnotation(p, selectedDimId)); setSelection(null); return; }
       if (drawing) { // los números van directo al largo, como en Promob
         if (e.key === 'Escape') stopDrawWalls();
@@ -309,7 +335,7 @@ export default function App() {
                 onDragStart={onDragStart} onDragEnd={history.commit}
                 drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
                 onWallContext={onWallContext}
-                annotating={annotating} onAnnotatePoint={onAnnotatePoint} onAnnotateFinish={stopAnnotate}
+                annotating={annTool} onAnnotatePoint={annotating ? onAnnotatePoint : onScalePoint} onAnnotateFinish={annotating ? stopAnnotate : stopScale}
                 selectedDimId={selectedDimId} onSelectDim={selectDim}
                 onRestoreWall={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, id, { lowered: false }) }))}
                 selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
@@ -319,7 +345,7 @@ export default function App() {
             </ErrorBoundary>
             <div className="vp-toolbar">
               {[['perspectiva', 'Perspectiva'], ['frente', 'Frente'], ['planta', 'Planta']].map(([k, l]) => (
-                <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => { setView((v) => ({ name: k, tick: v.tick + 1 })); if (k === 'planta') setShowDims(true); else { stopDrawWalls(); stopAnnotate(); } }}>{l}</button>
+                <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => { setView((v) => ({ name: k, tick: v.tick + 1 })); if (k === 'planta') setShowDims(true); else { stopDrawWalls(); stopAnnotate(); stopScale(); } }}>{l}</button>
               ))}
               <button className={showDims ? 'active-soft' : ''} onClick={() => setShowDims((s) => !s)} title="Mostrar medidas de paredes y módulos">Cotas</button>
               <button className={autoLower ? 'active-soft' : ''} onClick={() => setAutoLower((s) => !s)} title="Auto Rebajar: las paredes que tapan la vista bajan a zócalo">Auto rebajar</button>
@@ -366,6 +392,16 @@ export default function App() {
                 <span className="hint-inline">{annotating.mode === 'lin' ? 'Clic en el primer punto y en el segundo' : 'Clic en un brazo, en el vértice y en el otro brazo'} · se pega a esquinas y caras · Esc o clic derecho termina</span>
               </div>
             )}
+            {scaling && (
+              <div className="draw-hud">
+                <b>Escalar plano</b>
+                {scaling.points.length < 2
+                  ? <span className="hint-inline">Clic en los dos extremos de un tramo que conozcas (por ejemplo, una pared) · Esc cancela</span>
+                  : <label>Medida real <input ref={scaleRef} autoFocus value={scaleLen} onChange={(e) => setScaleLen(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') applyScale(); if (e.key === 'Escape') stopScale(); }} /> mm</label>}
+                {scaling.points.length === 2 && <button className="active" onClick={applyScale}>Aplicar</button>}
+                <button onClick={stopScale}>Cancelar</button>
+              </div>
+            )}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}
             {deleteDlg && <WallDeleteDialog label={`Pared ${project.room.walls.findIndex((w) => w.id === deleteDlg.wallId) + 1}`} onConfirm={confirmDelete} onCancel={() => setDeleteDlg(null)} />}
             <div className="statusbar">
@@ -376,7 +412,7 @@ export default function App() {
           <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
             selectedWallId={selectedWallId} onSelectWall={selectWall} onDrawWalls={startDrawWalls}
             onDeleteWall={(id) => setDeleteDlg({ wallId: id })} onSplitWall={doSplit}
-            selectedOpeningId={selectedOpeningId} selectedColumnId={selectedColumnId} onSelectItem={setSelection}
+            selectedOpeningId={selectedOpeningId} selectedColumnId={selectedColumnId} onSelectItem={setSelection} onScaleImage={startScale}
             onParams={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
             onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}

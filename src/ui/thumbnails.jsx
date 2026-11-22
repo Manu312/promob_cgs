@@ -23,9 +23,10 @@ function getRenderer() {
   return renderer;
 }
 
-function box(x, y, z, sx, sy, sz, material) {
+function box({ x, y, z, sx, sy, sz, ry = 0 }, material) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(sx * S, sy * S, sz * S), material);
   m.position.set((x + sx / 2) * S, (y + sy / 2) * S, (z + sz / 2) * S);
+  m.rotation.y = ry;
   return m;
 }
 
@@ -42,8 +43,8 @@ function render(item, variant, ctx) {
   const { width: W, height: H, depth: D } = params;
   const g = new THREE.Group();
   g.position.set((-W / 2) * S, (-H / 2) * S, (-D / 2) * S);
-  for (const p of b.parts) g.add(box(p.x, p.y, p.z, p.sx, p.sy, p.sz, mat3d(b.mats[p.role])));
-  for (const d of b.decors) g.add(box(d.x, d.y, d.z, d.sx, d.sy, d.sz, d.decor === 'mesada' ? stone : metal));
+  for (const p of b.parts) g.add(box(p, mat3d(b.mats[p.role])));
+  for (const d of b.decors) g.add(box(d, d.decor === 'mesada' ? stone : metal));
   scene.add(g);
   // Cámara de frente, un poco de costado y desde arriba; encuadra la esfera que envuelve al módulo.
   const cam = new THREE.PerspectiveCamera(28, 1, 0.01, 100);

@@ -47,7 +47,12 @@ diseño 3D, renderizado, plan de corte y presupuesto. Se quieren todas las funci
    colisión (`B`) y acoplamientos en la barra inferior como Promob, arrastre que no se pierde, cotas verticales
    (piso/techo), panel Herramientas · Movimiento (desplazamiento, rotación, paso, posición relativa), rotación libre,
    flechas por eje a ambos lados, módulos que acompañan a la pared, tamaño máximo (clic derecho) y apoyar sobre otros.
-   Siguiente: Fase 3 (#16) — catálogo tipo Promob.
+3d. ✅ **Paridad con Promob — Fase 3, catálogo** (ver `docs/PLAN-FASE-3.md`, issues #55–#62): barra de modulación arriba
+   del visor (biblioteca → familia → subfamilia, Más usados, atrás/adelante), miniaturas renderizadas del modelo, variantes
+   de medida, insertar arrastrando con recuadro verde (plano de inserción pared/piso), Localizar Rápido (Ctrl+L), Lista de
+   Módulos (visibilidad `O`, remover), módulos nuevos (cajoneros, especiales, p/electrodomésticos, islas, superiores, tapas
+   con bachas, vistas, estantes) y esquineros L y oblicuos. Queda para después: módulos curvos (3.8, *Puede*).
+   Siguiente: Fase 4 (#17) — modelos y estilos (materiales).
 4. ⏳ **Esquineros y especiales**: bajo esquinero L, alacena esquinera, horno/anafe, heladera, rebatibles, cajonera interna, alacena sobre heladera.
 5. ⏳ **Corte para taller**: orden de cortes, etiquetas por pieza imprimibles, sobrantes reutilizables.
 6. ⏳ **Módulo libre** a medida (editor por piezas).

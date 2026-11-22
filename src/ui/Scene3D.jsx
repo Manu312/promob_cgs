@@ -25,7 +25,7 @@ const MAX_DRAG_DIST = 25; // m: más lejos, el plano de arrastre está casi de c
 
 function PartMesh({ p, material }) {
   return (
-    <mesh position={[(p.x + p.sx / 2) * S, (p.y + p.sy / 2) * S, (p.z + p.sz / 2) * S]} material={material} castShadow receiveShadow>
+    <mesh position={[(p.x + p.sx / 2) * S, (p.y + p.sy / 2) * S, (p.z + p.sz / 2) * S]} rotation={[0, p.ry || 0, 0]} material={material} castShadow receiveShadow>
       <boxGeometry args={[p.sx * S, p.sy * S, p.sz * S]} />
     </mesh>
   );
@@ -41,7 +41,7 @@ function DecorMesh({ d }) {
     );
   }
   return (
-    <mesh position={pos} material={d.decor === 'mesada' ? stone : metal} castShadow receiveShadow>
+    <mesh position={pos} rotation={[0, d.ry || 0, 0]} material={d.decor === 'mesada' ? stone : metal} castShadow receiveShadow>
       <boxGeometry args={[d.sx * S, d.sy * S, d.sz * S]} />
     </mesh>
   );

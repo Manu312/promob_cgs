@@ -107,6 +107,25 @@ try {
   await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(400);
   p = await project();
   check('Deshacer saca el módulo insertado', p.modules.length === nBefore);
+  // Insertar arrastrando desde el catálogo con recuadro verde (#58)
+  const dropAt = await page.evaluate(() => window.__muebles.screenOfPoint(3300, 250, 0));
+  const drag = (type) => page.evaluate((type, x, y) => {
+    const src = [...document.querySelectorAll('.mod-btn')].find((e) => e.querySelector('span')?.textContent.trim() === 'Bajo mesada cajonero');
+    const vp = document.querySelector('.vp-area');
+    window.__dt = window.__dt || new DataTransfer();
+    const ev = (t, el) => el.dispatchEvent(new DragEvent(t, { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: window.__dt }));
+    if (type === 'start') { ev('dragstart', src); ev('dragenter', vp); ev('dragover', vp); }
+    if (type === 'drop') { ev('drop', vp); ev('dragend', src); window.__dt = null; }
+  }, type, dropAt.x, dropAt.y);
+  await drag('start'); await sleep(600);
+  check('Arrastrar desde el catálogo muestra el recuadro verde', await page.evaluate(() => window.__muebles.ghostShown));
+  await shot('01c-recuadro-verde');
+  await drag('drop'); await sleep(600);
+  p = await project();
+  const dropped = p.modules.at(-1);
+  check('Al soltar inserta contra la pared del fondo', p.modules.length === nBefore + 1 && dropped.type === 'bajo_cajones' && dropped.z === 0 && dropped.rot === 0 && !(await page.evaluate(() => window.__muebles.ghostShown)), '(' + dropped.x + ',' + dropped.z + ') rot ' + dropped.rot);
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(400);
+  check('Deshacer saca el módulo arrastrado', (await project()).modules.length === nBefore);
 
   // Seleccionar un bajo mesada con clic en 3D y arrastrarlo
   await page.keyboard.press('Escape');

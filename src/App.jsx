@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
-import { newModule, footprint, snapPosition, resizeModule, uid } from './domain/modules.js';
+import { newModule, footprint, snapPosition, resizeModule, uid, isSquare } from './domain/modules.js';
+import { insertPose } from './domain/insert.js';
 import { collideMove, collideLift } from './domain/collision.js';
 import { nudgeTarget, rotateAboutCenter, lockAxis, restingHeight } from './domain/movement.js';
 import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
@@ -278,8 +279,46 @@ export default function App() {
   };
 
   // Insertar desde el catálogo (doble clic): posición siguiente libre; cuenta para "Más usados".
+  const countUse = (item) => setUi((u) => ({ ...u, catalogUse: { ...(u.catalogUse || {}), [item.id]: ((u.catalogUse || {})[item.id] || 0) + 1 } }));
+  // Arrastrar desde el catálogo: recuadro verde en el plano de inserción (pared o piso) y soltar inserta.
+  const pickRef = useRef(null);
+  const dragItemRef = useRef(null);
+  const [ghost, setGhost] = useState(null);
+  const ghostAt = (clientX, clientY) => {
+    const d = dragItemRef.current;
+    const pt = d && pickRef.current?.(clientX, clientY, 0);
+    if (!pt) return null;
+    const params = itemParams(d.item, d.variant);
+    const { wallId, ...pose } = insertPose(d.item.type, params, project.room, pt); // eslint-disable-line no-unused-vars
+    let m = { id: '__ghost', type: d.item.type, params, ...pose, mats: {} };
+    if (ui.magnets !== false && isSquare(m.rot)) m = { ...m, ...snapPosition(m, project.modules, project.room, 40, gridStep) };
+    return m;
+  };
+  const vpDrag = {
+    onDragOver: (e) => {
+      if (!dragItemRef.current) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      const m = ghostAt(e.clientX, e.clientY);
+      setGhost((g) => (m && g && g.x === m.x && g.z === m.z && g.rot === m.rot ? g : m));
+    },
+    onDragLeave: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setGhost(null); },
+    onDrop: (e) => {
+      const d = dragItemRef.current;
+      if (!d) return;
+      e.preventDefault();
+      const m = ghostAt(e.clientX, e.clientY);
+      dragItemRef.current = null;
+      setGhost(null);
+      if (!m) return;
+      const mod = { ...m, id: uid() };
+      countUse(d.item);
+      setProject((p) => ({ ...p, modules: [...p.modules, mod] }));
+      setSelectedId(mod.id);
+    },
+  };
   const insertItem = (item, variant = null) => {
-    setUi((u) => ({ ...u, catalogUse: { ...(u.catalogUse || {}), [item.id]: ((u.catalogUse || {})[item.id] || 0) + 1 } }));
+    countUse(item);
     const m = newModule(item.type, project, itemParams(item, variant));
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));
     setSelectedId(m.id);
@@ -391,8 +430,9 @@ export default function App() {
       {tab === 'diseno' && (
         <main className="design">
           <section className="viewport">
-            <CatalogBar nav={ui.catalogPath} setNav={(p) => setUi((u) => ({ ...u, catalogPath: p }))} counts={ui.catalogUse} onInsert={insertItem} thumbCtx={thumbCtx} />
-            <div className="vp-area">
+            <CatalogBar nav={ui.catalogPath} setNav={(p) => setUi((u) => ({ ...u, catalogPath: p }))} counts={ui.catalogUse} onInsert={insertItem} thumbCtx={thumbCtx}
+              onDragItem={(item, variant) => { dragItemRef.current = item ? { item, variant } : null; if (!item) setGhost(null); }} />
+            <div className="vp-area" {...vpDrag}>
             <ErrorBoundary onReset={() => { setPhotoreal(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
                 selectedWallId={selectedWallId} onSelectWall={selectWall}
@@ -407,7 +447,7 @@ export default function App() {
                 selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
-                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower} />
+                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower} pickRef={pickRef} ghost={ghost} />
             </ErrorBoundary>
             <div className="vp-toolbar">
               {[['perspectiva', 'Perspectiva'], ['frente', 'Frente'], ['planta', 'Planta']].map(([k, l]) => (

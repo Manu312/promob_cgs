@@ -7,7 +7,7 @@ const ITEM_W = 122; // ancho de cada miniatura (px) para el paginado
 
 // Barra de modulación, arriba del visor como en Promob: biblioteca → familia → ítems →
 // subfamilia, con atrás/adelante y "Más usados". Clic elige el ítem; doble clic lo inserta.
-export default function CatalogBar({ nav, setNav, counts = {}, onInsert, thumbCtx }) {
+export default function CatalogBar({ nav, setNav, counts = {}, onInsert, onDragItem, thumbCtx }) {
   const masUsados = nav?.[0] === MAS;
   const r = resolvePath(masUsados ? [] : nav || []);
   const path = masUsados ? [MAS] : r.path;
@@ -56,8 +56,10 @@ export default function CatalogBar({ nav, setNav, counts = {}, onInsert, thumbCt
             const vs = variantValues(item);
             const v = variant[item.id] ?? null;
             return (
-              <div key={item.id} className={`mod-btn${picked === item.id ? ' picked' : ''}`} role="button" tabIndex={0} title="Doble clic para insertar"
-                onClick={() => setPicked(item.id)} onDoubleClick={() => onInsert(item, v)}>
+              <div key={item.id} className={`mod-btn${picked === item.id ? ' picked' : ''}`} role="button" tabIndex={0} title="Arrastralo al 3D o hacé doble clic para insertarlo"
+                onClick={() => setPicked(item.id)} onDoubleClick={() => onInsert(item, v)}
+                draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', item.id); e.dataTransfer.effectAllowed = 'copy'; setPicked(item.id); onDragItem?.(item, v); }}
+                onDragEnd={() => onDragItem?.(null)}>
                 {thumbCtx ? <ModelThumb item={item} variant={v} ctx={thumbCtx} /> : <Silhouette item={item} />}
                 <span>{item.label}</span>
                 {vs.length > 0 ? (

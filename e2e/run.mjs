@@ -111,6 +111,38 @@ try {
   p = await project();
   check('Supr borra módulo', p.modules.length === 8);
 
+  // Colisión, Acoplamientos y arrastre que no se pierde (#39)
+  const modNow = async (id) => (await project()).modules.find((m) => m.id === id);
+  const dragBy = async (id, dx, dy, n = 30) => {
+    const q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), id);
+    await page.mouse.move(q.x, q.y); await page.mouse.down();
+    for (let i = 1; i <= n; i++) { await page.mouse.move(q.x + dx * i, q.y + dy * i); await sleep(30); }
+    await page.mouse.up(); await sleep(400);
+  };
+  const toggleOn = (label) => page.evaluate((label) => [...document.querySelectorAll('.statusbar .sb-toggle')].find((b) => b.textContent.trim() === label)?.classList.contains('on'), label);
+  const fwOf = (m) => (m.rot % 180 ? m.params.depth : m.params.width);
+  check('Colisión y Acoplamientos activos por defecto en la barra inferior', (await toggleOn('Colisión')) && (await toggleOn('Acoplamientos')) && (await toggleOn('Auto Rebajar')));
+  await dragBy(target.id, 30, 0);
+  let cmod = await modNow(target.id);
+  check('Con Colisión el módulo frena contra la pared derecha', cmod.x + fwOf(cmod) <= 3600, `x=${cmod.x}, ancho en planta ${fwOf(cmod)}`);
+  await dragBy(target.id, 0, -25);
+  cmod = await modNow(target.id);
+  check('Arrastrar hacia el fondo no lo saca del ambiente', cmod.z >= 0 && cmod.x + fwOf(cmod) <= 3600 && cmod.x >= 0, `(${cmod.x},${cmod.z})`);
+  await shot('03-colision');
+  await page.keyboard.press('KeyB'); await sleep(300);
+  check('Tecla B apaga la Colisión', (await toggleOn('Colisión')) === false);
+  await dragBy(target.id, 30, 0);
+  cmod = await modNow(target.id);
+  check('Sin Colisión el módulo atraviesa la pared', cmod.x + fwOf(cmod) > 3600, `x=${cmod.x}`);
+  await ctrl('KeyZ'); await ctrl('KeyZ'); await ctrl('KeyZ');
+  await page.keyboard.press('KeyB'); await sleep(300);
+  check('Tecla B vuelve a prender la Colisión', await toggleOn('Colisión'));
+  await clickText('.statusbar .sb-toggle', 'Acoplamientos');
+  check('Acoplamientos se apaga desde la barra', (await toggleOn('Acoplamientos')) === false);
+  await clickText('.statusbar .sb-toggle', 'Acoplamientos');
+  p = await project();
+  check('Deshacer devuelve el módulo adentro', p.modules.length === 8 && (() => { const m = p.modules.find((o) => o.id === target.id); return m.x + fwOf(m) <= 3600; })());
+
   // Arrastrar en vacío rota cámara, no deselecciona errores
   await page.mouse.move(700, 200); await page.mouse.down(); await page.mouse.move(800, 250, { steps: 8 }); await page.mouse.up();
   await sleep(300);
@@ -451,11 +483,11 @@ try {
   const [backW, , frontW] = p.room.walls;
   let low = await page.evaluate(() => window.__mueblesLowered || {});
   check('Auto rebajar baja a zócalo la pared que tapa la vista', low[frontW.id] === true && low[backW.id] === false, JSON.stringify(low));
-  await clickText('.vp-toolbar button', 'Auto rebajar'); await sleep(700);
+  await clickText('.statusbar .sb-toggle', 'Auto Rebajar'); await sleep(700);
   low = await page.evaluate(() => window.__mueblesLowered || {});
   check('Sin Auto rebajar la pared de adelante vuelve a subir', low[frontW.id] === false);
   await shot('23-sin-auto-rebajar');
-  await clickText('.vp-toolbar button', 'Auto rebajar'); await sleep(700);
+  await clickText('.statusbar .sb-toggle', 'Auto Rebajar'); await sleep(700);
   const bp3 = await page.evaluate((id) => window.__muebles.screenOfWall(id, 1500), backW.id);
   await page.mouse.click(bp3.x, bp3.y, { button: 'right' }); await sleep(400);
   await clickText('.wall-menu button', 'Transparente'); await sleep(400);

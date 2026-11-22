@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
 import { newModule, footprint, snapPosition, resizeModule, uid } from './domain/modules.js';
+import { collideMove } from './domain/collision.js';
+import StatusToggles from './ui/StatusToggles.jsx';
 import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls } from './domain/wallEdit.js';
 import { WallContextMenu, WallDeleteDialog } from './ui/WallMenus.jsx';
 import { applyDimEdit } from './domain/dimensions.js';
@@ -39,7 +41,10 @@ const TABS = [['diseno', 'Diseño 3D'], ['corte', 'Plan de corte'], ['presupuest
 export default function App() {
   const [project, setProject, history] = useHistoryState('mueblesapp.project', sampleProject, normalizeProject);
   const [showDims, setShowDims] = useState(false);
-  const [autoLower, setAutoLower] = useState(true); // Auto Rebajar (como Promob)
+  // Interruptores de la barra inferior (como Promob): Colisión, Acoplamientos, Auto Rebajar.
+  const [ui, setUi] = usePersistent('mueblesapp.ui', { collision: true, magnets: true, autoLower: true });
+  const autoLower = ui.autoLower !== false;
+  const toggleUi = (k) => setUi((u) => ({ ...u, [k]: u[k] === false }));
   const [rawSettings, setSettings] = usePersistent('mueblesapp.settings', DEFAULT_SETTINGS);
   const settings = useMemo(() => mergeSettings(rawSettings), [rawSettings]);
   const [tab, setTab] = useState('diseno');
@@ -80,13 +85,16 @@ export default function App() {
   // En Planta, con grilla magnética, los arrastres se redondean al paso de la grilla.
   const grid = project.room.grid || { size: 50, magnetic: true };
   const gridStep = view.name === 'planta' && grid.magnetic ? grid.size : 10;
-  const onMove = useCallback((id, x, z) => setProject((p) => {
+  // Mover un módulo: imán (Acoplamientos) y, con Colisión, sin atravesar paredes ni módulos.
+  const placeModule = useCallback((p, id, x, z, magnet) => {
     const m = p.modules.find((o) => o.id === id);
     if (!m) return p;
-    const pos = snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id), p.room, 40, gridStep);
+    let pos = magnet ? snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id), p.room, 40, gridStep) : { x: Math.round(x), z: Math.round(z) };
+    if (ui.collision !== false) pos = collideMove(m, pos.x, pos.z, p.room, p.modules);
     if (pos.x === m.x && pos.z === m.z) return p;
     return { ...p, modules: p.modules.map((o) => (o.id === id ? { ...o, ...pos } : o)) };
-  }), [setProject, gridStep]);
+  }, [gridStep, ui.collision]);
+  const onMove = useCallback((id, x, z) => setProject((p) => placeModule(p, id, x, z, ui.magnets !== false)), [setProject, placeModule, ui.magnets]);
   const setGrid = (patch) => setProject((p) => ({ ...p, room: { ...p.room, grid: { ...grid, ...patch } } }));
 
   // Arrastre de paredes y vértices: cada movimiento parte del ambiente que había al
@@ -254,6 +262,7 @@ export default function App() {
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startDrawWalls(); return; }
       if (tab !== 'diseno' || inField) return;
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'b' || e.key === 'B')) { toggleUi('collision'); return; }
       if (annotating) { if (e.key === 'Escape') stopAnnotate(); return; }
       if (scaling) {
         if (e.key === 'Escape') stopScale();
@@ -284,7 +293,7 @@ export default function App() {
         const st = e.shiftKey ? 100 : 10;
         const dx = e.key === 'ArrowLeft' ? -st : e.key === 'ArrowRight' ? st : 0;
         const dz = e.key === 'ArrowUp' ? -st : e.key === 'ArrowDown' ? st : 0;
-        mapModule(selectedId, (m) => ({ ...m, x: m.x + dx, z: m.z + dz }));
+        setProject((p) => { const m = p.modules.find((o) => o.id === selectedId); return m ? placeModule(p, selectedId, m.x + dx, m.z + dz, false) : p; });
       }
     };
     window.addEventListener('keydown', onKey);
@@ -347,8 +356,6 @@ export default function App() {
               {[['perspectiva', 'Perspectiva'], ['frente', 'Frente'], ['planta', 'Planta']].map(([k, l]) => (
                 <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => { setView((v) => ({ name: k, tick: v.tick + 1 })); if (k === 'planta') setShowDims(true); else { stopDrawWalls(); stopAnnotate(); stopScale(); } }}>{l}</button>
               ))}
-              <button className={showDims ? 'active-soft' : ''} onClick={() => setShowDims((s) => !s)} title="Mostrar medidas de paredes y módulos">Cotas</button>
-              <button className={autoLower ? 'active-soft' : ''} onClick={() => setAutoLower((s) => !s)} title="Auto Rebajar: las paredes que tapan la vista bajan a zócalo">Auto rebajar</button>
               <button className={drawing ? 'active' : ''} onClick={() => (drawing ? stopDrawWalls() : startDrawWalls())} title="Construir paredes (Ctrl+Shift+P)">✏ Paredes</button>
               <button className={annotating ? 'active' : ''} onClick={() => (annotating ? stopAnnotate() : startAnnotate())} title="Cota manual: lineal o angular">↔ Cota</button>
               {view.name === 'planta' && (
@@ -407,6 +414,8 @@ export default function App() {
             <div className="statusbar">
               <span className="sb-sel">{describeSelection(project, selection) || 'Sin selección'}</span>
               <span className="sb-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</span>
+              <StatusToggles ui={ui} onToggle={toggleUi} showDims={showDims} onShowDims={setShowDims}
+                planImage={project.planImage} onPlanImage={(visible) => setProject((p) => ({ ...p, planImage: { ...p.planImage, visible } }))} />
             </div>
           </section>
           <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}

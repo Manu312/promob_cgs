@@ -10,10 +10,13 @@ import { planFitZoom } from '../domain/grid.js';
 import { mat3d, metal, stone } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
 import { ModuleDistances } from './Cotas.jsx';
+import { DrawTool } from './DrawTool.jsx';
 import { PlanGrid } from './PlanGrid.jsx';
 
 const ROTATE_BUTTONS = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 const PLAN_BUTTONS = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+// Dibujando paredes: el clic izquierdo y el derecho son de la herramienta; la ruedita hace zoom y el botón del medio mueve la vista.
+const DRAW_BUTTONS = { LEFT: -1, MIDDLE: THREE.MOUSE.PAN, RIGHT: -1 };
 
 const S = 0.001; // mm → m
 
@@ -205,6 +208,7 @@ function DevProbe({ project, origin }) {
         const n = project.room.nodes.find((o) => o.id === id);
         return n ? toScreen(n.x, project.room.h + 20, n.z) : null;
       },
+      screenOfPoint(x, z, y = 0) { return toScreen(x, y, z); },
       screenOfHandle(id, handle) {
         const m = project.modules.find((o) => o.id === id);
         if (!m) return null;
@@ -282,7 +286,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const { room } = project;
@@ -351,7 +355,8 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       dpr={renderMode ? [1, 2] : [1, 1.5]}
       gl={{ preserveDrawingBuffer: true, antialias: true }}
       camera={{ fov: 45, near: 0.05, far: 100, position: [1.6, 2.3, 4] }}
-      onPointerMissed={() => !drag && onSelect(null)}
+      onPointerMissed={() => !drag && !drawing && onSelect(null)}
+      onContextMenu={(e) => drawing && e.preventDefault()}
     >
       <color attach="background" args={[renderMode ? '#e7e3dc' : '#f3f4f6']} />
       <ambientLight intensity={renderMode ? 0.25 : 0.6} />
@@ -381,7 +386,8 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       <group position={[-origin.x * S, 0, -origin.z * S]}>
         <Room3D room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown} />
         {planta && !renderMode && <PlanGrid room={room} />}
-        {planta && !renderMode && <NodeHandles room={room} onNodeDown={onNodeDown} />}
+        {planta && !renderMode && !drawing && <NodeHandles room={room} onNodeDown={onNodeDown} />}
+        {planta && !renderMode && drawing && <DrawTool room={room} draw={drawing} origin={origin} cursorRef={drawCursorRef} onPoint={onDrawPoint} onFinish={onDrawFinish} />}
         {showDims && !renderMode && <Dimensions room={room} modules={project.modules} onWallLength={onWallLength} />}
         {selectedMod && !renderMode && <ModuleDistances room={room} modules={project.modules} mod={selectedMod} onEdit={onDimEdit} />}
         {project.modules.map((m) => {
@@ -394,7 +400,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       {renderMode && !photoreal && <ContactShadows position={[0, 0.002, 0]} scale={12} blur={2.2} opacity={0.45} far={2.5} />}
       {planta && <OrthographicCamera makeDefault near={0.1} far={200} position={[0, 40, 0.001]} />}
       <OrbitControls ref={controlsRef} makeDefault maxPolarAngle={planta ? Math.PI : Math.PI / 2 - 0.02} minDistance={0.5} maxDistance={20}
-        enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={planta ? PLAN_BUTTONS : ROTATE_BUTTONS} />
+        enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={planta ? (drawing ? DRAW_BUTTONS : PLAN_BUTTONS) : ROTATE_BUTTONS} />
       <CameraRig view={view} room={room} controlsRef={controlsRef} />
       {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
       <Capturer captureRef={captureRef} photoreal={photoreal} />

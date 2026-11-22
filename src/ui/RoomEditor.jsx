@@ -1,11 +1,14 @@
 import { OPENING_TYPES, roomWalls, rid, rebuildFromShape, setWallDefaults } from '../domain/room.js';
+import { useState } from 'react';
 import { NumField, SelField } from './fields.jsx';
+import { TEMPLATES, applyTemplate } from '../domain/drawWalls.js';
 
 const SHAPES = [['rect', 'Rectangular'], ['L', 'En L'], ['libre', 'Libre (puntos)']];
 
 // Editor numérico del ambiente. Las formas regeneran las paredes conservando sus ids
 // (las aberturas siguen en su pared). Se reemplaza por la edición interactiva de la Fase 1.
-export default function RoomEditor({ room, onChange, onSelectWall }) {
+export default function RoomEditor({ room, onChange, onSelectWall, onDrawWalls }) {
+  const [tpl, setTpl] = useState({ kind: 'dos', w: 3600, d: 3000 });
   const set = (patch) => onChange({ ...room, ...patch });
   const rebuild = (patch) => onChange(rebuildFromShape(room, patch));
   const walls = roomWalls(room);
@@ -33,6 +36,20 @@ export default function RoomEditor({ room, onChange, onSelectWall }) {
 
   return (
     <div className="room-editor">
+      {onDrawWalls && (
+        <div className="row-btns">
+          <button className="active-soft" onClick={onDrawWalls} title="Dibujar paredes con clics y medidas (Ctrl+Shift+P)">✏ Construir paredes</button>
+        </div>
+      )}
+      <div className="sub-card">
+        <div className="sub-head"><b>Nuevo ambiente</b></div>
+        <SelField label="Plantilla" value={tpl.kind} options={TEMPLATES} onChange={(kind) => setTpl({ ...tpl, kind })} />
+        <NumField label="Ancho" unit="mm" value={tpl.w} min={500} max={20000} step={50} onChange={(w) => setTpl({ ...tpl, w })} />
+        <NumField label="Profundidad" unit="mm" value={tpl.d} min={500} max={20000} step={50} onChange={(d) => setTpl({ ...tpl, d })} />
+        <div className="row-btns">
+          <button onClick={() => onChange(applyTemplate(room, tpl.kind, { w: tpl.w, d: tpl.d }))} title="Reemplaza las paredes (se puede deshacer)">Aplicar plantilla</button>
+        </div>
+      </div>
       <SelField label="Forma" value={room.shape} options={SHAPES} onChange={setShape} />
       {room.shape !== 'libre' && (
         <>

@@ -23,6 +23,7 @@ const page = await browser.newPage();
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(String(e)));
+page.on('dialog', (d) => d.accept()); // confirmaciones de la app (p. ej. "Nuevo")
 
 const project = () => page.evaluate(() => JSON.parse(localStorage.getItem('mueblesapp.project')));
 const shot = (n) => page.screenshot({ path: OUT + n + '.png' });
@@ -338,6 +339,26 @@ try {
   p = await project();
   check('Flecha de arriba cambia el alto', p.modules.find((m) => m.id === cz.id).params.height > cz.params.height, `alto=${p.modules.find((m) => m.id === cz.id).params.height}`);
   check('Sin errores de consola tras redimensionar', errors.length === 0, errors.slice(-3).join(' | '));
+
+  // Construir paredes (#6): proyecto nuevo con 2 paredes y un rectángulo dibujado solo con teclado
+  await page.keyboard.press('Escape'); await sleep(200);
+  await clickText('.top-actions button', 'Nuevo'); await sleep(1500);
+  p = await project();
+  check('Proyecto nuevo arranca con 2 paredes y piso', p.room.walls.length === 2 && p.room.points === null, `${p.room.walls.length} paredes`);
+  await clickText('.vp-toolbar button', '✏ Paredes'); await sleep(1500);
+  check('Construir paredes pasa a Planta y muestra la barra', (await page.evaluate(() => window.__muebles.cameraType)) === 'OrthographicCamera' && !!(await page.$('.draw-hud')));
+  const sp = await page.evaluate(() => window.__muebles.screenOfPoint(1000, 1000));
+  await page.mouse.click(sp.x, sp.y); await sleep(400);
+  const seg = async (len, ang) => { await page.keyboard.type(len); await page.keyboard.press('Enter'); await page.keyboard.type(ang); await page.keyboard.press('Enter'); await sleep(500); };
+  await seg('2000', '0'); await seg('1500', '90'); await seg('2000', '90'); await seg('1500', '90');
+  p = await project();
+  check('Rectángulo dibujado solo con teclado se cierra (piso automático)', p.room.walls.length === 6 && p.room.points?.length === 4, `${p.room.walls.length} paredes, contorno ${JSON.stringify(p.room.points)}`);
+  check('Al cerrar el ambiente termina la herramienta', !(await page.$('.draw-hud')));
+  await shot('19-paredes-dibujadas');
+  await ctrl('KeyZ');
+  p = await project();
+  check('Deshacer quita solo el último tramo', p.room.walls.length === 5, `${p.room.walls.length} paredes`);
+  check('Sin errores de consola tras construir paredes', errors.length === 0, errors.slice(-3).join(' | '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

@@ -23,7 +23,7 @@ function RulesEditor({ rules, inherit, onChange }) {
 }
 
 function MatSelect({ label, value, settings, onChange, allowInherit }) {
-  const opts = settings.materials.map((m) => [m.id, m.name]);
+  const opts = settings.materials.filter((m) => m.kind !== 'piedra').map((m) => [m.id, m.name]);
   if (allowInherit) opts.unshift(['', '— igual al proyecto —']);
   return <SelField label={label} value={value || ''} onChange={(v) => onChange(v || undefined)} options={opts} />;
 }

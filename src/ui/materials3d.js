@@ -60,7 +60,55 @@ function woodTexture(hex) {
   return t;
 }
 
+// Piedra procedural (propia, nada de bancos de terceros): granito = grano moteado de dos
+// tonos; mármol = vetas suaves; cuarzo = grano muy fino y parejo.
+function stoneTexture({ color, grain, pattern = 'granito', id = '' }) {
+  const S = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  let seed = seedFrom(id + color + grain);
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = color;
+  g.fillRect(0, 0, S, S);
+  if (pattern === 'marmol') {
+    for (let k = 0; k < 14; k++) {
+      g.strokeStyle = grain;
+      g.globalAlpha = 0.08 + rnd() * 0.25;
+      g.lineWidth = 0.6 + rnd() * 2.2;
+      g.beginPath();
+      let x = rnd() * S, y = 0;
+      g.moveTo(x, y);
+      while (y < S) { x += (rnd() - 0.5) * 60; y += 20 + rnd() * 40; g.lineTo(x, y); }
+      g.stroke();
+    }
+  } else {
+    const n = pattern === 'cuarzo' ? 9000 : 5500;
+    const maxR = pattern === 'cuarzo' ? 1.1 : 3.2;
+    for (let i = 0; i < n; i++) {
+      const r = 0.4 + rnd() * maxR;
+      const t = rnd();
+      g.fillStyle = t < 0.55 ? grain : t < 0.8 ? shade(color, 0.75 + rnd() * 0.2) : shade(color, 1.1 + rnd() * 0.25);
+      g.globalAlpha = 0.35 + rnd() * 0.55;
+      g.beginPath();
+      g.ellipse(rnd() * S, rnd() * S, r, r * (0.6 + rnd() * 0.8), rnd() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  g.globalAlpha = 1;
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}
+
 export function mat3d(m) {
+  if (m?.kind === 'piedra') {
+    const key = `piedra|${m.id}|${m.color}|${m.grain}|${m.pattern}`;
+    if (!cache.has(key)) cache.set(key, new THREE.MeshStandardMaterial({ map: stoneTexture(m), roughness: m.pattern === 'cuarzo' ? 0.35 : 0.22, metalness: 0.02 }));
+    return cache.get(key);
+  }
   const key = `${m.id}|${m.color}|${m.wood ? 1 : 0}`;
   if (!cache.has(key)) {
     cache.set(key, new THREE.MeshStandardMaterial({

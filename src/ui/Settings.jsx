@@ -1,10 +1,25 @@
-import { DEFAULT_SETTINGS } from '../domain/catalog.js';
+import { DEFAULT_SETTINGS, pathLabel } from '../domain/catalog.js';
 import { uid } from '../domain/modules.js';
 import { NumField } from './fields.jsx';
 
+const parsePath = (s) => s.split('>').map((x) => x.trim()).filter(Boolean);
+
+// Ruta en la biblioteca ("Granitos > Gris > Gris Mara"); se confirma al salir del campo.
+function PathInput({ m, onPath }) {
+  return (
+    <input type="text" defaultValue={pathLabel(m)} title="Ruta en la biblioteca, separada por >" key={pathLabel(m)}
+      onBlur={(e) => { const p = parsePath(e.target.value); if (p.length && p.join('>') !== m.path?.join('>')) onPath(m.id, p); }} />
+  );
+}
+
 export default function Settings({ settings, setSettings }) {
   const set = (patch) => setSettings((s) => ({ ...s, ...patch }));
-  const setMat = (i, patch) => set({ materials: settings.materials.map((m, j) => (j === i ? { ...m, ...patch } : m)) });
+  const setMat = (id, patch) => set({ materials: settings.materials.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
+  const delMat = (id) => set({ materials: settings.materials.filter((m) => m.id !== id) });
+  const byPath = (a, b) => pathLabel(a).localeCompare(pathLabel(b));
+  const placas = settings.materials.filter((m) => m.kind !== 'piedra').sort(byPath);
+  const piedras = settings.materials.filter((m) => m.kind === 'piedra').sort(byPath);
+  const onPath = (id, path) => setMat(id, { path });
   const setHw = (i, patch) => set({ hardware: settings.hardware.map((h, j) => (j === i ? { ...h, ...patch } : h)) });
 
   return (
@@ -20,25 +35,50 @@ export default function Settings({ settings, setSettings }) {
       <h3>Placas</h3>
       <div className="table-wrap">
         <table className="edit">
-          <thead><tr><th>Nombre</th><th>Esp. mm</th><th>Largo</th><th>Ancho</th><th>Color</th><th>Veta</th><th>Tapacanto</th><th>Precio placa</th><th></th></tr></thead>
+          <thead><tr><th>Biblioteca</th><th>Nombre</th><th>Esp. mm</th><th>Largo</th><th>Ancho</th><th>Color</th><th>Veta</th><th>Tapacanto</th><th>Precio placa</th><th></th></tr></thead>
           <tbody>
-            {settings.materials.map((m, i) => (
+            {placas.map((m) => (
               <tr key={m.id}>
-                <td><input type="text" value={m.name} onChange={(e) => setMat(i, { name: e.target.value })} /></td>
-                <td><NumField compact value={m.t} min={1} max={50} onChange={(v) => setMat(i, { t: v })} /></td>
-                <td><NumField compact value={m.L} min={500} max={4000} onChange={(v) => setMat(i, { L: v })} /></td>
-                <td><NumField compact value={m.W} min={300} max={2500} onChange={(v) => setMat(i, { W: v })} /></td>
-                <td><input type="color" value={m.color} onChange={(e) => setMat(i, { color: e.target.value })} /></td>
-                <td><input type="checkbox" checked={!!m.wood} onChange={(e) => setMat(i, { wood: e.target.checked })} /></td>
-                <td><input type="checkbox" checked={m.edge !== false} onChange={(e) => setMat(i, { edge: e.target.checked })} /></td>
-                <td><NumField compact value={m.price} min={0} max={1e9} step={100} onChange={(v) => setMat(i, { price: v })} /></td>
-                <td>{settings.materials.length > 1 && <button className="danger small" onClick={() => set({ materials: settings.materials.filter((_, j) => j !== i) })}>✕</button>}</td>
+                <td><PathInput m={m} onPath={onPath} /></td>
+                <td><input type="text" value={m.name} onChange={(e) => setMat(m.id, { name: e.target.value })} /></td>
+                <td><NumField compact value={m.t} min={1} max={50} onChange={(v) => setMat(m.id, { t: v })} /></td>
+                <td><NumField compact value={m.L} min={500} max={4000} onChange={(v) => setMat(m.id, { L: v })} /></td>
+                <td><NumField compact value={m.W} min={300} max={2500} onChange={(v) => setMat(m.id, { W: v })} /></td>
+                <td><input type="color" value={m.color} onChange={(e) => setMat(m.id, { color: e.target.value })} /></td>
+                <td><input type="checkbox" checked={!!m.wood} onChange={(e) => setMat(m.id, { wood: e.target.checked })} /></td>
+                <td><input type="checkbox" checked={m.edge !== false} onChange={(e) => setMat(m.id, { edge: e.target.checked })} /></td>
+                <td><NumField compact value={m.price} min={0} max={1e9} step={100} onChange={(v) => setMat(m.id, { price: v })} /></td>
+                <td>{placas.length > 1 && <button className="danger small" onClick={() => delMat(m.id)}>✕</button>}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <button onClick={() => set({ materials: [...settings.materials, { id: 'mat_' + uid(), name: 'Nueva melamina 18mm', t: 18, L: 2600, W: 1830, color: '#cccccc', wood: false, edge: true, price: 90000 }] })}>+ Agregar placa</button>
+      <button onClick={() => set({ materials: [...settings.materials, { id: 'mat_' + uid(), kind: 'placa', path: ['Colores', 'Nueva'], name: 'Nueva melamina 18mm', t: 18, L: 2600, W: 1830, color: '#cccccc', wood: false, edge: true, price: 90000 }] })}>+ Agregar placa</button>
+
+      <h3>Piedras (tapas y mesadas)</h3>
+      <div className="table-wrap">
+        <table className="edit">
+          <thead><tr><th>Biblioteca</th><th>Tipo</th><th>Color</th><th>Grano / veta</th><th>Precio m²</th><th></th></tr></thead>
+          <tbody>
+            {piedras.map((m) => (
+              <tr key={m.id}>
+                <td><PathInput m={m} onPath={onPath} /></td>
+                <td>
+                  <select value={m.pattern} onChange={(e) => setMat(m.id, { pattern: e.target.value })}>
+                    <option value="granito">Granito</option><option value="marmol">Mármol</option><option value="cuarzo">Cuarzo</option>
+                  </select>
+                </td>
+                <td><input type="color" value={m.color} onChange={(e) => setMat(m.id, { color: e.target.value })} /></td>
+                <td><input type="color" value={m.grain} onChange={(e) => setMat(m.id, { grain: e.target.value })} /></td>
+                <td><NumField compact value={m.priceM2} min={0} max={1e9} step={1000} onChange={(v) => setMat(m.id, { priceM2: v })} /></td>
+                <td>{piedras.length > 1 && <button className="danger small" onClick={() => delMat(m.id)}>✕</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <button onClick={() => set({ materials: [...settings.materials, { id: 'pie_' + uid(), kind: 'piedra', path: ['Granitos', 'Gris', 'Nuevo granito'], name: 'Nuevo granito', color: '#9a9893', grain: '#3a3a3a', pattern: 'granito', priceM2: 150000 }] })}>+ Agregar piedra</button>
 
       <h3>Herrajes</h3>
       <div className="table-wrap">

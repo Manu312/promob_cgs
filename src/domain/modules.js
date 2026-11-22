@@ -278,11 +278,18 @@ export function buildModule(mod, ctx) {
 
 export const uid = () => Math.random().toString(36).slice(2, 9);
 
+// Huella en planta: caja envolvente del módulo girado (`x`, `z` son su esquina mínima).
+// Con giros de 90° es el ancho y la profundidad (intercambiados si está de costado).
 export function footprint(mod) {
-  const r = (((mod.rot || 0) % 360) + 360) % 360;
   const W = mod.params.width, D = mod.params.depth;
-  return r % 180 === 0 ? { fw: W, fd: D } : { fw: D, fd: W };
+  const { ex } = localAxes(mod.rot || 0);
+  const c = Math.abs(ex[0]), s = Math.abs(ex[1]);
+  const r = (v) => Math.round(v * 1000) / 1000;
+  return { fw: r(W * c + D * s), fd: r(W * s + D * c) };
 }
+
+// ¿Está a escuadra (0, 90, 180, 270°)? El imán solo actúa así.
+export const isSquare = (rot = 0) => Math.abs(((rot % 90) + 90) % 90) < 1e-6;
 
 
 // Flechas de redimensionar, en el sistema del módulo: eje local y signo hacia afuera.
@@ -324,6 +331,7 @@ export function resizeModule(mod, handle, delta) {
 // `step`: paso al que se redondea cuando no hay imán cerca (10 mm, o la grilla magnética en Planta).
 export function snapPosition(mod, others, room, thr = 40, step = 10) {
   const { fw, fd } = footprint(mod);
+  if (!isSquare(mod.rot || 0)) return { x: Math.round(mod.x / step) * step, z: Math.round(mod.z / step) * step }; // girado: solo la grilla
   const walls = room.walls?.length ? snapCandidates(room, fw, fd) : { xs: [0, room.w - fw], zs: [0, room.d - fd] };
   const cx = [...walls.xs], cz = [...walls.zs];
   for (const o of others) {

@@ -185,6 +185,21 @@ try {
     await page.keyboard.press('KeyE'); await sleep(300);
     check('E vuelve a Propiedades', (await onTool()).endsWith('Propiedades') && !!(await page.$('.inspector h3')));
     check('Sin errores de consola tras el panel Movimiento', errors.length === 0, errors.slice(-3).join(' | '));
+
+    // Rotación libre (#42)
+    const rotIn = await fieldInput('Rotación');
+    await rotIn.click({ clickCount: 3 }); await rotIn.type('45'); await page.keyboard.press('Enter'); await sleep(500);
+    mm = await modNow(target.id);
+    const sb = await page.$eval('.sb-sel', (e) => e.textContent);
+    check('Rotación libre: 45° desde Propiedades', mm.rot === 45 && sb.includes('Rotación: 45°'), sb);
+    await shot('03c-rotacion-45');
+    const before45 = { x: mm.x, z: mm.z };
+    await dragBy(target.id, -8, 6, 12);
+    mm = await modNow(target.id);
+    check('Un módulo girado se sigue arrastrando', mm.rot === 45 && (mm.x !== before45.x || mm.z !== before45.z), `(${before45.x},${before45.z}) → (${mm.x},${mm.z})`);
+    await ctrl('KeyZ'); await ctrl('KeyZ');
+    mm = await modNow(target.id);
+    check('Deshacer devuelve la rotación', mm.rot === m0.rot && mm.x === m0.x && mm.z === m0.z, `rot ${mm.rot}`);
   }
 
   // Arrastrar en vacío rota cámara, no deselecciona errores

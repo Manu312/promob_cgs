@@ -34,7 +34,7 @@ export function describeSelection(project, sel) {
     const m = project.modules.find((x) => x.id === sel.id);
     if (!m) return '';
     const { width, height, depth } = m.params;
-    return `${MODULE_TYPES[m.type]?.label || m.type} · ${width} × ${height} × ${depth}`;
+    return `${MODULE_TYPES[m.type]?.label || m.type} · ${width} × ${height} × ${depth}${m.rot ? ` · Rotación: ${Math.round(m.rot * 10) / 10}°` : ''}`;
   }
   return '';
 }

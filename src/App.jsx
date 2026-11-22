@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
 import { newModule, footprint, snapPosition, uid } from './domain/modules.js';
-import { moveWall, moveNode } from './domain/wallEdit.js';
+import { moveWall, moveNode, setWallLength } from './domain/wallEdit.js';
+import { applyDimEdit } from './domain/dimensions.js';
 import { buildAll, computeCutList } from './domain/cutlist.js';
 import { nestAll } from './domain/nesting.js';
 import { computeBudget } from './domain/budget.js';
@@ -84,6 +85,10 @@ export default function App() {
   const onMoveWall = useCallback((id, dx, dz) => setProject((p) => ({ ...p, room: moveWall(baseRoomRef.current || p.room, id, dx, dz) })), [setProject]);
   const onMoveNode = useCallback((id, x, z) => setProject((p) => ({ ...p, room: moveNode(p.room, id, x, z) })), [setProject]);
   const recenter = () => setView((v) => ({ ...v, tick: v.tick + 1 }));
+
+  // Cotas editables: la distancia del módulo mueve el módulo; el largo de pared cambia la pared.
+  const onDimEdit = (dim, value) => selectedId && mapModule(selectedId, (m) => ({ ...m, ...applyDimEdit(m, dim, value) }));
+  const onWallLength = (id, value) => setProject((p) => normalizeProject({ ...p, room: setWallLength(p.room, id, value) }));
 
   const addModule = (type) => {
     const m = newModule(type, project);
@@ -169,6 +174,7 @@ export default function App() {
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
                 selectedWallId={selectedWallId} onSelectWall={selectWall}
                 onMoveWall={onMoveWall} onMoveNode={onMoveNode} step={gridStep}
+                onDimEdit={onDimEdit} onWallLength={onWallLength}
                 onDragStart={onDragStart} onDragEnd={history.commit}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoHideWalls} />

@@ -9,6 +9,7 @@ import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
 import { mat3d, metal, stone } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
+import { ModuleDistances } from './Cotas.jsx';
 import { PlanGrid } from './PlanGrid.jsx';
 
 const ROTATE_BUTTONS = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
@@ -242,11 +243,12 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onDimEdit, onWallLength, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const { room } = project;
   const planta = view.name === 'planta';
+  const selectedMod = project.modules.find((m) => m.id === selectedId) || null;
   // Origen del visor (mm del ambiente en el centro de la escena). Se fija al cambiar de
   // vista, no en cada cambio: si se recentrara mientras se arrastra una pared, la escena
   // se movería debajo del mouse.
@@ -318,7 +320,8 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
         <Room3D room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown} />
         {planta && !renderMode && <PlanGrid room={room} />}
         {planta && !renderMode && <NodeHandles room={room} onNodeDown={onNodeDown} />}
-        {showDims && !renderMode && <Dimensions room={room} modules={project.modules} />}
+        {showDims && !renderMode && <Dimensions room={room} modules={project.modules} onWallLength={onWallLength} />}
+        {selectedMod && !renderMode && <ModuleDistances room={room} modules={project.modules} mod={selectedMod} onEdit={onDimEdit} />}
         {project.modules.map((m) => {
           const b = builtById.get(m.id);
           if (!b) return null;

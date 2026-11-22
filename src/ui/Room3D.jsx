@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { roomWalls, wallPieces } from '../domain/room.js';
 import { wallCorners, floorPolygon } from '../domain/walls.js';
 import { footprint } from '../domain/modules.js';
+import { CotaLabel } from './Cotas.jsx';
 
 const S = 0.001;
 const wallMat = new THREE.MeshStandardMaterial({ color: '#eeebe5', roughness: 0.95 });
@@ -141,8 +142,8 @@ const Label = ({ p, children, small }) => (
   </Html>
 );
 
-// Cotas: largo de cada pared (por fuera) y ancho de cada módulo.
-export function Dimensions({ room, modules }) {
+// Cotas: largo de cada pared (por fuera, editable) y ancho de cada módulo.
+export function Dimensions({ room, modules, onWallLength }) {
   const walls = useMemo(() => roomWalls(room), [room]);
   const y = 0.01;
   return (
@@ -156,7 +157,8 @@ export function Dimensions({ room, modules }) {
             <Line points={[[a[0] * S, y, a[1] * S], [b[0] * S, y, b[1] * S]]} color="#2f6fdf" lineWidth={1.2} />
             <Line points={tick(a)} color="#2f6fdf" lineWidth={1.2} />
             <Line points={tick(b)} color="#2f6fdf" lineWidth={1.2} />
-            <Label p={[((a[0] + b[0]) / 2) * S, y, ((a[1] + b[1]) / 2) * S]}>P{w.i + 1} · {w.len}</Label>
+            <CotaLabel p={[((a[0] + b[0]) / 2) * S, y, ((a[1] + b[1]) / 2) * S]} value={w.len} text={`P${w.i + 1} · ${w.len}`}
+              onCommit={onWallLength ? (v) => onWallLength(w.id, v) : undefined} />
           </group>
         );
       })}

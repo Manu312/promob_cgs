@@ -21,6 +21,7 @@ const PLAN_BUTTONS = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: 
 const DRAW_BUTTONS = { LEFT: -1, MIDDLE: THREE.MOUSE.PAN, RIGHT: -1 };
 
 const S = 0.001; // mm → m
+const MAX_DRAG_DIST = 25; // m: más lejos, el plano de arrastre está casi de canto a la cámara
 
 function PartMesh({ p, material }) {
   return (
@@ -282,6 +283,9 @@ function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onRe
       v.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(v, cam);
       if (!ray.ray.intersectPlane(planeOf(drag, cam), pt)) return;
+      // Cerca del horizonte la proyección se dispara (decenas de metros por píxel): se ignora
+      // ese movimiento y el objeto queda donde estaba en vez de salir volando.
+      if (!cam.isOrthographicCamera && pt.distanceTo(cam.position) > MAX_DRAG_DIST) return;
       const snap = (val) => Math.round(val / drag.step) * drag.step;
       const rx = pt.x / S + o.x, rz = pt.z / S + o.z;
       if (drag.kind === 'resize') {

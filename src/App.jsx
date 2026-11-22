@@ -8,6 +8,8 @@ import { withItem } from './domain/library.js';
 import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
 import ModelsPanel from './ui/ModelsPanel.jsx';
 import AggregatesPanel from './ui/AggregatesPanel.jsx';
+import AutoInsertPanel from './ui/AutoInsertPanel.jsx';
+import { applyAuto, withAutoInsert } from './domain/autoInsert.js';
 import { setAgg } from './domain/aggregates.js';
 import { applyModel } from './domain/models.js';
 import { applyStyle, stylesOf } from './domain/styles.js';
@@ -59,6 +61,9 @@ export default function App() {
   const [ui, setUi] = usePersistent('mueblesapp.ui', { collision: true, magnets: true, autoLower: true });
   const autoLower = ui.autoLower !== false;
   const toggleUi = (k) => setUi((u) => ({ ...u, [k]: u[k] === false }));
+  // Paneles laterales (pestañas verticales a la izquierda): Lista de Módulos o Inserción Automática.
+  const side = ui.side ?? (ui.listOpen ? 'lista' : null);
+  const setSide = (s) => setUi((u) => ({ ...u, listOpen: undefined, side: (u.side ?? (u.listOpen ? 'lista' : null)) === s ? null : s }));
   const tool = ['movimiento', 'modelos', 'agregados'].includes(ui.tool) ? ui.tool : 'propiedades'; // botonera Herramientas
   const setTool = (t) => setUi((u) => ({ ...u, tool: t }));
   // Traba de eje al arrastrar (teclas X / Y de Promob): 'x' o 'z'.
@@ -321,7 +326,7 @@ export default function App() {
       dragItemRef.current = null;
       setGhost(null);
       if (!m) return;
-      const mod = withItem({ ...m, id: uid() }, d.item, project.modules);
+      const mod = withAutoInsert(withItem({ ...m, id: uid() }, d.item, project.modules), project, (x) => resolveRules(x, project));
       countUse(d.item);
       setProject((p) => ({ ...p, modules: [...p.modules, mod] }));
       setSelectedId(mod.id);
@@ -329,7 +334,7 @@ export default function App() {
   };
   const insertItem = (item, variant = null) => {
     countUse(item);
-    const m = withItem(newModule(item.type, project, itemParams(item, variant), item.y), item, project.modules);
+    const m = withAutoInsert(withItem(newModule(item.type, project, itemParams(item, variant), item.y), item, project.modules), project, (x) => resolveRules(x, project));
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));
     setSelectedId(m.id);
     setTab('diseno');
@@ -441,11 +446,17 @@ export default function App() {
       </header>
 
       {tab === 'diseno' && (
-        <main className={`design${ui.listOpen ? ' with-list' : ''}`}>
+        <main className={`design${side ? ' with-list' : ''}`}>
           <div className="side-tabs">
-            <button className={`side-tab${ui.listOpen ? ' on' : ''}`} onClick={() => setUi((u) => ({ ...u, listOpen: !u.listOpen }))}>Lista de Módulos</button>
+            <button className={`side-tab${side === 'lista' ? ' on' : ''}`} onClick={() => setSide('lista')}>Lista de Módulos</button>
+            <button className={`side-tab${side === 'auto' ? ' on' : ''}`} onClick={() => setSide('auto')}>Inserción Automática</button>
           </div>
-          {ui.listOpen && (
+          {side === 'auto' && (
+            <AutoInsertPanel autoInsert={project.autoInsert} hasSelection={!!selectedId}
+              onAutoInsert={(ai) => setProject((p) => ({ ...p, autoInsert: ai }))}
+              onAmbiente={(cat, ids, on, onlySel) => setProject((p) => applyAuto(p, cat, ids, on, (m) => resolveRules(m, p), onlySel ? (selectedId ? [selectedId] : []) : null))} />
+          )}
+          {side === 'lista' && (
             <ModuleList project={project} selectedId={selectedId} onSelect={setSelectedId}
               onToggleHidden={(ids) => setProject((p) => toggleHidden(p, ids))}
               onRemove={(ids) => { setProject((p) => removeModules(p, ids)); setSelectedId(null); }} />

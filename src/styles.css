@@ -224,3 +224,10 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .ag-row .radio { flex: 1; display: flex; align-items: center; gap: 6px; }
 .ag-plus { padding: 0 7px; font-weight: 700; }
 .ag-opts { flex-basis: 100%; padding-left: 22px; }
+
+/* Inserción Automática */
+.auto-insert .mv-tabs { margin-top: 4px; }
+.ai-cat { margin-top: 6px; }
+.ai-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 1px 0 1px 14px; }
+.ai-only { padding-left: 0; margin: 10px 0 6px; }
+.ai-btns { margin: 6px 0; }

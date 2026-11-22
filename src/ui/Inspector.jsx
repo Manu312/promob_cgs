@@ -28,7 +28,7 @@ function MatSelect({ label, value, settings, onChange, allowInherit }) {
   return <SelField label={label} value={value || ''} onChange={(v) => onChange(v || undefined)} options={opts} />;
 }
 
-export default function Inspector({ project, settings, selected, selectedWallId, onSelectWall, onDrawWalls, onDeleteWall, onSplitWall, selectedOpeningId, selectedColumnId, onSelectItem, onScaleImage, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onRotateTo, onProject }) {
+export default function Inspector({ project, settings, selected, selectedWallId, onSelectWall, onDrawWalls, onDeleteWall, onSplitWall, selectedOpeningId, selectedColumnId, onSelectItem, onScaleImage, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onRotateTo, onRest, onProject }) {
   if (selectedWallId && project.room.walls.some((w) => w.id === selectedWallId)) {
     return <WallPanel room={project.room} wallId={selectedWallId} onBack={() => onSelectWall(null)} onDelete={onDeleteWall} onSplit={onSplitWall}
       onRoom={(fn) => onProject((p) => ({ ...p, room: fn(p.room) }))} />;
@@ -88,6 +88,9 @@ export default function Inspector({ project, settings, selected, selectedWallId,
       <NumField label="Z (desde pared fondo)" unit="mm" value={selected.z} step={10} onChange={(v) => onUpdate({ z: v })} />
       <NumField label="Altura desde el piso" unit="mm" value={selected.y || 0} min={0} max={3000} step={10} onChange={(v) => onUpdate({ y: v })} />
       <NumField label="Rotación" unit="°" value={Math.round((selected.rot || 0) * 10) / 10} min={-360} max={360} step={15} onChange={(v) => onRotateTo(v)} />
+      <label className="radio check-row" title="Al moverlo se apoya sobre la mesada o el módulo que tenga debajo (o en el piso)">
+        <input type="checkbox" checked={!!selected.rest} onChange={(e) => onRest(e.target.checked)} /> Apoyar sobre lo de abajo
+      </label>
       <h4>Materiales del módulo</h4>
       <MatSelect label="Cuerpo" value={selected.mats?.cuerpo} settings={settings} allowInherit onChange={(v) => onUpdate({ mats: { ...selected.mats, cuerpo: v } })} />
       <MatSelect label="Frentes" value={selected.mats?.frente} settings={settings} allowInherit onChange={(v) => onUpdate({ mats: { ...selected.mats, frente: v } })} />

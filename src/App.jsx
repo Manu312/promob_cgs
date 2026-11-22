@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
 import { newModule, footprint, snapPosition, resizeModule, uid } from './domain/modules.js';
 import { collideMove, collideLift } from './domain/collision.js';
-import { nudgeTarget, rotateAboutCenter, lockAxis } from './domain/movement.js';
+import { nudgeTarget, rotateAboutCenter, lockAxis, restingHeight } from './domain/movement.js';
 import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
 import StatusToggles from './ui/StatusToggles.jsx';
 import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls, followWall } from './domain/wallEdit.js';
@@ -98,10 +98,13 @@ export default function App() {
     if (!m) return p;
     const { x, z } = lockAxis(m, x0, z0, lock);
     let pos = magnet ? snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id), p.room, 40, gridStep) : { x: Math.round(x), z: Math.round(z) };
-    if (ui.collision !== false) pos = collideMove(m, pos.x, pos.z, p.room, p.modules);
+    // Apoyado: se mueve a la altura de lo que tiene debajo en el destino (sube a la mesada, baja al piso).
+    const mm = m.rest ? { ...m, y: restingHeight({ ...m, ...pos }, p.modules) } : m;
+    if (ui.collision !== false) pos = collideMove(mm, pos.x, pos.z, p.room, p.modules);
     if (lock === 'x') pos = { ...pos, z: m.z };
     if (lock === 'z') pos = { ...pos, x: m.x };
-    if (pos.x === m.x && pos.z === m.z) return p;
+    if (m.rest) pos = { ...pos, y: restingHeight({ ...m, ...pos }, p.modules) };
+    if (pos.x === m.x && pos.z === m.z && (pos.y ?? m.y) === m.y) return p;
     return { ...p, modules: p.modules.map((o) => (o.id === id ? { ...o, ...pos } : o)) };
   }, [gridStep, ui.collision]);
   const onMove = useCallback((id, x, z) => setProject((p) => placeModule(p, id, x, z, ui.magnets !== false, axisLock)), [setProject, placeModule, ui.magnets, axisLock]);
@@ -479,6 +482,7 @@ export default function App() {
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
             onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}
             onRotateTo={(deg) => selected && rotateBy(deg - (selected.rot || 0))}
+            onRest={(on) => selectedId && setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === selectedId ? { ...m, rest: on, ...(on ? { y: restingHeight(m, p.modules) } : {}) } : m)) }))}
             onProject={(fn) => setProject((p) => normalizeProject(fn(p)))} />}
           </div>
         </main>

@@ -142,3 +142,4 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .cota.selectable { cursor: pointer; }
 .draw-hud input[type=radio], .draw-hud input[type=checkbox] { width: auto; }
 .draw-hud label.radio { display: inline-flex; align-items: center; gap: 4px; }
+.check-row { display: flex; align-items: center; gap: 6px; margin: 6px 0; font-size: 13px; }

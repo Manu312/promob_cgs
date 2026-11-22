@@ -24,6 +24,20 @@ export function NumField({ label, value, onChange, min, max, step = 1, unit, com
   return <label className="field"><span>{label}</span>{input}</label>;
 }
 
+// Lista de números (p. ej. alturas) en un campo de texto; se confirma al salir o con Enter.
+export function ListField({ label, value, parse, onChange }) {
+  const txt = value.join(', ');
+  const [s, setS] = useState(txt);
+  useEffect(() => setS(txt), [txt]);
+  const commit = () => { const v = parse(s); if (v.join(',') !== value.join(',')) onChange(v); else setS(txt); };
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <input type="text" value={s} onChange={(e) => setS(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
+    </label>
+  );
+}
+
 export function SelField({ label, value, onChange, options }) {
   return (
     <label className="field">

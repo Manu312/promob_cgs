@@ -63,6 +63,8 @@ export function migrateRoom(r0) {
     shape: r.shape, h: r.h, t: r.t, cutW: r.cutW, cutD: r.cutD,
     nodes, walls, openings,
     columns: Array.isArray(r.columns) ? r.columns : [],
+    // configuración que ya pudiera venir en el ambiente viejo
+    ...Object.fromEntries(['refHeights', 'grid', 'draw', 'lowerH'].filter((k) => r[k] != null).map((k) => [k, r[k]])),
   };
 }
 
@@ -75,6 +77,7 @@ export function normalizeRoom(r0) {
     .filter((w) => ids.has(w.n0) && ids.has(w.n1) && w.n0 !== w.n1)
     .map((w) => ({ ...WALL_DEFAULTS, t: room.t, h0: room.h, h1: w.h0 ?? room.h, ...w }));
   room.columns = Array.isArray(room.columns) ? room.columns : [];
+  room.refHeights = [...new Set((Array.isArray(room.refHeights) ? room.refHeights : []).map((v) => Math.round(Number(v))).filter((v) => Number.isFinite(v) && v > 0))].sort((a, b) => a - b);
   const geo = new Map(wallGeometry(room).map((g) => [g.id, g]));
   room.openings = (Array.isArray(room.openings) ? room.openings : [])
     .map(({ wall, ...o }) => ({ ...o, wallId: o.wallId ?? room.walls[wall]?.id }))

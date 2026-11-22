@@ -9,3 +9,6 @@ e2e/screens/
 evidence/
 *.dll
 *.exe
+# Capturas/archivos de referencia de Promob: viven fuera del repo (es público)
+*.zip
+*:Zone.Identifier

@@ -459,6 +459,7 @@ export default function App() {
             onParams={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
             onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}
+            onRotateTo={(deg) => selected && rotateBy(deg - (selected.rot || 0))}
             onProject={(fn) => setProject((p) => normalizeProject(fn(p)))} />}
           </div>
         </main>

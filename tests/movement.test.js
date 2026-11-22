@@ -50,3 +50,38 @@ test('subir con colisión frena debajo de la alacena; bajar frena en la mesada',
   assert.equal(collideLift(alacena, 1600, r, [bajo, alacena]), 1600);
   assert.equal(collideLift(bajo, -50, r, [bajo]), 0);
 });
+
+// Rotación libre (#42)
+import { footprint, snapPosition } from '../src/domain/modules.js';
+import { collideMove, modulePoly } from '../src/domain/collision.js';
+
+test('huella de un módulo girado 45°: caja envolvente', () => {
+  const f = footprint(mod('a', 0, 0, { rot: 45 })); // 600 × 560
+  const e = (600 + 560) * Math.SQRT1_2;
+  assert.ok(Math.abs(f.fw - e) < 0.01 && Math.abs(f.fd - e) < 0.01);
+  assert.deepEqual(footprint(mod('a', 0, 0, { rot: 90 })), { fw: 560, fd: 600 });
+  assert.deepEqual(footprint(mod('a', 0, 0, { rot: 180 })), { fw: 600, fd: 560 });
+});
+
+test('girar 30° sobre el centro y volver deja el módulo igual', () => {
+  const m = mod('a', 1000, 1000);
+  const r = { ...m, ...rotateAboutCenter(m, 30) };
+  assert.equal(r.rot, 30);
+  const back = { ...r, ...rotateAboutCenter(r, -30) };
+  assert.equal(back.rot, 0);
+  assert.ok(Math.abs(back.x - 1000) <= 1 && Math.abs(back.z - 1000) <= 1);
+});
+
+test('el imán solo actúa a escuadra: girado, solo redondea a la grilla', () => {
+  const r = normalizeRoom({ w: 3600, d: 3000, openings: [] });
+  assert.deepEqual(snapPosition(mod('a', 23, 1007), [], r, 40, 10), { x: 0, z: 1007 > 0 ? 1010 : 0 });
+  assert.deepEqual(snapPosition(mod('a', 23, 1007, { rot: 45 }), [], r, 40, 10), { x: 20, z: 1010 });
+});
+
+test('la colisión usa el rectángulo girado: la esquina frena contra la pared', () => {
+  const r = normalizeRoom({ w: 3600, d: 3000, openings: [] });
+  const m = mod('a', 1000, 1000, { rot: 45 });
+  const to = collideMove(m, 1000, -2000, r, [m]);
+  const zs = modulePoly({ ...m, ...to }).map((p) => p[1]);
+  assert.ok(Math.min(...zs) >= -0.5 && Math.min(...zs) < 2, `z mínima ${Math.min(...zs)}`);
+});

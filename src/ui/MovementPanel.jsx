@@ -47,8 +47,8 @@ export function MovementPanel({ label, ui, setUi, onNudge, onRotate }) {
       <div className="mv-grid">
         <div className="mv-col">{rows.map((a) => arrow(a, -1))}</div>
         <div className="mv-step">
-          <NumField compact value={step} min={desp ? 1 : 90} max={desp ? 5000 : 270} step={desp ? 1 : 90} unit={desp ? 'mm' : '°'}
-            onChange={(v) => set(desp ? { moveStep: v } : { rotStep: Math.max(90, Math.round(v / 90) * 90) })} />
+          <NumField compact value={step} min={desp ? 1 : 0.5} max={desp ? 5000 : 360} step={desp ? 1 : 15} unit={desp ? 'mm' : '°'}
+            onChange={(v) => set(desp ? { moveStep: v } : { rotStep: v })} />
         </div>
         <div className="mv-col">{rows.map((a) => arrow(a, 1))}</div>
       </div>
@@ -58,7 +58,7 @@ export function MovementPanel({ label, ui, setUi, onNudge, onRotate }) {
       <p className="hint">{label ? <>Moviendo: <b>{label}</b></> : 'Seleccioná un módulo para moverlo.'}</p>
       <p className="hint">{desp
         ? 'Rojo: ancho · Verde: profundidad · Azul: alto. Con Posición relativa los ejes siguen el giro del módulo; sin ella, los del ambiente. Con Colisión activa no atraviesa paredes ni módulos.'
-        : 'Gira sobre el eje vertical, alrededor del centro del módulo.'}</p>
+        : 'Gira sobre el eje vertical, alrededor del centro del módulo, de a cualquier ángulo. El imán solo actúa a 0, 90, 180 y 270°.'}</p>
       <p className="hint">Atajos: <b>E</b> Propiedades · <b>Ctrl+Shift+M</b> Movimiento · <b>X</b>/<b>Y</b> trabar eje al arrastrar · <b>RePág</b>/<b>AvPág</b> alto · <b>Ctrl+D</b> duplicar · <b>D</b> cota.</p>
     </aside>
   );

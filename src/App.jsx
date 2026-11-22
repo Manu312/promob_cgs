@@ -23,6 +23,8 @@ import { sampleProject, emptyProject, normalizeProject } from './domain/project.
 import Scene3D from './ui/Scene3D.jsx';
 import CatalogBar from './ui/CatalogBar.jsx';
 import QuickFind from './ui/QuickFind.jsx';
+import ModuleList from './ui/ModuleList.jsx';
+import { toggleHidden, removeModules } from './domain/moduleList.js';
 import { itemParams } from './domain/library.js';
 import Inspector from './ui/Inspector.jsx';
 import CutPlan from './ui/CutPlan.jsx';
@@ -356,6 +358,7 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'm') { e.preventDefault(); setTool('movimiento'); return; }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'd') { e.preventDefault(); duplicateSelected(); return; }
       if (plain && key === 'e') { setTool('propiedades'); return; }
+      if (plain && key === 'o' && selectedId) { setProject((p) => toggleHidden(p, [selectedId])); return; } // visible / oculto
       if (plain && key === 'x') { setAxisLock((l) => (l === 'x' ? null : 'x')); return; }
       if (plain && key === 'y') { setAxisLock((l) => (l === 'z' ? null : 'z')); return; }
       if (plain && key === 'm') { stopDrawWalls(); stopAnnotate(); stopScale(); return; } // Seleccionar / Mover
@@ -431,7 +434,15 @@ export default function App() {
       </header>
 
       {tab === 'diseno' && (
-        <main className="design">
+        <main className={`design${ui.listOpen ? ' with-list' : ''}`}>
+          <div className="side-tabs">
+            <button className={`side-tab${ui.listOpen ? ' on' : ''}`} onClick={() => setUi((u) => ({ ...u, listOpen: !u.listOpen }))}>Lista de Módulos</button>
+          </div>
+          {ui.listOpen && (
+            <ModuleList project={project} selectedId={selectedId} onSelect={setSelectedId}
+              onToggleHidden={(ids) => setProject((p) => toggleHidden(p, ids))}
+              onRemove={(ids) => { setProject((p) => removeModules(p, ids)); setSelectedId(null); }} />
+          )}
           <section className="viewport">
             <CatalogBar nav={ui.catalogPath} setNav={(p) => setUi((u) => ({ ...u, catalogPath: p }))} counts={ui.catalogUse} onInsert={insertItem} thumbCtx={thumbCtx}
               onDragItem={(item, variant) => { dragItemRef.current = item ? { item, variant } : null; if (!item) setGhost(null); }}

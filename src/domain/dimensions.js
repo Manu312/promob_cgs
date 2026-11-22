@@ -30,7 +30,7 @@ export function nearestDistances(mod, room, modules, maxDist = 20000) {
   const obstacles = roomWalls(room).map((g) => ({ target: { kind: 'wall', id: g.id }, segs: [[g.a, g.b]] }));
   for (const c of room.columns || []) obstacles.push({ target: { kind: 'column', id: c.id }, segs: rectSegs(c.x, c.z, c.x + c.w, c.z + c.d) });
   for (const o of modules) {
-    if (o.id === mod.id) continue;
+    if (o.id === mod.id || o.hidden) continue;
     const oy0 = o.y || 0, oy1 = oy0 + o.params.height;
     if (oy0 >= y1 || oy1 <= y0) continue; // a otra altura: no estorba
     const f = footprint(o);
@@ -67,7 +67,7 @@ export function verticalDistances(mod, room, modules) {
   const poly = modulePoly(mod);
   let below = { y: 0, target: { kind: 'floor' } }, above = { y: room.h, target: { kind: 'ceiling' } };
   for (const o of modules) {
-    if (o.id === mod.id || !overlaps(poly, modulePoly(o))) continue;
+    if (o.id === mod.id || o.hidden || !overlaps(poly, modulePoly(o))) continue;
     const oy0 = o.y || 0, oy1 = oy0 + o.params.height;
     if (oy1 <= y0 + 0.5 && oy1 > below.y) below = { y: oy1, target: { kind: 'module', id: o.id } };
     if (oy0 >= y1 - 0.5 && oy0 < above.y) above = { y: oy0, target: { kind: 'module', id: o.id } };

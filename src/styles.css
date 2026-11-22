@@ -23,7 +23,19 @@ h2 { margin: 0; font-size: 20px; } h3 { margin: 16px 0 8px; font-size: 15px; } h
 .top-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .total-pill { background: var(--accent-weak); color: var(--accent); padding: 5px 10px; border-radius: 999px; font-weight: 600; }
 
-.design { flex: 1; display: grid; grid-template-columns: 1fr 290px; min-height: 0; }
+.design { flex: 1; display: grid; grid-template-columns: 26px 1fr 290px; min-height: 0; }
+.design.with-list { grid-template-columns: 26px 250px 1fr 290px; }
+.side-tabs { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; padding-top: 6px; }
+.side-tab { writing-mode: vertical-rl; transform: rotate(180deg); border: 1px solid transparent; background: transparent; padding: 10px 2px; font-size: 12px; border-radius: 3px; white-space: nowrap; }
+.side-tab.on { border-color: #5b8def; background: var(--accent-weak); }
+.module-list { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 8px 10px; min-height: 0; }
+.ml-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.ml-actions { margin-bottom: 6px; }
+.ml-plane-btn { border: none; background: transparent; padding: 3px 0; font-weight: 600; font-size: 12.5px; }
+.ml-row { display: flex; align-items: center; gap: 4px; padding: 2px 4px 2px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+.ml-row:hover, .ml-row.on { background: var(--accent-weak); }
+.ml-row.off span { color: var(--muted); text-decoration: line-through; }
+.ml-bulb { border: none; background: transparent; padding: 0 2px; line-height: 0; }
 .catalog, .inspector { background: var(--panel); overflow-y: auto; padding: 10px 12px 24px; }
 .catalog { border-right: 1px solid var(--line); } .inspector { border-left: 1px solid var(--line); }
 .tools-col { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--panel); }

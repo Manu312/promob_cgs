@@ -1,24 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { LIBRARY, resolvePath, mostUsed, paginate, itemParams, itemSize } from '../domain/library.js';
+import { LIBRARY, resolvePath, mostUsed, paginate, itemSize } from '../domain/library.js';
+import { ModelThumb, Silhouette } from './thumbnails.jsx';
 
 const MAS = '__mas'; // pestaña "Más usados"
 const ITEM_W = 122; // ancho de cada miniatura (px) para el paginado
 
-// Silueta provisoria (proporcional a ancho × alto) hasta tener la miniatura del 3D.
-export function Silhouette({ item }) {
-  const p = itemParams(item);
-  const k = 64 / Math.max(p.width, p.height);
-  const w = Math.max(10, p.width * k), h = Math.max(10, p.height * k);
-  return (
-    <svg className="cb-thumb" viewBox="0 0 70 70" aria-hidden="true">
-      <rect x={(70 - w) / 2} y={70 - h - 2} width={w} height={h} rx="1.5" fill="#d8c3a5" stroke="#8a6d4b" />
-    </svg>
-  );
-}
-
 // Barra de modulación, arriba del visor como en Promob: biblioteca → familia → ítems →
 // subfamilia, con atrás/adelante y "Más usados". Clic elige el ítem; doble clic lo inserta.
-export default function CatalogBar({ nav, setNav, counts = {}, onInsert, Thumb = Silhouette }) {
+export default function CatalogBar({ nav, setNav, counts = {}, onInsert, thumbCtx }) {
   const masUsados = nav?.[0] === MAS;
   const r = resolvePath(masUsados ? [] : nav || []);
   const path = masUsados ? [MAS] : r.path;
@@ -65,7 +54,7 @@ export default function CatalogBar({ nav, setNav, counts = {}, onInsert, Thumb =
           {pg.items.map((item) => (
             <button key={item.id} className={`mod-btn${picked === item.id ? ' picked' : ''}`} title="Doble clic para insertar"
               onClick={() => setPicked(item.id)} onDoubleClick={() => onInsert(item)}>
-              <Thumb item={item} />
+              {thumbCtx ? <ModelThumb item={item} ctx={thumbCtx} /> : <Silhouette item={item} />}
               <span>{item.label}</span>
               <small>{itemSize(item)}</small>
             </button>

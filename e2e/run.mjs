@@ -81,6 +81,9 @@ try {
   check('Más usados muestra lo que se insertó', usados.includes('Placard batientes'), usados.join(', '));
   await clickText('.cb-subs .cb-nav', '⟵');
   check('Atrás vuelve a la biblioteca anterior', (await page.$eval('.cb-libs .cb-tab.on', (e) => e.textContent.trim())) === 'Cocinas');
+  await sleep(800);
+  const thumbs = await page.$$eval('.mod-btn img.cb-thumb', (els) => els.map((e) => e.src.length));
+  check('Miniaturas generadas del modelo 3D', thumbs.length > 0 && thumbs.every((n) => n > 3000), `${thumbs.length} miniaturas, ${thumbs.join('/')} bytes`);
   await shot('01b-catalogo');
   const placard = p.modules.at(-1);
   check('Módulo nuevo queda seleccionado', (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Placard batientes');

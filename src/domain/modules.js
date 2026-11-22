@@ -4,7 +4,7 @@
 // alineada a ejes; la misma geometría alimenta el 3D y el despiece.
 
 import { snapCandidates } from './room.js';
-import { buildAparato, FINISHES, TIPOS } from './appliances.js';
+import { buildAparato, FINISHES, TIPOS, splitAround } from './appliances.js';
 import { bounds } from './walls.js';
 
 const SLIDES = [250, 300, 350, 400, 450, 500, 550, 600];
@@ -55,6 +55,10 @@ export const PARAM_DEFS = {
   bachas: { label: 'Bachas', type: 'num', min: 0, max: 2, step: 1 },
   hornallas: { label: 'Hornallas', type: 'num', min: 2, max: 6, step: 1 },
   tipo: { label: 'Tipo', type: 'sel', options: TIPOS },
+  bowls: { label: 'Cubetas', type: 'num', min: 1, max: 2, step: 1 },
+  montaje: { label: 'Montaje', type: 'sel', options: [['apoyo', 'De apoyo'], ['bajo', 'Bajo mesada']] },
+  bowlDepth: { label: 'Profundidad de cubeta', type: 'num', min: 100, max: 300, step: 10, unit: 'mm' },
+  reach: { label: 'Alcance del caño', type: 'num', min: 100, max: 350, step: 5, unit: 'mm' },
   finish: { label: 'Terminación', type: 'sel', options: FINISHES },
   chimneyH: { label: 'Chimenea (alto)', type: 'num', min: 0, max: 1500, step: 10, unit: 'mm' },
   price: { label: 'Precio (opcional, al presupuesto)', type: 'num', min: 0, max: 1e9, step: 1000, unit: '$' },
@@ -112,6 +116,9 @@ export const MODULE_TYPES = {
   microondas: { label: 'Microondas', cat: 'Electrodomésticos', kind: 'aparato', ap: 'microondas', y: 890, rest: true, fields: ['width', 'height', 'depth', 'finish', 'price'], defaults: { width: 440, height: 260, depth: 340, finish: 'inox', price: 0 } },
   lavavajillas: { label: 'Lavavajillas', cat: 'Electrodomésticos', kind: 'aparato', ap: 'lavavajillas', y: 0, fields: ['width', 'height', 'depth', 'finish', 'price'], defaults: { width: 600, height: 850, depth: 600, finish: 'inox', price: 0 } },
   lavarropas: { label: 'Lavarropas', cat: 'Electrodomésticos', kind: 'aparato', ap: 'lavarropas', y: 0, fields: ['width', 'height', 'depth', 'tipo', 'finish', 'price'], defaults: { width: 595, height: 850, depth: 550, tipo: 'frontal', finish: 'blanco', price: 0 } },
+  // Accesorios de cocina (Fase 6.2): la bacha cala la mesada sobre la que se apoya.
+  bacha: { label: 'Bacha', cat: 'Accesorios', kind: 'aparato', ap: 'bacha', y: 870, rest: true, fields: ['width', 'depth', 'bowls', 'montaje', 'bowlDepth', 'price'], defaults: { width: 710, height: 10, depth: 482, bowls: 1, montaje: 'apoyo', bowlDepth: 180, price: 0 } },
+  griferia: { label: 'Grifería', cat: 'Accesorios', kind: 'aparato', ap: 'griferia', y: 870, rest: true, fields: ['height', 'reach', 'tipo', 'finish', 'price'], defaults: { width: 60, height: 334, depth: 240, reach: 210, tipo: 'alto', finish: 'cromo', price: 0 } },
   mostrador: { label: 'Mostrador', cat: 'Oficina', kind: 'caja', y: 0, defaults: caja({ width: 1500, height: 1050, depth: 500, plinth: 100, dividers: 2, doorType: 'ninguna', doors: 0, shelves: 1, handlePos: 'none' }) },
 };
 
@@ -148,7 +155,7 @@ export function baseOf(mod, rules = {}) {
   return { pies: r === 'patas_zocalo', zocalo: r !== 'ninguna', zocalo_tras: r === 'zocalo', ruedas: false };
 }
 
-function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null }) {
+function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null, holes = [] }) {
   const p = sanitize(raw);
   const R = { ...DEFAULT_RULES, ...rules };
   // Agregado "Fondo": pone o saca el fondo de este módulo
@@ -345,8 +352,9 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null }) {
   // Mesada (se compra aparte: va al presupuesto por m², no al plan de corte)
   if (p.mesada === 'si') {
     const md = D + tf + p.mesadaOver;
-    decors.push(decor('mesada', 0, H, 0, W, p.mesadaT, md));
+    for (const r of splitAround({ x0: 0, z0: 0, x1: W, z1: md }, holes)) decors.push(decor('mesada', r.x0, H, r.z0, r.x1 - r.x0, p.mesadaT, r.z1 - r.z0));
     add('mesada', Math.round((W * md) / 1e4) / 100);
+    add('calado', holes.length);
   }
 
   if (sliding) {
@@ -409,18 +417,22 @@ function buildEscritorio(raw, { t }) {
 
 // Tapa / mesada de piedra (se compra aparte: va al presupuesto por m², no al despiece),
 // con 0, 1 o 2 huecos de bacha.
-function buildTapa(raw) {
+function buildTapa(raw, { holes = [] } = {}) {
   const p = sanitize(raw);
   const W = p.width, D = p.depth, T = p.mesadaT;
-  const decors = [decor('mesada', 0, 0, 0, W, T, D)];
+  const decors = [];
+  const own = []; // huecos de sus propias bachas
   const nb = Math.round(p.bachas || 0);
   for (let i = 0; i < nb; i++) {
     const bw = Math.min(500, (W - 100 * (nb + 1)) / nb), bd = Math.min(400, D - 160);
     if (bw < 200 || bd < 200) break;
     const cx = (W * (i + 1)) / (nb + 1);
-    decors.push(decor('bacha', cx - bw / 2, -180, (D - bd) / 2, bw, 180 + T + 1, bd));
+    own.push({ x0: cx - bw / 2, z0: (D - bd) / 2, x1: cx + bw / 2, z1: (D + bd) / 2 });
+    for (const [x, z, sx, sz] of [[cx - bw / 2, (D - bd) / 2, bw, 2], [cx - bw / 2, (D + bd) / 2 - 2, bw, 2], [cx - bw / 2, (D - bd) / 2, 2, bd], [cx + bw / 2 - 2, (D - bd) / 2, 2, bd]]) decors.push(decor('bacha', x, -180, z, sx, 180 + T, sz));
+    decors.push(decor('bacha', cx - bw / 2, -180, (D - bd) / 2, bw, 2, bd));
   }
-  return { parts: [], decors, hardware: { mesada: Math.round((W * D) / 1e4) / 100, ...(nb ? { bacha: nb } : {}) } };
+  for (const r of splitAround({ x0: 0, z0: 0, x1: W, z1: D }, [...own, ...holes])) decors.push(decor('mesada', r.x0, 0, r.z0, r.x1 - r.x0, T, r.z1 - r.z0));
+  return { parts: [], decors, hardware: { mesada: Math.round((W * D) / 1e4) / 100, ...(nb ? { bacha: nb } : {}), ...(own.length + holes.length ? { calado: own.length + holes.length } : {}) } };
 }
 
 // Vista: panel lateral suelto del material de los frentes.
@@ -534,7 +546,7 @@ export function buildModule(mod, ctx) {
   const def = MODULE_TYPES[mod.type];
   if (!def) return { parts: [], decors: [], hardware: {} };
   if (def.kind === 'aparato') return buildAparato(def.ap, { ...def.defaults, ...mod.params }, mod.name || def.label);
-  return (BUILDERS[def.kind] || buildCaja)(mod.params, { ...ctx, aggs: mod.aggs || null });
+  return (BUILDERS[def.kind] || buildCaja)(mod.params, { ...ctx, aggs: mod.aggs || null, holes: ctx.holes || [] });
 }
 
 // ---- Ubicación en el ambiente ----

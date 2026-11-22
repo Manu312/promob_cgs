@@ -157,7 +157,82 @@ function lavarropas(p) {
   return out;
 }
 
-export const APPLIANCE_BUILDERS = { cocina, anafe, horno, campana, heladera, microondas, lavavajillas, lavarropas };
+// Bacha de acero: 1 o 2 cubetas; 'apoyo' (con borde sobre la mesada y escurridor) o 'bajo'
+// mesada (sin borde a la vista). Las cubetas se dibujan como un hueco (paredes y fondo).
+export function sinkBowls(p) {
+  const { width: W, depth: D, bowls = 1, montaje = 'apoyo' } = p;
+  const m = montaje === 'bajo' ? 0 : 40; // borde
+  const esc = montaje === 'apoyo' && bowls === 1 && W >= 650 ? W * 0.42 : 0; // escurridor
+  const bw = (W - 2 * m - esc - (bowls - 1) * 40) / bowls, bd = D - 2 * m;
+  return Array.from({ length: bowls }, (_, i) => ({ x: m + i * (bw + 40), z: m, w: bw, d: bd }));
+}
+function bacha(p) {
+  const { width: W, depth: D, montaje = 'apoyo', bowlDepth: B = 180 } = p;
+  const out = [];
+  const bowls = sinkBowls(p);
+  if (montaje === 'apoyo') { // borde y escurridor sobre la mesada
+    const last = bowls.at(-1);
+    out.push(box(0, 0, 0, W, 3, bowls[0].z, 'inox'), box(0, 0, D - bowls[0].z, W, 3, bowls[0].z, 'inox'));
+    out.push(box(0, 0, 0, bowls[0].x, 3, D, 'inox'), box(last.x + last.w, 0, 0, W - last.x - last.w, 3, D, 'inox'));
+    for (let i = 0; i + 1 < bowls.length; i++) out.push(box(bowls[i].x + bowls[i].w, 0, 0, 40, 3, D, 'inox'));
+    if (last.x + last.w + 60 < W) for (let k = 0; k < 6; k++) out.push(box(last.x + last.w + 40, 3, 70 + k * ((D - 140) / 6), W - last.x - last.w - 80, 1, 6, 'negro'));
+  }
+  for (const b of bowls) {
+    out.push(box(b.x, -B, b.z, b.w, 2, b.d, 'inox')); // fondo
+    out.push(box(b.x, -B, b.z, 2, B, b.d, 'inox'), box(b.x + b.w - 2, -B, b.z, 2, B, b.d, 'inox'));
+    out.push(box(b.x, -B, b.z, b.w, B, 2, 'inox'), box(b.x, -B, b.z + b.d - 2, b.w, B, 2, 'inox'));
+    out.push(cyl(b.x + b.w / 2, -B + 2, b.z + b.d / 2, 30, 2, 'cromo')); // desagüe
+  }
+  return out;
+}
+
+// Grifería monocomando: 'alto' (caño alto curvo), 'bajo' o 'extraible' (cabezal grueso).
+function griferia(p) {
+  const { height: H = 334, reach: R = 210, tipo = 'alto', finish = 'cromo' } = p;
+  const out = [cyl(30, 0, 30, 28, 30, finish)]; // base
+  const bodyH = tipo === 'bajo' ? H - 30 : 160;
+  out.push(cyl(30, 30, 30, 22, bodyH, finish)); // cuerpo
+  out.push(box(22, 30 + bodyH - 10, 30, 16, 14, 60, finish)); // palanca
+  if (tipo === 'bajo') {
+    out.push(box(22, H - 40, 30, 16, 16, R, finish)); // caño recto
+  } else {
+    out.push(cyl(30, 30 + bodyH, 30, 14, H - bodyH - 50, finish)); // caño que sube
+    out.push(box(22, H - 30, 30, 16, 16, R, finish)); // cuello que avanza
+    out.push(tipo === 'extraible' ? cyl(30, H - 120, 30 + R - 10, 22, 100, finish) : cyl(30, H - 70, 30 + R - 8, 10, 50, finish)); // salida
+  }
+  return out;
+}
+
+export const APPLIANCE_BUILDERS = { cocina, anafe, horno, campana, heladera, microondas, lavavajillas, lavarropas, bacha, griferia };
+
+// Rectángulo que cala la mesada, en coordenadas locales del aparato (null si no cala).
+export function cutoutOf(type, p, def) {
+  if (type === 'bacha') {
+    const bs = sinkBowls(p);
+    if (p.montaje === 'bajo') { const x0 = Math.min(...bs.map((b) => b.x)), x1 = Math.max(...bs.map((b) => b.x + b.w)); return { x0, z0: bs[0].z, x1, z1: bs[0].z + bs[0].d }; }
+    return { x0: 20, z0: 20, x1: p.width - 20, z1: p.depth - 20 };
+  }
+  if (def?.cut) { const w = Math.min(def.cut.w, p.width - 10), d = Math.min(def.cut.d, p.depth - 10); return { x0: (p.width - w) / 2, z0: (p.depth - d) / 2, x1: (p.width + w) / 2, z1: (p.depth + d) / 2 }; }
+  return null;
+}
+
+// Parte un rectángulo {x0,z0,x1,z1} alrededor de los huecos (la mesada calada).
+export function splitAround(rect, holes) {
+  let rects = [rect];
+  for (const h of holes) {
+    const next = [];
+    for (const r of rects) {
+      const ix0 = Math.max(r.x0, h.x0), ix1 = Math.min(r.x1, h.x1), iz0 = Math.max(r.z0, h.z0), iz1 = Math.min(r.z1, h.z1);
+      if (ix0 >= ix1 || iz0 >= iz1) { next.push(r); continue; }
+      if (r.z0 < iz0) next.push({ x0: r.x0, z0: r.z0, x1: r.x1, z1: iz0 });
+      if (iz1 < r.z1) next.push({ x0: r.x0, z0: iz1, x1: r.x1, z1: r.z1 });
+      if (r.x0 < ix0) next.push({ x0: r.x0, z0: iz0, x1: ix0, z1: iz1 });
+      if (ix1 < r.x1) next.push({ x0: ix1, z0: iz0, x1: r.x1, z1: iz1 });
+    }
+    rects = next;
+  }
+  return rects;
+}
 
 // Construye un aparato: solo piezas decorativas (no van al despiece) y, si tiene precio, la
 // línea para el presupuesto.

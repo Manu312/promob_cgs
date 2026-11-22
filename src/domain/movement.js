@@ -48,7 +48,8 @@ export function restingHeight(mod, modules) {
     if (o.id === mod.id || !((o.y || 0) <= 1 || o.rest)) continue;
     if ((o.y || 0) + o.params.height > SUPPORT_MAX_H) continue;
     if (!overlaps(poly, modulePoly(o))) continue;
-    y = Math.max(y, (o.y || 0) + o.params.height);
+    const mesada = o.params.mesada === 'si' ? o.params.mesadaT || 0 : 0; // se apoya arriba de la mesada
+    y = Math.max(y, (o.y || 0) + o.params.height + mesada);
   }
   return Math.round(y);
 }

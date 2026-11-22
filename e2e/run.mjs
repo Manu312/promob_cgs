@@ -179,6 +179,30 @@ try {
   check('Deshacer devuelve los módulos removidos', p.modules.length === nBefore && p.modules.every((m) => !m.hidden));
   await clickText('.side-tab', 'Lista de Módulos');
   await page.keyboard.press('Escape'); await sleep(200);
+  // Inserción Automática (#83): Inserción (al insertar) y Ambiente (sobre los existentes)
+  await clickText('.side-tab', 'Inserción Automática');
+  const aiTick = (cat, label) => page.evaluate((cat, label) => {
+    const c = [...document.querySelectorAll('.ai-cat')].find((e) => e.querySelector('.ml-plane-btn').textContent.includes(cat));
+    [...c.querySelectorAll('.ai-item')].find((l) => l.textContent.trim() === label).querySelector('input').click();
+  }, cat, label);
+  await aiTick('Cocinas', 'Tapas'); await sleep(300);
+  p = await project();
+  check('Inserción: lo tildado queda guardado en el proyecto', JSON.stringify(p.autoInsert?.Cocinas) === '["tapas"]');
+  await insertFromCatalog('Bajo mesada puertas');
+  p = await project();
+  check('Un módulo insertado sale con lo tildado (tapa)', !!p.modules.at(-1).aggs?.tapa);
+  for (let i = 0; i < 2; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300); }
+  await clickText('.auto-insert .mv-tabs button', 'Ambiente');
+  await aiTick('Cocinas', 'Marco para Superior'); await sleep(200);
+  await clickText('.auto-insert .ai-btns button', '⇨ Insertar');
+  p = await project();
+  const altas = p.modules.filter((m) => (m.y || 0) >= 1000 && m.type.startsWith('alacena'));
+  check('Ambiente · Insertar: marco en todos los superiores de cocina', altas.length > 0 && altas.every((m) => m.aggs?.marco) && p.modules.filter((m) => (m.y || 0) < 1000).every((m) => !m.aggs?.marco));
+  await shot('01h-insercion-automatica');
+  await clickText('.auto-insert .ai-btns button', '✕ Remover');
+  p = await project();
+  check('Ambiente · Remover lo saca', p.modules.every((m) => !m.aggs?.marco));
+  await clickText('.side-tab', 'Inserción Automática');
   // Localizar Rápido (#59)
   await page.keyboard.down('Control'); await page.keyboard.press('KeyL'); await page.keyboard.up('Control'); await sleep(400);
   check('Ctrl+L abre Localizar Rápido', !!(await page.$('.quickfind')));

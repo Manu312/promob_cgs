@@ -1,4 +1,6 @@
-import { buildModule, moduleName, DEFAULT_RULES } from './modules.js';
+import { buildModule, moduleName, DEFAULT_RULES, MODULE_TYPES, footprint, localAxes } from './modules.js';
+import { cutoutOf } from './appliances.js';
+import { modulePoly, overlaps } from './collision.js';
 import { matById, stoneById, slotIds, slotOf, SLOTS, pathLabel, ACC_FAMILIES, accById } from './catalog.js';
 
 const clean = (o) => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== undefined && v !== ''));
@@ -37,10 +39,47 @@ export function resolveRules(mod, project) {
   return { ...DEFAULT_RULES, ...clean(project.rules), ...clean(mod.rules) };
 }
 
+// Calados: cada aparato que cala (bacha, anafe) apoyado sobre un módulo con mesada o sobre una
+// tapa le pasa a ese módulo el hueco, en sus coordenadas locales. Devuelve { [moduleId]: [hueco] }.
+const toLocal = (m, [wx, wz]) => {
+  const { fw, fd } = footprint(m);
+  const { ex, ez } = localAxes(m.rot || 0);
+  const dx = wx - (m.x + fw / 2), dz = wz - (m.z + fd / 2);
+  return [dx * ex[0] + dz * ex[1] + m.params.width / 2, dx * ez[0] + dz * ez[1] + m.params.depth / 2];
+};
+const toWorld = (m, [lx, lz]) => {
+  const { fw, fd } = footprint(m);
+  const { ex, ez } = localAxes(m.rot || 0);
+  const ux = lx - m.params.width / 2, uz = lz - m.params.depth / 2;
+  return [m.x + fw / 2 + ex[0] * ux + ez[0] * uz, m.z + fd / 2 + ex[1] * ux + ez[1] * uz];
+};
+export function cutoutsFor(modules) {
+  const out = {};
+  for (const m of modules) {
+    const def = MODULE_TYPES[m.type];
+    if (m.hidden || def?.kind !== 'aparato') continue;
+    const c = cutoutOf(def.ap, { ...def.defaults, ...m.params }, def);
+    if (!c) continue;
+    const poly = modulePoly(m);
+    const sup = modules.find((o) => {
+      if (o.id === m.id || o.hidden || !overlaps(poly, modulePoly(o))) return false;
+      const k = MODULE_TYPES[o.type]?.kind;
+      const top = (o.y || 0) + (k === 'tapa' ? 0 : o.params.height);
+      return (k === 'tapa' || o.params.mesada === 'si') && Math.abs(top + (k === 'tapa' ? o.params.height : o.params.mesadaT || 0) - (m.y || 0)) <= 2;
+    });
+    if (!sup) continue;
+    const pts = [[c.x0, c.z0], [c.x1, c.z0], [c.x1, c.z1], [c.x0, c.z1]].map((q) => toLocal(sup, toWorld(m, q)));
+    const xs = pts.map((q) => q[0]), zs = pts.map((q) => q[1]);
+    (out[sup.id] = out[sup.id] || []).push({ x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs), z1: Math.max(...zs) });
+  }
+  return out;
+}
+
 export function buildAll(project, settings) {
+  const holes = cutoutsFor(project.modules);
   return project.modules.map((mod, i) => {
     const mats = resolveMats(mod, project, settings);
-    const b = buildModule(mod, { t: mats.cajas.t, tf: mats.puertas.t, tb: mats.fondos.t, tc: mats.cajones.t, rules: resolveRules(mod, project) });
+    const b = buildModule(mod, { t: mats.cajas.t, tf: mats.puertas.t, tb: mats.fondos.t, tc: mats.cajones.t, rules: resolveRules(mod, project), holes: holes[mod.id] || [] });
     const parts = b.parts.map((p) => ({ ...p, slot: slotOf(p) }));
     const acc = resolveAcc(mod, project, settings);
     return { id: mod.id, tag: `M${i + 1}`, label: moduleName(mod), mats, acc, ...b, parts, decors: styleHandles(b.decors, acc.tiradores) };

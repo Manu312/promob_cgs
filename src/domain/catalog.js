@@ -79,6 +79,7 @@ export function accById(settings, fam, id) {
 
 export const DEFAULT_HARDWARE = [
   { code: 'rueda', name: 'Rueda giratoria con freno', unit: 'u', price: 2500 },
+  { code: 'calado', name: 'Calado de mesada (bacha / anafe)', unit: 'u', price: 18000 },
   { code: 'barral', name: 'Barral oval + soportes', unit: 'm', price: 6000 },
   { code: 'soporte_estante', name: 'Soporte de estante', unit: 'u', price: 80 },
   { code: 'kit_corrediza', name: 'Kit puerta corrediza (por hoja)', unit: 'u', price: 25000 },

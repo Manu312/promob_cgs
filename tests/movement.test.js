@@ -92,7 +92,7 @@ import { restingHeight } from '../src/domain/movement.js';
 test('apoyado: toma la altura de la mesada que tiene debajo; sin nada, el piso', () => {
   const bajo = mod('b', 0, 0);
   const caja = { ...mod('c', 100, 50), rest: true };
-  assert.equal(restingHeight(caja, [bajo, caja]), 870);
+  assert.equal(restingHeight(caja, [bajo, caja]), 870 + 20, 'arriba de la mesada (20 mm)');
   assert.equal(restingHeight({ ...caja, x: 1500 }, [bajo, caja]), 0);
 });
 
@@ -101,7 +101,7 @@ test('apoyado: una alacena colgada no es apoyo, pero un módulo apoyado sí', ()
   const caja = { ...mod('c', 0, 0), rest: true };
   assert.equal(restingHeight(caja, [alacena, caja]), 0);
   const bajo = mod('b', 0, 0), tabla = { ...mod('s', 0, 0), params: { ...mod('s', 0, 0).params, height: 40 }, y: 870, rest: true };
-  assert.equal(restingHeight(caja, [bajo, tabla, caja]), 910);
+  assert.equal(restingHeight(caja, [bajo, tabla, caja]), 870 + 40 + 20);
 });
 
 test('apoyado: un placard alto no es apoyo (ahí choca)', () => {

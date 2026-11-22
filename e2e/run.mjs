@@ -193,6 +193,28 @@ try {
     await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(600);
     for (let i = 0; i < 4; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300); }
     check('Deshacer saca heladera, lavarropas, microondas y cocina', (await project()).modules.length === nBefore);
+    // Bachas y calado de la mesada (#93): bacha simple sobre el bajo bacha → la mesada queda calada
+    const bb = (await project()).modules.find((m) => m.type === 'bajo_bacha');
+    await clickText('.cb-libs .cb-tab', 'Accesorios'); await clickText('.cb-groups .cb-tab', 'Bachas'); await clickText('.cb-subs .cb-tab', 'De apoyo');
+    await dbl('Bacha simple con escurridor'); await sleep(400);
+    await page.keyboard.press('KeyE'); await sleep(200);
+    const setF = async (label, v) => { const f = await fieldInput(label); await f.click({ clickCount: 3 }); await f.type(String(v)); await page.keyboard.press('Enter'); await sleep(250); };
+    await setF('X (desde pared izq.)', bb.x + 45); await setF('Z (desde pared fondo)', bb.z + 40);
+    const apo = () => page.evaluate(() => [...document.querySelectorAll('.inspector label.check-row')].find((l) => l.textContent.includes('Apoyar')).querySelector('input').click());
+    await apo(); await sleep(250); await apo(); await sleep(400);
+    p = await project();
+    const sink = p.modules.at(-1);
+    check('La bacha se apoya arriba de la mesada del bajo', sink.type === 'bacha' && sink.y === bb.params.height + bb.params.mesadaT, 'y=' + sink.y);
+    await clickText('.cb-groups .cb-tab', 'Griferías'); await dbl('Monocomando caño alto'); await sleep(300);
+    await setF('X (desde pared izq.)', bb.x + 370); await setF('Z (desde pared fondo)', bb.z + 10);
+    await apo(); await sleep(250); await apo(); await sleep(400);
+    await shot('01k-bacha-calada');
+    await clickText('.tabs button', 'Presupuesto'); await sleep(400);
+    const cal = await page.$$eval('.page table tbody tr', (rs) => rs.map((r) => r.textContent).filter((t) => t.includes('Calado de mesada')));
+    check('El calado de la mesada va al presupuesto', cal.length === 1 && cal[0].includes('1u'), cal.join(' | '));
+    await clickText('.tabs button', 'Diseño 3D'); await sleep(400);
+    for (let i = 0; i < 10; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(200); }
+    check('Deshacer saca la bacha y la grifería', (await project()).modules.length === nBefore);
     await page.keyboard.press('Escape'); await sleep(200);
   }
   // Lista de Módulos (#60)
@@ -419,13 +441,13 @@ try {
     await page.evaluate(() => [...document.querySelectorAll('.inspector label.check-row')].find((l) => l.textContent.includes('Apoyar'))?.querySelector('input').click());
     await sleep(400);
     let cm2 = await modNow(cid);
-    check('Apoyar sobre lo de abajo: la cajonera sube a la mesada del bajo', cm2.rest === true && cm2.y === bajoC.params.height, `y=${cm2.y}`);
+    check('Apoyar sobre lo de abajo: la cajonera sube a la mesada del bajo', cm2.rest === true && cm2.y === bajoC.params.height + bajoC.params.mesadaT, `y=${cm2.y}`);
     for (let i = 0; i < 8; i++) { await page.keyboard.down('Shift'); await page.keyboard.press('ArrowDown'); await page.keyboard.up('Shift'); await sleep(150); }
     cm2 = await modNow(cid);
     check('Al sacarla de encima del bajo baja al piso', cm2.y === 0 && cm2.z >= 560, `z=${cm2.z}, y=${cm2.y}`);
     for (let i = 0; i < 8; i++) { await page.keyboard.down('Shift'); await page.keyboard.press('ArrowUp'); await page.keyboard.up('Shift'); await sleep(150); }
     cm2 = await modNow(cid);
-    check('Al volver sobre el bajo se apoya otra vez en la mesada', cm2.y === bajoC.params.height, `z=${cm2.z}, y=${cm2.y}`);
+    check('Al volver sobre el bajo se apoya otra vez en la mesada', cm2.y === bajoC.params.height + bajoC.params.mesadaT, `z=${cm2.z}, y=${cm2.y}`);
     await shot('03e-apoyar');
     await page.keyboard.press('Delete'); await sleep(300);
     check('Sin errores de consola tras apoyar', errors.length === 0, errors.slice(-3).join(' | '));

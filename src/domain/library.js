@@ -125,6 +125,27 @@ export const LIBRARY = [
     ],
   },
   {
+    id: 'accesorios', label: 'Accesorios', groups: [
+      { id: 'bachas', label: 'Bachas', subgroups: [
+        { id: 'apoyo', label: 'De apoyo', items: [
+          it('acc-bacha-simple', 'bacha', 'Bacha simple con escurridor'),
+          it('acc-bacha-doble', 'bacha', 'Bacha doble', { width: 780, depth: 435, bowls: 2 }),
+        ] },
+        { id: 'bajo', label: 'Bajo mesada', items: [
+          it('acc-bacha-bajo', 'bacha', 'Bacha bajo mesada', { width: 500, depth: 400, montaje: 'bajo' }),
+          it('acc-bacha-bajo-doble', 'bacha', 'Bacha doble bajo mesada', { width: 780, depth: 420, bowls: 2, montaje: 'bajo' }),
+        ] },
+      ] },
+      { id: 'griferias', label: 'Griferías', subgroups: [
+        { id: 'cocina', label: 'Cocina', items: [
+          it('acc-grif-alto', 'griferia', 'Monocomando caño alto'),
+          it('acc-grif-bajo', 'griferia', 'Monocomando caño bajo', { height: 230, reach: 210, tipo: 'bajo' }),
+          it('acc-grif-extraible', 'griferia', 'Monocomando extraíble', { height: 400, reach: 220, tipo: 'extraible' }),
+        ] },
+      ] },
+    ],
+  },
+  {
     id: 'dormitorios', label: 'Dormitorios', groups: [
       { id: 'placares', label: 'Placares', subgroups: [
         { id: 'batientes', label: 'Batientes', items: [it('dor-pla-bat', 'placard_bat', null, null, W(900, 1200, 1500, 1800, 2100, 2400))] },

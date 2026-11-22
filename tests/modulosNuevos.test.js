@@ -40,7 +40,7 @@ test('torre p/ heladera: hueco desde el piso y puertas arriba', () => {
 test('tapa p/ 2 bachas: va por m² al presupuesto, sin piezas de corte', () => {
   const b = build('tapa', { width: 1800, bachas: 2 });
   assert.equal(b.parts.length, 0);
-  assert.equal(b.decors.filter((d) => d.decor === 'bacha').length, 2);
+  assert.equal(b.decors.filter((d) => d.decor === 'bacha' && d.sy === 2).length, 2, 'dos cubetas (fondo de cada una)');
   assert.equal(b.hardware.mesada, Math.round((1800 * 600) / 1e4) / 100);
   assert.equal(b.hardware.bacha, 2);
 });
@@ -74,7 +74,7 @@ test('insertar desde un ítem: guarda su nombre y la tapa se apoya sobre el bajo
   const m = withItem({ ...newModule('tapa', { room, modules: [] }, itemParams(item)), x: 0, z: 0 }, item, [bajo]);
   assert.equal(moduleName(m), 'Tapa p/ 2 bachas');
   assert.equal(m.rest, true);
-  assert.equal(m.y, 850);
+  assert.equal(m.y, 850 + 20, 'arriba de la mesada del bajo');
   const sinNombre = withItem(newModule('bajo', { room, modules: [] }), findItem('coc-inf-2p').item, []);
   assert.equal(sinNombre.name, undefined);
   assert.equal(moduleName(sinNombre), MODULE_TYPES.bajo.label);

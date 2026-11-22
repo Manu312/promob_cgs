@@ -277,6 +277,37 @@ try {
   p = await project();
   check('En 3D una pared no movible se selecciona pero no se arrastra', JSON.stringify(p.room.nodes) === nodesBefore && (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Pared 1');
   check('Sin errores de consola tras arrastrar paredes', errors.length === 0, errors.slice(-3).join(' | '));
+
+  // Cotas de referencia del módulo seleccionado (distancia a paredes / vecinos), editables
+  await page.keyboard.press('Escape'); await sleep(200);
+  p = await project();
+  const cj = p.modules.find((m) => m.type === 'cajonera_placard');
+  const cjp = await page.evaluate((id) => window.__muebles.screenOf(id), cj.id);
+  await page.mouse.click(cjp.x, cjp.y); await sleep(600);
+  const dists = await page.$$eval('.cota-dist', (els) => els.map((e) => e.textContent));
+  check('Al seleccionar un módulo aparecen sus cotas a paredes', dists.includes(String(cj.x)) && dists.includes(String(cj.z)), dists.join(', '));
+  await shot('17-cotas-modulo');
+  const clickCota = async (sel, text) => {
+    const ok = await page.evaluate((sel, text) => { const el = [...document.querySelectorAll(sel)].find((e) => e.textContent.trim() === text); if (el) el.click(); return !!el; }, sel, text);
+    if (!ok) throw new Error(`No encontré la cota "${text}"`);
+    await sleep(300);
+  };
+  await clickCota('.cota-dist', String(cj.x));
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyA'); await page.keyboard.up('Control');
+  await page.keyboard.type('1500'); await page.keyboard.press('Enter'); await sleep(500);
+  p = await project();
+  check('Editar la cota a la pared mueve el módulo', p.modules.find((m) => m.id === cj.id).x === 1500, `x=${p.modules.find((m) => m.id === cj.id).x}`);
+  await ctrl('KeyZ');
+  p = await project();
+  check('Deshacer la edición de cota', p.modules.find((m) => m.id === cj.id).x === cj.x);
+  const p1 = (await page.$$eval('.cota.editable', (els) => els.map((e) => e.textContent))).find((t) => t.startsWith('P1 ·'));
+  await clickCota('.cota.editable', p1);
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyA'); await page.keyboard.up('Control');
+  await page.keyboard.type('4500'); await page.keyboard.press('Enter'); await sleep(500);
+  p = await project();
+  const pr = p.room.nodes;
+  check('Editar la cota de una pared cambia su largo', Math.round(Math.hypot(pr[1].x - pr[0].x, pr[1].z - pr[0].z)) === 4500, p1);
+  check('Sin errores de consola tras editar cotas', errors.length === 0, errors.slice(-3).join(' | '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

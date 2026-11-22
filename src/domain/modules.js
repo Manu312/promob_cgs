@@ -290,7 +290,7 @@ export function clampToRoom(mod, room) {
 
 export function snapPosition(mod, others, room, thr = 40) {
   const { fw, fd } = footprint(mod);
-  const walls = room.points ? snapCandidates(room, fw, fd) : { xs: [0, room.w - fw], zs: [0, room.d - fd] };
+  const walls = room.walls?.length ? snapCandidates(room, fw, fd) : { xs: [0, room.w - fw], zs: [0, room.d - fd] };
   const cx = [...walls.xs], cz = [...walls.zs];
   for (const o of others) {
     const f = footprint(o);

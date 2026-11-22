@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { Html, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { roomWalls, wallPieces } from '../domain/room.js';
+import { wallCorners, floorPolygon } from '../domain/walls.js';
 import { footprint } from '../domain/modules.js';
 
 const S = 0.001;
@@ -42,7 +43,7 @@ function Opening({ o, T, zc }) {
 
 function Wall({ w, prev, room, openings, autoHide }) {
   const ref = useRef();
-  const T = room.t, H = room.h;
+  const T = w.t, H = w.h;
   const theta = Math.atan2(-w.u[1], w.u[0]);
   // Eje z local del grupo rotado = (-uz, ux). El espesor va hacia el lado de la normal exterior.
   const outSign = w.n[0] * -w.u[1] + w.n[1] * w.u[0];
@@ -61,8 +62,8 @@ function Wall({ w, prev, room, openings, autoHide }) {
         <Box key={i} c={[((p.u0 + p.u1) / 2) * S, ((p.v0 + p.v1) / 2) * S, zc * S]} s={[(p.u1 - p.u0) * S, (p.v1 - p.v0) * S, T * S]} m={wallMat} />
       ))}
       {openings.map((o) => <Opening key={o.id} o={o} T={T} zc={zc} />)}
-      {/* Encuentro con la pared anterior (esquina), en coordenadas locales de esta pared */}
-      {(() => {
+      {/* Encuentro con la pared que llega a este vértice (esquina), en coordenadas locales de esta pared */}
+      {prev && (() => {
         const ox = ((w.n[0] + prev.n[0]) * T) / 2, oz = ((w.n[1] + prev.n[1]) * T) / 2;
         const lu = ox * w.u[0] + oz * w.u[1], lz = ox * -w.u[1] + oz * w.u[0];
         return <Box c={[lu * S, (H / 2) * S, lz * S]} s={[T * S, H * S, T * S]} m={wallMat} />;
@@ -72,18 +73,21 @@ function Wall({ w, prev, room, openings, autoHide }) {
 }
 
 export function Room3D({ room, autoHide = true }) {
-  const walls = useMemo(() => roomWalls(room), [room]);
+  const walls = useMemo(() => roomWalls(room).filter((w) => w.wall.visible), [room]);
+  // Esquina de cada pared: la pared que llega a su vértice de inicio.
+  const incomingOf = useMemo(() => new Map(wallCorners(room).map((c) => [c.outgoing.id, c.incoming])), [room]);
+  const floorPts = useMemo(() => floorPolygon(room), [room]);
   const floorGeo = useMemo(() => {
-    const shape = new THREE.Shape(room.points.map(([x, z]) => new THREE.Vector2(x * S, -z * S)));
+    const shape = new THREE.Shape(floorPts.map(([x, z]) => new THREE.Vector2(x * S, -z * S)));
     return new THREE.ShapeGeometry(shape);
-  }, [room.points]);
-  const T = room.t, H = room.h;
+  }, [floorPts]);
+  const H = room.h;
   return (
     <group>
       <mesh geometry={floorGeo} rotation={[-Math.PI / 2, 0, 0]} material={floorMat} receiveShadow />
-      {walls.map((w, i) => (
-        <Wall key={w.i} w={w} prev={walls[(i - 1 + walls.length) % walls.length]} room={room}
-          openings={room.openings.filter((o) => o.wall === w.i)} autoHide={autoHide} />
+      {walls.map((w) => (
+        <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} room={room}
+          openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide} />
       ))}
       {room.columns.map((c) => (
         <Box key={c.id} c={[(c.x + c.w / 2) * S, (H / 2) * S, (c.z + c.d / 2) * S]} s={[c.w * S, H * S, c.d * S]} m={wallMat} />
@@ -101,11 +105,11 @@ const Label = ({ p, children, small }) => (
 // Cotas: largo de cada pared (por fuera) y ancho de cada módulo.
 export function Dimensions({ room, modules }) {
   const walls = useMemo(() => roomWalls(room), [room]);
-  const off = room.t + 250;
   const y = 0.01;
   return (
     <group>
       {walls.map((w) => {
+        const off = w.t + 250;
         const a = [w.a[0] + w.n[0] * off, w.a[1] + w.n[1] * off], b = [w.b[0] + w.n[0] * off, w.b[1] + w.n[1] * off];
         const tick = (p) => [[(p[0] - w.n[0] * 80) * S, y, (p[1] - w.n[1] * 80) * S], [(p[0] + w.n[0] * 80) * S, y, (p[1] + w.n[1] * 80) * S]];
         return (

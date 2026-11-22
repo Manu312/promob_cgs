@@ -184,6 +184,20 @@ try {
   await (await fieldInput('Forma')).select('libre'); await sleep(400);
   const nPts = await page.$$eval('.pts-row', (r) => r.length);
   check('Modo libre muestra los vértices editables', nPts === 6);
+
+  // Proyecto guardado con el formato viejo (v1: polígono + aberturas por índice) se migra solo
+  await page.evaluate(() => localStorage.setItem('mueblesapp.project', JSON.stringify({
+    name: 'Proyecto viejo',
+    room: { shape: 'L', w: 4000, d: 3000, h: 2600, t: 150, cutW: 1200, cutD: 1000, openings: [{ id: 'o1', type: 'ventana', wall: 0, offset: 500, width: 1000, height: 1000, sill: 1000 }], columns: [] },
+    defaults: { cuerpo: 'mel18_blanco', frente: 'mel18_roble', fondo: 'fibro3_blanco', cajon: 'mel18_blanco' },
+    modules: [],
+  })));
+  await page.reload({ waitUntil: 'networkidle0' }); await sleep(2000);
+  p = await project();
+  const wallIds = new Set((p.room.walls || []).map((w) => w.id));
+  check('Proyecto v1 se migra a paredes v2', p.room.version === 2 && p.room.walls.length === 6 && p.room.nodes.length === 6, `${p.room.walls?.length} paredes`);
+  check('Abertura del proyecto v1 queda en su pared', p.room.openings.length === 1 && wallIds.has(p.room.openings[0].wallId));
+  await shot('11-proyecto-v1-migrado');
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

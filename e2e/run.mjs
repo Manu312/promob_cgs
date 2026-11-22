@@ -391,6 +391,19 @@ try {
   p = await project();
   check('Deshacer la eliminación en un paso', p.room.walls.length === 4 && p.modules.length === 1);
   check('Sin errores de consola tras eliminar paredes', errors.length === 0, errors.slice(-3).join(' | '));
+
+  // Cotas angulares automáticas (#8): 90° en las 4 esquinas del rectángulo, editables
+  await page.keyboard.press('Escape'); await sleep(300);
+  const angs = await page.$$eval('.cota-ang', (els) => els.map((e) => e.textContent));
+  check('Rectángulo muestra 90° en sus 4 esquinas', angs.length === 4 && angs.every((t) => t === '90°'), angs.join(', '));
+  await shot('21-cotas-angulares');
+  await clickCota('.cota-ang', '90°');
+  await page.keyboard.type('100'); await page.keyboard.press('Enter'); await sleep(600);
+  const angs2 = await page.$$eval('.cota-ang', (els) => els.map((e) => e.textContent));
+  check('Editar una cota angular gira la pared', angs2.includes('100°'), angs2.join(', '));
+  await ctrl('KeyZ');
+  const angs3 = await page.$$eval('.cota-ang', (els) => els.map((e) => e.textContent));
+  check('Deshacer la edición de ángulo', angs3.length === 4 && angs3.every((t) => t === '90°'), angs3.join(', '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

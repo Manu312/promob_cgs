@@ -303,7 +303,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallContext, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const dragRef = useRef(null);
@@ -415,7 +415,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
         {planta && !renderMode && <PlanGrid room={room} />}
         {planta && !renderMode && !drawing && <NodeHandles room={room} onNodeDown={onNodeDown} />}
         {planta && !renderMode && drawing && <DrawTool room={room} draw={drawing} origin={origin} cursorRef={drawCursorRef} onPoint={onDrawPoint} onFinish={onDrawFinish} />}
-        {showDims && !renderMode && <Dimensions room={room} modules={project.modules} onWallLength={onWallLength} />}
+        {showDims && !renderMode && <Dimensions room={room} modules={project.modules} onWallLength={onWallLength} onWallAngle={onWallAngle} />}
         {selectedMod && !renderMode && <ModuleDistances room={room} modules={project.modules} mod={selectedMod} onEdit={onDimEdit} />}
         {project.modules.map((m) => {
           const b = builtById.get(m.id);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
 import { newModule, footprint, snapPosition, resizeModule, uid } from './domain/modules.js';
-import { moveWall, moveNode, setWallLength, updateWall, splitWall, deleteWalls } from './domain/wallEdit.js';
+import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls } from './domain/wallEdit.js';
 import { WallContextMenu, WallDeleteDialog } from './ui/WallMenus.jsx';
 import { applyDimEdit } from './domain/dimensions.js';
 import { addWall, segmentEnd } from './domain/drawWalls.js';
@@ -97,6 +97,7 @@ export default function App() {
   // Cotas editables: la distancia del módulo mueve el módulo; el largo de pared cambia la pared.
   const onDimEdit = (dim, value) => selectedId && mapModule(selectedId, (m) => ({ ...m, ...applyDimEdit(m, dim, value) }));
   const onWallLength = (id, value) => setProject((p) => normalizeProject({ ...p, room: setWallLength(p.room, id, value) }));
+  const onWallAngle = (id, value) => setProject((p) => normalizeProject({ ...p, room: setWallAngle(p.room, id, value, 'rel') }));
 
   // Construir paredes: estado del trazo (punto inicial o esquina desde la que sigue,
   // esquina donde empezó la cadena y ángulo del último tramo). Cada tramo es un paso de deshacer.
@@ -271,7 +272,7 @@ export default function App() {
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
                 selectedWallId={selectedWallId} onSelectWall={selectWall}
                 onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
-                onDimEdit={onDimEdit} onWallLength={onWallLength}
+                onDimEdit={onDimEdit} onWallLength={onWallLength} onWallAngle={onWallAngle}
                 onDragStart={onDragStart} onDragEnd={history.commit}
                 drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
                 onWallContext={onWallContext}

@@ -3,6 +3,7 @@
 
 import { roomWalls } from './room.js';
 import { footprint } from './modules.js';
+import { wallAngles, wallCorners } from './walls.js';
 
 const DIRS = [['-x', [-1, 0]], ['+x', [1, 0]], ['-z', [0, -1]], ['+z', [0, 1]]];
 
@@ -62,4 +63,27 @@ export function applyDimEdit(mod, dim, value) {
   const d = DIRS.find(([k]) => k === dim.dir)[1];
   const delta = value - dim.dist;
   return { x: Math.round(mod.x - d[0] * delta), z: Math.round(mod.z - d[1] * delta) };
+}
+
+// Cotas automáticas de paredes: lineal por pared (largo interior) y angular en cada
+// esquina donde se unen dos paredes (se omiten los 180°). El arco y la etiqueta van del
+// lado interior; `wallId` es la pared que sale de la esquina (editar el ángulo la gira).
+export function wallDims(room, { arcR = 250, labelR = 420, steps = 16 } = {}) {
+  const geo = roomWalls(room);
+  const linear = geo.map((g) => ({ wallId: g.id, len: g.len, a: g.a, b: g.b, n: g.n }));
+  const ang = new Map(wallAngles(room).map((a) => [a.id, a]));
+  const rot = (v, deg) => { const t = (deg * Math.PI) / 180, c = Math.cos(t), s = Math.sin(t); return [v[0] * c - v[1] * s, v[0] * s + v[1] * c]; };
+  const angular = [];
+  for (const { nodeId, incoming: inc, outgoing: out } of wallCorners(room)) {
+    const a = ang.get(out.id);
+    if (out.n0 !== nodeId || inc.n1 !== nodeId || a?.rel == null || Math.abs(a.rel - 180) < 0.01) continue;
+    const va = [-inc.u[0], -inc.u[1]], deg = a.rel;
+    const miss = (s) => { const r = rot(va, s * deg); return Math.hypot(r[0] - out.u[0], r[1] - out.u[1]); };
+    const sgn = miss(1) <= miss(-1) ? 1 : -1;
+    const at = out.a;
+    const arc = Array.from({ length: steps + 1 }, (_, i) => { const r = rot(va, (sgn * deg * i) / steps); return [at[0] + r[0] * arcR, at[1] + r[1] * arcR]; });
+    const mid = rot(va, (sgn * deg) / 2);
+    angular.push({ nodeId, at, deg, wallId: out.id, arc, label: [at[0] + mid[0] * labelR, at[1] + mid[1] * labelR] });
+  }
+  return { linear, angular };
 }

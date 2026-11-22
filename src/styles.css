@@ -107,3 +107,4 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .wall-dialog { background: #fff; border-radius: 8px; padding: 14px 16px; min-width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,.2); display: flex; flex-direction: column; gap: 8px; }
 .wall-dialog h3 { margin: 0 0 4px; font-size: 15px; }
 .wall-dialog .radio { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.cota.cota-ang { background: #7c3aed; }

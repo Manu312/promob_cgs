@@ -340,6 +340,26 @@ try {
   p = await project();
   const pr = p.room.nodes;
   check('Editar la cota de una pared cambia su largo', Math.round(Math.hypot(pr[1].x - pr[0].x, pr[1].z - pr[0].z)) === 4500, p1);
+  // Cotas verticales: piso y techo (#40)
+  await page.keyboard.press('Escape'); await sleep(200);
+  p = await project();
+  const vj = p.modules.find((m) => m.type === 'cajonera_placard');
+  const vjp = await page.evaluate((id) => window.__muebles.screenOf(id), vj.id);
+  await page.mouse.click(vjp.x, vjp.y); await sleep(600);
+  const alt = await fieldInput('Altura desde el piso');
+  await alt.click({ clickCount: 3 }); await alt.type('80'); await page.keyboard.press('Enter'); await sleep(600);
+  const vText = (cls) => page.$$eval(cls, (els) => els.map((e) => e.textContent.trim()));
+  const down = await vText('.cota-down'), up = await vText('.cota-up');
+  check('Módulo a 80 mm del piso muestra la cota al piso y al techo', down[0] === '80' && up.length === 1, `abajo ${down}, arriba ${up}`);
+  await shot('17b-cota-piso');
+  await clickCota('.cota-down', '80');
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyA'); await page.keyboard.up('Control');
+  await page.keyboard.type('100'); await page.keyboard.press('Enter'); await sleep(500);
+  p = await project();
+  check('Editar la cota al piso sube el módulo', p.modules.find((m) => m.id === vj.id).y === 100, `y=${p.modules.find((m) => m.id === vj.id).y}`);
+  await ctrl('KeyZ'); await ctrl('KeyZ');
+  p = await project();
+  check('Deshacer deja el módulo en el piso', (p.modules.find((m) => m.id === vj.id).y || 0) === (vj.y || 0));
   check('Sin errores de consola tras editar cotas', errors.length === 0, errors.slice(-3).join(' | '));
 
   // Flechas para estirar / achicar el módulo seleccionado (#29)

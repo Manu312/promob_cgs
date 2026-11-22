@@ -77,3 +77,43 @@ test('editar una cota mueve el módulo para que valga el valor escrito', () => {
   assert.deepEqual(applyDimEdit(m, d['+x'], 2000), { x: 1000, z: 0 });
   assert.deepEqual(applyDimEdit(m, d['+z'], 2000), { x: 500, z: 440 });
 });
+
+// Cotas verticales (#40)
+import { verticalDistances } from '../src/domain/dimensions.js';
+import { MODULE_TYPES as MT } from '../src/domain/modules.js';
+const vmod = (id, x, z, y, type = 'bajo') => ({ id, type, params: { ...MT[type].defaults }, x, z, y, rot: 0 });
+
+test('cota vertical: módulo levantado 80 mm muestra la distancia al piso y al techo', () => {
+  const r = normalizeRoom({ w: 3600, d: 3000, openings: [] });
+  const m = vmod('a', 0, 0, 80);
+  const v = verticalDistances(m, r, [m]);
+  const by = Object.fromEntries(v.map((d) => [d.dir, d]));
+  assert.equal(by.down.dist, 80);
+  assert.equal(by.down.target.kind, 'floor');
+  assert.equal(by.up.dist, r.h - 80 - m.params.height);
+  assert.equal(by.up.target.kind, 'ceiling');
+});
+
+test('cota vertical: apoyado en el piso no muestra cota hacia abajo', () => {
+  const r = normalizeRoom({ w: 3600, d: 3000, openings: [] });
+  const m = vmod('a', 0, 0, 0);
+  assert.deepEqual(verticalDistances(m, r, [m]).map((d) => d.dir), ['up']);
+});
+
+test('cota vertical: alacena mide hasta la mesada del bajo de abajo y no a un módulo corrido', () => {
+  const r = normalizeRoom({ w: 3600, d: 3000, openings: [] });
+  const bajo = vmod('b', 0, 0, 0), lejos = vmod('c', 2000, 0, 0);
+  const alacena = vmod('a', 100, 0, 1450, 'alacena');
+  const by = Object.fromEntries(verticalDistances(alacena, r, [bajo, lejos, alacena]).map((d) => [d.dir, d]));
+  assert.equal(by.down.dist, 1450 - bajo.params.height);
+  assert.deepEqual(by.down.target, { kind: 'module', id: 'b' });
+  const byBajo = Object.fromEntries(verticalDistances(bajo, r, [bajo, alacena]).map((d) => [d.dir, d]));
+  assert.equal(byBajo.up.dist, 1450 - bajo.params.height);
+});
+
+test('editar la cota vertical mueve el módulo en altura', () => {
+  const m = vmod('a', 0, 0, 80);
+  assert.deepEqual(applyDimEdit(m, { dir: 'down', dist: 80 }, 100), { y: 100 });
+  assert.deepEqual(applyDimEdit(m, { dir: 'up', dist: 1650 }, 1600), { y: 130 });
+  assert.deepEqual(applyDimEdit(m, { dir: 'down', dist: 80 }, -50 + 0), { y: 0 });
+});

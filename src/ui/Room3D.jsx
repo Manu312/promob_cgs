@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { roomWalls, wallPieces } from '../domain/room.js';
-import { wallCorners, floorPolygon } from '../domain/walls.js';
+import { wallCorners, floorPolygon, wallFacesCamera } from '../domain/walls.js';
 import { footprint } from '../domain/modules.js';
 import { CotaLabel } from './Cotas.jsx';
 import { wallDims } from '../domain/dimensions.js';
@@ -77,16 +77,18 @@ function SlopedWall({ len, h0, h1, T, zc, openings, material }) {
   return <mesh geometry={geo} position={[0, 0, (zc - T / 2) * S]} material={material} castShadow receiveShadow />;
 }
 
-export const LOWERED_H = 100; // alto de una pared rebajada (mm)
 
-function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDown, onMenu, selectedOpeningId, onOpeningDown }) {
+function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onDown: onWallDown, onMenu, selectedOpeningId, onOpeningDown }) {
   const ref = useRef();
   const W = w.wall;
   const T = w.t;
   const gap = W.floorGap || 0; // la separación del piso eleva toda la pared
-  const h0 = (W.lowered ? LOWERED_H : W.h0) - gap, h1 = (W.lowered ? LOWERED_H : W.h1) - gap;
+  // Auto Rebajar: la pared que tapa la vista baja a zócalo (estado que cambia solo cuando hace falta).
+  const [autoLow, setAutoLow] = useState(false);
+  const lowered = W.lowered || autoLow;
+  const h0 = (lowered ? Math.min(lowerH, W.h0) : W.h0) - gap, h1 = (lowered ? Math.min(lowerH, W.h1) : W.h1) - gap;
   const H = Math.max(h0, h1);
-  const ops = W.lowered ? [] : openings;
+  const ops = lowered ? [] : openings;
   const mat = W.transparent ? (selected ? wallSelTransMat : wallTransMat) : (selected ? wallSelMat : wallMat);
   const theta = Math.atan2(-w.u[1], w.u[0]);
   // Eje z local del grupo rotado = (-uz, ux). El espesor va hacia el lado de la normal exterior.
@@ -94,14 +96,14 @@ function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDow
   const zc = (outSign >= 0 ? 1 : -1) * (T / 2);
   const sloped = h0 !== h1;
   const pieces = useMemo(() => (sloped ? [] : wallPieces(w.len, H, ops)), [sloped, w.len, H, ops]);
-  const mid = [(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2];
   useFrame(({ camera }) => {
-    if (!ref.current) return;
-    if (!autoHide) { ref.current.visible = true; return; }
-    const cx = camera.position.x / S + origin.x, cz = camera.position.z / S + origin.z;
-    ref.current.visible = (cx - mid[0]) * w.n[0] + (cz - mid[1]) * w.n[1] < 200;
+    const low = autoHide && wallFacesCamera(w, [camera.position.x / S + origin.x, camera.position.z / S + origin.z]);
+    if (low !== autoLow) setAutoLow(low);
   });
-  // Solo toma el clic si se ve: una pared oculta deja pasar el clic a lo que tiene detrás.
+  useEffect(() => { // solo en desarrollo: los tests e2e consultan qué paredes están rebajadas
+    if (import.meta.env?.DEV) (window.__mueblesLowered ||= {})[w.id] = lowered;
+  }, [w.id, lowered]);
+  // Solo toma el clic si se ve (una pared con Visible = No ni se dibuja).
   const onDown = (e) => {
     if (!onWallDown || !ref.current?.visible) return;
     e.stopPropagation();
@@ -144,7 +146,7 @@ export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDo
       <mesh geometry={floorGeo} rotation={[-Math.PI / 2, 0, 0]} material={floorMat} receiveShadow />
       {walls.map((w) => (
         <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} origin={origin}
-          openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide}
+          openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide} lowerH={room.lowerH}
           selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu}
           selectedOpeningId={selectedOpeningId} onOpeningDown={onOpeningDown} />
       ))}

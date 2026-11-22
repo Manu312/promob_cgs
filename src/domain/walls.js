@@ -72,6 +72,13 @@ export function wallAngles(room) {
   });
 }
 
+// Auto Rebajar: la pared mira a la cámara (está entre la cámara y el ambiente) si la cámara
+// queda del lado exterior de su cara, a más de `margin` mm. `cam` = [x, z] en mm del ambiente.
+export function wallFacesCamera(g, cam, margin = 200) {
+  const mid = [(g.a[0] + g.b[0]) / 2, (g.a[1] + g.b[1]) / 2];
+  return (cam[0] - mid[0]) * g.n[0] + (cam[1] - mid[1]) * g.n[1] > margin;
+}
+
 // Contornos cerrados, siguiendo n0 → n1. Devuelve listas de puntos.
 export function wallLoops(room) {
   const nm = nodeMap(room);

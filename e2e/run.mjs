@@ -442,6 +442,37 @@ try {
   const col2 = p.room.columns.find((c) => c.id === col.id);
   check('Arrastrar una columna en Planta (grilla de 50)', (col2.x !== col.x || col2.z !== col.z) && col2.x % 50 === 0 && col2.z % 50 === 0 && (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Columna', `(${col.x},${col.z}) → (${col2.x},${col2.z})`);
   check('Sin errores de consola tras aberturas y columnas', errors.length === 0, errors.slice(-3).join(' | '));
+
+  // Rebajar / Transparente / Auto Rebajar (#11)
+  await page.keyboard.press('Escape'); await sleep(200);
+  await ctrl('KeyZ'); await ctrl('KeyZ'); // saca la columna de prueba (arrastre + alta)
+  await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(1500);
+  p = await project();
+  const [backW, , frontW] = p.room.walls;
+  let low = await page.evaluate(() => window.__mueblesLowered || {});
+  check('Auto rebajar baja a zócalo la pared que tapa la vista', low[frontW.id] === true && low[backW.id] === false, JSON.stringify(low));
+  await clickText('.vp-toolbar button', 'Auto rebajar'); await sleep(700);
+  low = await page.evaluate(() => window.__mueblesLowered || {});
+  check('Sin Auto rebajar la pared de adelante vuelve a subir', low[frontW.id] === false);
+  await shot('23-sin-auto-rebajar');
+  await clickText('.vp-toolbar button', 'Auto rebajar'); await sleep(700);
+  const bp3 = await page.evaluate((id) => window.__muebles.screenOfWall(id, 1500), backW.id);
+  await page.mouse.click(bp3.x, bp3.y, { button: 'right' }); await sleep(400);
+  await clickText('.wall-menu button', 'Transparente'); await sleep(400);
+  p = await project();
+  check('Pared transparente desde el menú', p.room.walls[0].transparent === true);
+  await page.mouse.click(bp3.x, bp3.y, { button: 'right' }); await sleep(400);
+  await clickText('.wall-menu button', 'Opaca'); await sleep(300);
+  await page.mouse.click(bp3.x, bp3.y, { button: 'right' }); await sleep(400);
+  await clickText('.wall-menu button', 'Rebajar'); await sleep(500);
+  p = await project();
+  check('Rebajar a mano desde el menú', p.room.walls[0].lowered === true && p.room.walls[0].transparent === false);
+  await shot('24-pared-rebajada');
+  const plinth = await page.evaluate((id) => window.__muebles.screenOfWall(id, 50), backW.id);
+  await page.mouse.click(plinth.x, plinth.y); await sleep(500);
+  p = await project();
+  check('Clic en el zócalo de una pared rebajada la restaura', p.room.walls[0].lowered === false);
+  check('Sin errores de consola tras rebajar paredes', errors.length === 0, errors.slice(-3).join(' | '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

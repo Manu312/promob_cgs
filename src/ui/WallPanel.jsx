@@ -7,7 +7,7 @@ const YES_NO = [['si', 'Sí'], ['no', 'No']];
 const yn = (b) => (b ? 'si' : 'no');
 
 // Propiedades de la pared seleccionada (como Herramientas → Propiedades de Promob).
-export default function WallPanel({ room, wallId, onRoom, onBack }) {
+export default function WallPanel({ room, wallId, onRoom, onBack, onDelete, onSplit }) {
   const g = roomWalls(room).find((w) => w.id === wallId);
   if (!g) return null;
   const ang = wallAngles(room).find((a) => a.id === wallId);
@@ -18,6 +18,8 @@ export default function WallPanel({ room, wallId, onRoom, onBack }) {
       <h3>Pared {g.i + 1}</h3>
       <div className="row-btns">
         <button onClick={onBack}>← Proyecto</button>
+        {onSplit && <button onClick={() => onSplit(wallId, g.len / 2)} title="Parte la pared en dos tramos iguales">Dividir al medio</button>}
+        {onDelete && <button className="danger" onClick={() => onDelete(wallId)}>Eliminar…</button>}
       </div>
       <h4>Dimensiones</h4>
       <NumField label="Largo" unit="mm" value={g.len} min={100} max={30000} step={10} onChange={(v) => onRoom((r) => setWallLength(r, wallId, v))} />
@@ -35,6 +37,7 @@ export default function WallPanel({ room, wallId, onRoom, onBack }) {
       <SelField label="Visible" value={yn(w.visible)} options={YES_NO} onChange={(v) => set({ visible: v === 'si' })} />
       <p className="hint">Al cambiar el largo o el ángulo, la pared siguiente se corre en paralelo y el ambiente sigue cerrado.</p>
       <p className="hint">Una pared invisible se vuelve a elegir desde la lista de paredes del proyecto.</p>
+      <p className="hint">Clic derecho sobre la pared: Rebajar · Transparente · Dividir aquí · Eliminar. <b>Supr</b> también elimina.</p>
     </aside>
   );
 }

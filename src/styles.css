@@ -99,3 +99,11 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
   .sheets { grid-template-columns: 1fr 1fr; }
   .sheet { break-inside: avoid; }
 }
+.menu-backdrop { position: fixed; inset: 0; z-index: 50; }
+.menu-backdrop.dim { background: rgba(17,24,39,.25); display: grid; place-items: center; }
+.wall-menu { position: fixed; display: flex; flex-direction: column; min-width: 170px; background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.15); padding: 4px; }
+.wall-menu button { border: none; text-align: left; padding: 6px 10px; border-radius: 4px; }
+.wall-menu button:hover { background: var(--accent-weak); }
+.wall-dialog { background: #fff; border-radius: 8px; padding: 14px 16px; min-width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,.2); display: flex; flex-direction: column; gap: 8px; }
+.wall-dialog h3 { margin: 0 0 4px; font-size: 15px; }
+.wall-dialog .radio { display: flex; align-items: center; gap: 8px; font-size: 13px; }

@@ -359,6 +359,38 @@ try {
   p = await project();
   check('Deshacer quita solo el último tramo', p.room.walls.length === 5, `${p.room.walls.length} paredes`);
   check('Sin errores de consola tras construir paredes', errors.length === 0, errors.slice(-3).join(' | '));
+
+  // Eliminar y dividir paredes (#7): menú de clic derecho, Supr y diálogo con módulos apoyados
+  await page.keyboard.press('Escape'); await sleep(200);
+  await (await fieldInput('Plantilla')).select('rect'); await sleep(200);
+  await clickText('.room-editor button', 'Aplicar plantilla'); await sleep(800);
+  p = await project();
+  check('Aplicar plantilla rectangular', p.room.walls.length === 4 && p.room.points?.length === 4, `${p.room.walls.length} paredes`);
+  await clickText('.mod-btn span', 'Bajo mesada puertas'); await sleep(400);
+  await page.keyboard.press('Escape'); await sleep(200);
+  p = await project();
+  const backWall = p.room.walls[0];
+  const bw = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2000, 75), backWall.id);
+  await page.mouse.click(bw.x, bw.y, { button: 'right' }); await sleep(500);
+  check('Clic derecho en una pared abre su menú', !!(await page.$('.wall-menu')));
+  await clickText('.wall-menu button', 'Dividir aquí'); await sleep(600);
+  p = await project();
+  check('Dividir aquí agrega un vértice y un tramo', p.room.walls.length === 5 && p.room.points?.length === 5, `${p.room.walls.length} paredes`);
+  await ctrl('KeyZ');
+  p = await project();
+  check('Deshacer la división', p.room.walls.length === 4);
+  await page.mouse.click(bw.x, bw.y); await sleep(500);
+  await page.keyboard.press('Delete'); await sleep(500);
+  check('Supr sobre una pared abre el diálogo de eliminar', !!(await page.$('.wall-dialog')));
+  await page.click('.wall-dialog input[type=checkbox]'); await sleep(100);
+  await clickText('.wall-dialog button', 'Eliminar'); await sleep(700);
+  p = await project();
+  check('Eliminar la pared del fondo y el módulo apoyado en ella', p.room.walls.length === 3 && p.room.points === null && p.modules.length === 0, `${p.room.walls.length} paredes, ${p.modules.length} módulos`);
+  await shot('20-pared-eliminada');
+  await ctrl('KeyZ');
+  p = await project();
+  check('Deshacer la eliminación en un paso', p.room.walls.length === 4 && p.modules.length === 1);
+  check('Sin errores de consola tras eliminar paredes', errors.length === 0, errors.slice(-3).join(' | '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

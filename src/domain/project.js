@@ -3,7 +3,7 @@ import { normalizeRoom, rid } from './room.js';
 import { roomTemplate } from './drawWalls.js';
 
 export function normalizeProject(p) {
-  return { ...p, room: normalizeRoom(p.room), rules: { ...DEFAULT_RULES, ...(p.rules || {}) } };
+  return { ...p, room: normalizeRoom(p.room), rules: { ...DEFAULT_RULES, ...(p.rules || {}) }, annotations: Array.isArray(p.annotations) ? p.annotations : [] };
 }
 
 const mk = (type, x, extra = {}) => ({ id: uid(), type, params: { ...MODULE_TYPES[type].defaults, ...(extra.params || {}) }, x, z: 0, y: extra.y ?? MODULE_TYPES[type].y ?? 0, rot: 0, mats: {} });

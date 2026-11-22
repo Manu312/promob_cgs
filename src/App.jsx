@@ -6,6 +6,7 @@ import { WallContextMenu, WallDeleteDialog } from './ui/WallMenus.jsx';
 import { applyDimEdit } from './domain/dimensions.js';
 import { updateOpening, setOpeningDim, moveColumn, removeOpening, removeColumn } from './domain/openings.js';
 import { addWall, segmentEnd } from './domain/drawWalls.js';
+import { addAnnotation, removeAnnotation } from './domain/annotations.js';
 import { absAngle } from './domain/walls.js';
 import DrawHud from './ui/DrawHud.jsx';
 import { buildAll, computeCutList } from './domain/cutlist.js';
@@ -51,6 +52,8 @@ export default function App() {
   const selectedColumnId = selection?.kind === 'column' ? selection.id : null;
   const selectOpening = useCallback((id) => setSelection(id ? { kind: 'opening', id } : null), []);
   const selectColumn = useCallback((id) => setSelection(id ? { kind: 'column', id } : null), []);
+  const selectedDimId = selection?.kind === 'dim' ? selection.id : null;
+  const selectDim = useCallback((id) => setSelection(id ? { kind: 'dim', id } : null), []);
   const [renderMode, setRenderMode] = useState(false);
   const [photoreal, setPhotoreal] = useState(false);
   const [samples, setSamples] = useState(0);
@@ -116,7 +119,20 @@ export default function App() {
   const drawCursorRef = useRef(null);
   const lenRef = useRef(null), angRef = useRef(null);
   const freshDraw = { start: null, fromNodeId: null, chainStartId: null, prevAbs: null, segs: 0, confirmClose: false };
+  // Cotas manuales: lineal (2 clics) o angular (3 clics); la herramienta sigue activa hasta Esc.
+  const [annotating, setAnnotating] = useState(null); // { mode: 'lin' | 'ang', points }
+  const toPlanta = () => { if (view.name !== 'planta') { setView((v) => ({ name: 'planta', tick: v.tick + 1 })); setShowDims(true); } };
+  const startAnnotate = () => { setDrawing(null); setAnnotating({ mode: 'lin', points: [] }); setSelection(null); toPlanta(); };
+  const stopAnnotate = () => setAnnotating(null);
+  const onAnnotatePoint = (pt) => {
+    const pts = [...annotating.points, pt];
+    if (pts.length === (annotating.mode === 'lin' ? 2 : 3)) {
+      setProject((p) => addAnnotation(p, annotating.mode, pts));
+      setAnnotating({ ...annotating, points: [] });
+    } else setAnnotating({ ...annotating, points: pts });
+  };
   const startDrawWalls = () => {
+    setAnnotating(null);
     setDrawing(freshDraw); setDrawLen(''); setDrawAng(''); setSelection(null);
     if (view.name !== 'planta') { setView((v) => ({ name: 'planta', tick: v.tick + 1 })); setShowDims(true); }
     setTimeout(() => lenRef.current?.focus(), 50);
@@ -218,6 +234,8 @@ export default function App() {
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startDrawWalls(); return; }
       if (tab !== 'diseno' || inField) return;
+      if (annotating) { if (e.key === 'Escape') stopAnnotate(); return; }
+      if (selectedDimId && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); setProject((p) => removeAnnotation(p, selectedDimId)); setSelection(null); return; }
       if (drawing) { // los números van directo al largo, como en Promob
         if (e.key === 'Escape') stopDrawWalls();
         else if (/^[0-9.,]$/.test(e.key)) { e.preventDefault(); setDrawLen((s) => s + e.key); lenRef.current?.focus(); }
@@ -291,6 +309,8 @@ export default function App() {
                 onDragStart={onDragStart} onDragEnd={history.commit}
                 drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
                 onWallContext={onWallContext}
+                annotating={annotating} onAnnotatePoint={onAnnotatePoint} onAnnotateFinish={stopAnnotate}
+                selectedDimId={selectedDimId} onSelectDim={selectDim}
                 onRestoreWall={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, id, { lowered: false }) }))}
                 selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
@@ -299,11 +319,12 @@ export default function App() {
             </ErrorBoundary>
             <div className="vp-toolbar">
               {[['perspectiva', 'Perspectiva'], ['frente', 'Frente'], ['planta', 'Planta']].map(([k, l]) => (
-                <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => { setView((v) => ({ name: k, tick: v.tick + 1 })); if (k === 'planta') setShowDims(true); else stopDrawWalls(); }}>{l}</button>
+                <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => { setView((v) => ({ name: k, tick: v.tick + 1 })); if (k === 'planta') setShowDims(true); else { stopDrawWalls(); stopAnnotate(); } }}>{l}</button>
               ))}
               <button className={showDims ? 'active-soft' : ''} onClick={() => setShowDims((s) => !s)} title="Mostrar medidas de paredes y módulos">Cotas</button>
               <button className={autoLower ? 'active-soft' : ''} onClick={() => setAutoLower((s) => !s)} title="Auto Rebajar: las paredes que tapan la vista bajan a zócalo">Auto rebajar</button>
               <button className={drawing ? 'active' : ''} onClick={() => (drawing ? stopDrawWalls() : startDrawWalls())} title="Construir paredes (Ctrl+Shift+P)">✏ Paredes</button>
+              <button className={annotating ? 'active' : ''} onClick={() => (annotating ? stopAnnotate() : startAnnotate())} title="Cota manual: lineal o angular">↔ Cota</button>
               {view.name === 'planta' && (
                 <span className="grid-ctl">
                   <button className={grid.magnetic ? 'active-soft' : ''} onClick={() => setGrid({ magnetic: !grid.magnetic })}
@@ -329,12 +350,21 @@ export default function App() {
                   </select>
                 </span>
               )}
-              <button onClick={exportImage} title="Exportar imagen (PNG)">⤓ Imagen</button>
+              <button onClick={exportImage} title="Exportar imagen (PNG)">⤓</button>
             </div>
             {drawing && (
               <DrawHud draw={drawing} len={drawLen} setLen={setDrawLen} ang={drawAng} setAng={setDrawAng} lenRef={lenRef} angRef={angRef}
                 onCommit={commitTyped} onCancel={stopDrawWalls}
                 onClose={(yes) => (yes ? commitWall({ nodeId: drawing.chainStartId }) : setDrawing({ ...drawing, confirmClose: false }))} />
+            )}
+            {annotating && (
+              <div className="draw-hud">
+                <b>Cota manual</b>
+                <label className="radio"><input type="radio" name="ann" checked={annotating.mode === 'lin'} onChange={() => setAnnotating({ mode: 'lin', points: [] })} /> Lineal</label>
+                <label className="radio"><input type="radio" name="ann" checked={annotating.mode === 'ang'} onChange={() => setAnnotating({ mode: 'ang', points: [] })} /> Angular</label>
+                <button onClick={stopAnnotate}>Terminar</button>
+                <span className="hint-inline">{annotating.mode === 'lin' ? 'Clic en el primer punto y en el segundo' : 'Clic en un brazo, en el vértice y en el otro brazo'} · se pega a esquinas y caras · Esc o clic derecho termina</span>
+              </div>
             )}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}
             {deleteDlg && <WallDeleteDialog label={`Pared ${project.room.walls.findIndex((w) => w.id === deleteDlg.wallId) + 1}`} onConfirm={confirmDelete} onCancel={() => setDeleteDlg(null)} />}

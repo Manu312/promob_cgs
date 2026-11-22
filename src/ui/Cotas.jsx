@@ -4,12 +4,13 @@ import { nearestDistances, heightRuler } from '../domain/dimensions.js';
 import { bounds } from '../domain/walls.js';
 import { roomWalls } from '../domain/room.js';
 import { openingDims } from '../domain/openings.js';
+import { annotationValue } from '../domain/annotations.js';
 
 const S = 0.001;
 
 // Contenido de la etiqueta. Tiene que tener su propio estado: drei <Html> lo renderiza
 // en otra raíz de React, y un input controlado con estado en la raíz de afuera pierde teclas.
-function CotaContent({ value, text, onCommit, className }) {
+function CotaContent({ value, text, onCommit, onSelect, className }) {
   const [edit, setEdit] = useState(false);
   const [s, setS] = useState('');
   const commit = () => {
@@ -25,19 +26,19 @@ function CotaContent({ value, text, onCommit, className }) {
     );
   }
   return (
-    <div className={`${className}${onCommit ? ' editable' : ''}`} title={onCommit ? 'Clic para escribir la medida' : undefined}
+    <div className={`${className}${onCommit ? ' editable' : ''}${onSelect ? ' selectable' : ''}`} title={onCommit ? 'Clic para escribir la medida' : onSelect ? 'Clic para seleccionar (Supr la borra)' : undefined}
       onPointerDown={(e) => e.stopPropagation()}
-      onClick={() => { if (!onCommit) return; setS(String(value)); setEdit(true); }}>
+      onClick={() => { if (onSelect && !onCommit) { onSelect(); return; } if (!onCommit) return; setS(String(value)); setEdit(true); }}>
       {text ?? value}
     </div>
   );
 }
 
 // Etiqueta de cota. Con `onCommit` es editable: clic → escribir → Enter (Esc cancela).
-export function CotaLabel({ p, value, text, onCommit, className = 'cota' }) {
+export function CotaLabel({ p, value, text, onCommit, onSelect, className = 'cota' }) {
   return (
-    <Html position={p} center zIndexRange={[20, 0]} style={{ pointerEvents: onCommit ? 'auto' : 'none' }}>
-      <CotaContent value={value} text={text} onCommit={onCommit} className={className} />
+    <Html position={p} center zIndexRange={[20, 0]} style={{ pointerEvents: onCommit || onSelect ? 'auto' : 'none' }}>
+      <CotaContent value={value} text={text} onCommit={onCommit} onSelect={onSelect} className={className} />
     </Html>
   );
 }
@@ -99,4 +100,44 @@ export function HeightRuler({ room, modules }) {
       ))}
     </group>
   );
+}
+
+// Cotas manuales guardadas en el proyecto. Clic en la etiqueta = seleccionarla (Supr la borra).
+export function Annotations({ annotations, selectedId, onSelect }) {
+  const y = 0.03;
+  const p3 = (p) => [p[0] * S, y, p[1] * S];
+  return annotations.map((a) => {
+    const v = annotationValue(a);
+    const cls = `cota cota-man${a.id === selectedId ? ' sel' : ''}`;
+    const color = a.id === selectedId ? '#f59e0b' : '#0f766e';
+    if (a.kind === 'lin') {
+      const [p0, p1] = a.points;
+      const d = [p1[0] - p0[0], p1[1] - p0[1]], L = Math.hypot(...d) || 1;
+      const n = [(-d[1] / L) * 70, (d[0] / L) * 70];
+      const tick = (p) => [p3([p[0] - n[0], p[1] - n[1]]), p3([p[0] + n[0], p[1] + n[1]])];
+      return (
+        <group key={a.id}>
+          <Line points={[p3(p0), p3(p1)]} color={color} lineWidth={1.6} depthTest={false} renderOrder={5} />
+          <Line points={tick(p0)} color={color} lineWidth={1.6} depthTest={false} renderOrder={5} />
+          <Line points={tick(p1)} color={color} lineWidth={1.6} depthTest={false} renderOrder={5} />
+          <CotaLabel p={p3([(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2])} value={v} className={cls} onSelect={() => onSelect?.(a.id)} />
+        </group>
+      );
+    }
+    const [p0, c, p2] = a.points;
+    const ang = (p) => Math.atan2(p[1] - c[1], p[0] - c[0]);
+    let t0 = ang(p0), t1 = ang(p2);
+    let dt = t1 - t0;
+    while (dt > Math.PI) dt -= 2 * Math.PI;
+    while (dt < -Math.PI) dt += 2 * Math.PI;
+    const arc = Array.from({ length: 17 }, (_, i) => p3([c[0] + Math.cos(t0 + (dt * i) / 16) * 300, c[1] + Math.sin(t0 + (dt * i) / 16) * 300]));
+    const mid = t0 + dt / 2;
+    return (
+      <group key={a.id}>
+        <Line points={[p3(p0), p3(c), p3(p2)]} color={color} lineWidth={1.4} depthTest={false} renderOrder={5} />
+        <Line points={arc} color={color} lineWidth={1.6} depthTest={false} renderOrder={5} />
+        <CotaLabel p={p3([c[0] + Math.cos(mid) * 460, c[1] + Math.sin(mid) * 460])} value={v} text={`${v}°`} className={cls} onSelect={() => onSelect?.(a.id)} />
+      </group>
+    );
+  });
 }

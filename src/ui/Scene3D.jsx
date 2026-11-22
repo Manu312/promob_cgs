@@ -9,7 +9,8 @@ import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
 import { mat3d, metal, stone } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
-import { ModuleDistances, OpeningDims, HeightRuler } from './Cotas.jsx';
+import { ModuleDistances, OpeningDims, HeightRuler, Annotations } from './Cotas.jsx';
+import { AnnotateTool } from './AnnotateTool.jsx';
 import { DrawTool } from './DrawTool.jsx';
 import { PlanGrid } from './PlanGrid.jsx';
 
@@ -314,7 +315,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const dragRef = useRef(null);
@@ -414,7 +415,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       dpr={renderMode ? [1, 2] : [1, 1.5]}
       gl={{ preserveDrawingBuffer: true, antialias: true }}
       camera={{ fov: 45, near: 0.05, far: 100, position: [1.6, 2.3, 4] }}
-      onPointerMissed={() => !dragRef.current && !drawing && onSelect(null)}
+      onPointerMissed={() => !dragRef.current && !drawing && !annotating && onSelect(null)}
       onContextMenu={(e) => e.preventDefault()}
     >
       <color attach="background" args={[renderMode ? '#e7e3dc' : '#f3f4f6']} />
@@ -444,13 +445,15 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       )}
       <group position={[-origin.x * S, 0, -origin.z * S]}>
         <Room3D room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown}
-          onWallMenu={renderMode || drawing ? null : onWallMenu}
+          onWallMenu={renderMode || drawing || annotating ? null : onWallMenu}
           selectedOpeningId={renderMode ? null : selectedOpeningId} onOpeningDown={renderMode || drawing ? null : onOpeningDown}
           selectedColumnId={renderMode ? null : selectedColumnId} onColumnDown={renderMode || drawing ? null : onColumnDown} />
         {view.name === 'frente' && !renderMode && <HeightRuler room={room} modules={project.modules} />}
         {selectedOpeningId && !renderMode && <OpeningDims room={room} id={selectedOpeningId} onEdit={onOpeningDim} />}
         {planta && !renderMode && <PlanGrid room={room} />}
-        {planta && !renderMode && !drawing && <NodeHandles room={room} onNodeDown={onNodeDown} />}
+        {planta && !renderMode && !drawing && !annotating && <NodeHandles room={room} onNodeDown={onNodeDown} />}
+        {planta && !renderMode && annotating && <AnnotateTool room={room} modules={project.modules} tool={annotating} origin={origin} onPoint={onAnnotatePoint} onFinish={onAnnotateFinish} />}
+        {!renderMode && <Annotations annotations={project.annotations || []} selectedId={selectedDimId} onSelect={onSelectDim} />}
         {planta && !renderMode && drawing && <DrawTool room={room} draw={drawing} origin={origin} cursorRef={drawCursorRef} onPoint={onDrawPoint} onFinish={onDrawFinish} />}
         {showDims && !renderMode && <Dimensions room={room} modules={project.modules} onWallLength={onWallLength} onWallAngle={onWallAngle} />}
         {selectedMod && !renderMode && <ModuleDistances room={room} modules={project.modules} mod={selectedMod} onEdit={onDimEdit} />}
@@ -464,7 +467,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       {renderMode && !photoreal && <ContactShadows position={[0, 0.002, 0]} scale={12} blur={2.2} opacity={0.45} far={2.5} />}
       {planta && <OrthographicCamera makeDefault near={0.1} far={200} position={[0, 40, 0.001]} />}
       <OrbitControls ref={controlsRef} makeDefault maxPolarAngle={planta ? Math.PI : Math.PI / 2 - 0.02} minDistance={0.5} maxDistance={20}
-        enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={planta ? (drawing ? DRAW_BUTTONS : PLAN_BUTTONS) : ROTATE_BUTTONS} />
+        enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={planta ? (drawing || annotating ? DRAW_BUTTONS : PLAN_BUTTONS) : ROTATE_BUTTONS} />
       <CameraRig view={view} room={room} controlsRef={controlsRef} />
       {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
       <Capturer captureRef={captureRef} photoreal={photoreal} />

@@ -6,6 +6,8 @@ import { collideMove, collideLift } from './domain/collision.js';
 import { nudgeTarget, rotateAboutCenter, lockAxis, restingHeight } from './domain/movement.js';
 import { withItem } from './domain/library.js';
 import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
+import ModelsPanel from './ui/ModelsPanel.jsx';
+import { applyModel } from './domain/models.js';
 import StatusToggles from './ui/StatusToggles.jsx';
 import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls, followWall } from './domain/wallEdit.js';
 import { WallContextMenu, WallDeleteDialog, ModuleContextMenu } from './ui/WallMenus.jsx';
@@ -54,7 +56,7 @@ export default function App() {
   const [ui, setUi] = usePersistent('mueblesapp.ui', { collision: true, magnets: true, autoLower: true });
   const autoLower = ui.autoLower !== false;
   const toggleUi = (k) => setUi((u) => ({ ...u, [k]: u[k] === false }));
-  const tool = ui.tool === 'movimiento' ? 'movimiento' : 'propiedades'; // botonera Herramientas
+  const tool = ['movimiento', 'modelos'].includes(ui.tool) ? ui.tool : 'propiedades'; // botonera Herramientas
   const setTool = (t) => setUi((u) => ({ ...u, tool: t }));
   // Traba de eje al arrastrar (teclas X / Y de Promob): 'x' o 'z'.
   const [axisLock, setAxisLock] = useState(null);
@@ -538,9 +540,13 @@ export default function App() {
           </section>
           <div className="tools-col">
           <ToolsNav tool={tool} onTool={setTool} />
+          {tool === 'modelos' && (
+            <ModelsPanel project={project} settings={settings} selected={selected}
+              onApply={(slot, id, scope) => setProject((p) => applyModel(p, slot, id, scope, selectedId ? [selectedId] : []))} />
+          )}
           {tool === 'movimiento'
             ? <MovementPanel label={selected ? describeSelection(project, selection) : null} ui={ui} setUi={setUi} onNudge={nudgeSelected} onRotate={(sign) => rotateBy(sign * (ui.rotStep ?? 90))} />
-            : <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
+            : tool === 'propiedades' && <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
             selectedWallId={selectedWallId} onSelectWall={selectWall} onDrawWalls={startDrawWalls}
             onDeleteWall={(id) => setDeleteDlg({ wallId: id })} onSplitWall={doSplit}
             selectedOpeningId={selectedOpeningId} selectedColumnId={selectedColumnId} onSelectItem={setSelection} onScaleImage={startScale}

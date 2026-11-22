@@ -13,8 +13,8 @@ export function ToolsNav({ tool, onTool }) {
   );
   return (
     <nav className="tools-nav">
-      <div className="tools-title">Herramientas · {tool === 'movimiento' ? 'Movimiento' : 'Propiedades'}</div>
-      {item('modelos', 'Modelos', '▦', true)}
+      <div className="tools-title">Herramientas · {{ movimiento: 'Movimiento', modelos: 'Modelos' }[tool] || 'Propiedades'}</div>
+      {item('modelos', 'Modelos', '▦')}
       {item('movimiento', 'Movimiento', '✥')}
       {item('propiedades', 'Propiedades', '☰')}
     </nav>

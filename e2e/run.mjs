@@ -412,14 +412,40 @@ try {
   check('Presupuesto con la mesada por m² de su piedra', tapaLines.includes('Tapa Granitos > Gris > Gris Mara'), tapaLines.join(' | '));
   await clickText('.tabs button', 'Diseño 3D'); await sleep(600);
   await page.keyboard.press('Escape'); await sleep(200);
-  const tapasSel = await fieldInput('Tapas');
-  await tapasSel.select('gra_negro_absoluto'); await sleep(500);
+  // Herramientas · Modelos (#73): menú en cascada Granitos › Negro › Negro Absoluto (ámbito Todos)
+  await clickText('.tools-item', '▦Modelos');
+  const mdRow = async (label) => page.evaluateHandle((label) => [...document.querySelectorAll('.md-row')].find((r) => r.querySelector('.md-label').textContent === label + ':')?.querySelector('.md-value'), label);
+  const pick = async (...steps) => { for (const t of steps) { const h = await page.evaluateHandle((t) => [...document.querySelectorAll('.cascade .cm-item')].find((b) => b.textContent.trim().replace(/^‹\s*/, '') === t), t); await h.hover(); await h.click(); await sleep(250); } };
+  await (await mdRow('Tapas')).click(); await sleep(300);
+  await pick('Granitos', 'Negro');
+  await shot('06a-modelos-cascada');
+  await pick('Negro Absoluto');
   p = await project();
+  check('Modelos · Todos: menú en cascada cambia las tapas', p.defaults.tapas === 'gra_negro_absoluto', p.defaults.tapas);
   await clickText('.tabs button', 'Presupuesto'); await sleep(400);
   const tapaLines2 = await page.$$eval('.page table tbody tr td:first-child', (els) => els.map((e) => e.textContent.trim()).filter((t) => t.startsWith('Tapa ')));
   check('Cambiar la piedra de las tapas cambia el presupuesto', p.defaults.tapas === 'gra_negro_absoluto' && tapaLines2.includes('Tapa Granitos > Negro > Negro Absoluto'), tapaLines2.join(' | '));
   await clickText('.tabs button', 'Diseño 3D'); await sleep(400);
   await shot('06b-granito-negro');
+  // Selección: solo el módulo elegido; Mostrar todos…
+  const selMod = p.modules.find((m) => m.type === 'bajo_mixto');
+  const selPt = await page.evaluate((id) => window.__muebles.screenOf(id, 100), selMod.id);
+  await page.mouse.click(selPt.x, selPt.y); await sleep(500);
+  await clickText('.models .mv-tabs button', 'Selección');
+  await (await mdRow('Puertas')).click(); await sleep(300);
+  await pick('Colores', 'Negro');
+  p = await project();
+  check('Modelos · Selección: cambia solo el módulo elegido', p.modules.find((m) => m.id === selMod.id).mats?.puertas === 'mel18_negro' && p.modules.filter((m) => m.mats?.puertas === 'mel18_negro').length === 1 && p.defaults.puertas !== 'mel18_negro');
+  await (await mdRow('Frentes')).click(); await sleep(300);
+  await clickText('.cascade .cm-item', 'Mostrar todos…');
+  await page.type('.showall .qf-search input', 'nogal'); await sleep(200);
+  await clickText('.showall .qf-item span', 'Maderas > Nogal');
+  await clickText('.showall .qf-foot button', 'Aplicar');
+  p = await project();
+  check('Mostrar todos… busca y aplica', p.modules.find((m) => m.id === selMod.id).mats?.frentes === 'mel18_nogal' && !(await page.$('.showall')));
+  await shot('06c-modelos-seleccion');
+  for (let i = 0; i < 2; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300); }
+  await page.keyboard.press('KeyE'); await page.keyboard.press('Escape'); await sleep(300);
   await shot('07-precios');
 
   // Reglas de construcción del proyecto: fondo en ranura cambia el despiece

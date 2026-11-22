@@ -1,7 +1,6 @@
 import { MODULE_TYPES, PARAM_DEFS, RULE_DEFS, DEFAULT_RULES, fieldsFor, moduleName } from '../domain/modules.js';
 import { NumField, SelField, TextField, num } from './fields.jsx';
 import RoomEditor from './RoomEditor.jsx';
-import { SLOTS, pathLabel } from '../domain/catalog.js';
 import WallPanel from './WallPanel.jsx';
 import { OpeningPanel, ColumnPanel } from './RoomItemPanels.jsx';
 
@@ -23,12 +22,6 @@ function RulesEditor({ rules, inherit, onChange }) {
   });
 }
 
-function MatSelect({ label, value, settings, onChange, allowInherit, kind = 'placa' }) {
-  const opts = settings.materials.filter((m) => (m.kind === 'piedra') === (kind === 'piedra')).map((m) => [m.id, kind === 'piedra' ? pathLabel(m) : m.name]);
-  if (allowInherit) opts.unshift(['', '— igual al proyecto —']);
-  return <SelField label={label} value={value || ''} onChange={(v) => onChange(v || undefined)} options={opts} />;
-}
-
 export default function Inspector({ project, settings, selected, selectedWallId, onSelectWall, onDrawWalls, onDeleteWall, onSplitWall, selectedOpeningId, selectedColumnId, onSelectItem, onScaleImage, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onRotateTo, onRest, onProject }) {
   if (selectedWallId && project.room.walls.some((w) => w.id === selectedWallId)) {
     return <WallPanel room={project.room} wallId={selectedWallId} onBack={() => onSelectWall(null)} onDelete={onDeleteWall} onSplit={onSplitWall}
@@ -42,8 +35,7 @@ export default function Inspector({ project, settings, selected, selectedWallId,
     return <ColumnPanel room={project.room} id={selectedColumnId} onRoom={onRoom} onBack={() => onSelectItem(null)} />;
   }
   if (!selected) {
-    const { room, defaults } = project;
-    const setDef = (k, v) => onProject((p) => ({ ...p, defaults: { ...p.defaults, [k]: v } }));
+    const { room } = project;
     return (
       <aside className="inspector">
         <h3>Proyecto</h3>
@@ -51,8 +43,8 @@ export default function Inspector({ project, settings, selected, selectedWallId,
         <h4>Ambiente</h4>
         <RoomEditor room={room} onChange={(r) => onProject((p) => ({ ...p, room: r }))} onSelectWall={onSelectWall} onDrawWalls={onDrawWalls} onSelectItem={onSelectItem}
           planImage={project.planImage} onPlanImage={(fn) => onProject((p) => ({ ...p, planImage: fn(p.planImage) }))} onScaleImage={onScaleImage} />
-        <h4>Materiales por defecto</h4>
-        {SLOTS.map((s) => <MatSelect key={s.id} label={s.label} kind={s.kind} value={defaults[s.id]} settings={settings} onChange={(v) => setDef(s.id, v)} />)}
+        <h4>Materiales</h4>
+        <p className="hint">Se eligen en <b>Herramientas · Modelos</b> (Todos o Selección).</p>
         <h4>Construcción del proyecto</h4>
         <RulesEditor rules={{ ...DEFAULT_RULES, ...project.rules }} onChange={(r) => onProject((p) => ({ ...p, rules: r }))} />
         <p className="hint">Estas reglas aplican a todos los módulos; cada módulo puede tener las suyas.</p>
@@ -89,8 +81,7 @@ export default function Inspector({ project, settings, selected, selectedWallId,
       <label className="radio check-row" title="Al moverlo se apoya sobre la mesada o el módulo que tenga debajo (o en el piso)">
         <input type="checkbox" checked={!!selected.rest} onChange={(e) => onRest(e.target.checked)} /> Apoyar sobre lo de abajo
       </label>
-      <h4>Materiales del módulo</h4>
-      {SLOTS.map((s) => <MatSelect key={s.id} label={s.label} kind={s.kind} value={selected.mats?.[s.id]} settings={settings} allowInherit onChange={(v) => onUpdate({ mats: { ...selected.mats, [s.id]: v } })} />)}
+      <p className="hint">Materiales de este módulo: <b>Herramientas · Modelos → Selección</b>.</p>
       {def.kind === 'caja' && (
         <>
           <h4>Construcción de este módulo</h4>

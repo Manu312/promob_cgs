@@ -49,3 +49,27 @@ export function WallDeleteDialog({ label, onConfirm, onCancel }) {
     </div>
   );
 }
+
+// Menú contextual del módulo (clic derecho): tamaño máximo hasta el obstáculo y acciones rápidas.
+export function ModuleContextMenu({ menu, canMax, onAction, onClose }) {
+  useEffect(() => {
+    const k = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [onClose]);
+  const item = (action, label, disabled) => <button key={action} disabled={disabled} onClick={() => onAction(action)}
+    title={disabled ? 'Solo con el módulo a escuadra (0, 90, 180 o 270°)' : undefined}>{label}</button>;
+  return (
+    <div className="menu-backdrop" onPointerDown={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
+      <div className="wall-menu module-menu" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()}>
+        {item('max-width', 'Ancho máximo', !canMax)}
+        {item('max-height', 'Alto máximo')}
+        {item('max-depth', 'Profundidad máxima', !canMax)}
+        <hr />
+        {item('rotate', 'Rotar 90°')}
+        {item('duplicate', 'Duplicar')}
+        {item('delete', 'Eliminar')}
+      </div>
+    </div>
+  );
+}

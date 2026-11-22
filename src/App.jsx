@@ -6,7 +6,8 @@ import { nudgeTarget, rotateAboutCenter, lockAxis } from './domain/movement.js';
 import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
 import StatusToggles from './ui/StatusToggles.jsx';
 import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls, followWall } from './domain/wallEdit.js';
-import { WallContextMenu, WallDeleteDialog } from './ui/WallMenus.jsx';
+import { WallContextMenu, WallDeleteDialog, ModuleContextMenu } from './ui/WallMenus.jsx';
+import { maxSize, canMaxSize } from './domain/maxSize.js';
 import { applyDimEdit } from './domain/dimensions.js';
 import { updateOpening, setOpeningDim, moveColumn, removeOpening, removeColumn } from './domain/openings.js';
 import { addWall, segmentEnd } from './domain/drawWalls.js';
@@ -256,6 +257,19 @@ export default function App() {
     setSelection(null);
   };
 
+  // Menú del módulo (clic derecho): tamaño máximo hasta el obstáculo, rotar, duplicar, eliminar.
+  const [modMenu, setModMenu] = useState(null); // { id, x, y }
+  const moduleAction = (action) => {
+    const id = modMenu.id;
+    setModMenu(null);
+    if (action.startsWith('max-')) {
+      const param = action.slice(4);
+      setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === id ? maxSize(m, param, p.room, p.modules) : m)) }));
+    } else if (action === 'rotate') rotateSelected();
+    else if (action === 'duplicate') duplicateSelected();
+    else if (action === 'delete') deleteSelected();
+  };
+
   const addModule = (type) => {
     const m = newModule(type, project);
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));
@@ -376,7 +390,7 @@ export default function App() {
                 onDimEdit={onDimEdit} onWallLength={onWallLength} onWallAngle={onWallAngle}
                 onDragStart={onDragStart} onDragEnd={history.commit}
                 drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
-                onWallContext={onWallContext}
+                onWallContext={onWallContext} onModuleContext={(m) => setModMenu(m)}
                 annotating={annTool} onAnnotatePoint={annotating ? onAnnotatePoint : onScalePoint} onAnnotateFinish={annotating ? stopAnnotate : stopScale}
                 selectedDimId={selectedDimId} onSelectDim={selectDim}
                 onRestoreWall={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, id, { lowered: false }) }))}
@@ -442,6 +456,7 @@ export default function App() {
                 <button onClick={stopScale}>Cancelar</button>
               </div>
             )}
+            {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}
             {deleteDlg && <WallDeleteDialog label={`Pared ${project.room.walls.findIndex((w) => w.id === deleteDlg.wallId) + 1}`} onConfirm={confirmDelete} onCancel={() => setDeleteDlg(null)} />}
             <div className="statusbar">

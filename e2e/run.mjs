@@ -200,6 +200,18 @@ try {
     await ctrl('KeyZ'); await ctrl('KeyZ');
     mm = await modNow(target.id);
     check('Deshacer devuelve la rotación', mm.rot === m0.rot && mm.x === m0.x && mm.z === m0.z, `rot ${mm.rot}`);
+
+    // Tamaño máximo con clic derecho (#45)
+    const rc = await page.evaluate((id) => window.__muebles.screenOf(id, 100), target.id);
+    await page.mouse.click(rc.x, rc.y, { button: 'right' }); await sleep(400);
+    check('Clic derecho en un módulo abre su menú', !!(await page.$('.module-menu')));
+    await clickText('.module-menu button', 'Ancho máximo');
+    mm = await modNow(target.id);
+    check('Ancho máximo estira hasta el obstáculo más cercano', mm.params.width > m0.params.width, `${m0.params.width} → ${mm.params.width}`);
+    await shot('03d-ancho-maximo');
+    await ctrl('KeyZ');
+    mm = await modNow(target.id);
+    check('Deshacer el tamaño máximo', mm.params.width === m0.params.width);
   }
 
   // Arrastrar en vacío rota cámara, no deselecciona errores

@@ -462,6 +462,28 @@ try {
     await page.keyboard.press('KeyE'); await page.keyboard.press('Escape'); await sleep(200);
   }
 
+  // Posición del tirador (#85)
+  {
+    const tm = (await project()).modules.filter((m) => m.type === 'alacena').at(-1);
+    const tmp = await page.evaluate((m) => window.__muebles.screenOfPoint(m.x + m.params.width / 4, m.z + m.params.depth + 10, m.y + m.params.height / 2), tm);
+    await page.mouse.click(tmp.x, tmp.y); await sleep(400);
+    await clickText('.tools-item', '⊥Posición del Tirador');
+    await clickText('.tp-preset span', 'Personalizada');
+    const offIn = await page.evaluateHandle(() => [...document.querySelectorAll('.tirador label.field')].find((l) => l.textContent.includes('Desde el borde'))?.querySelector('input'));
+    await offIn.click({ clickCount: 3 }); await offIn.type('120'); await page.keyboard.press('Enter'); await sleep(300);
+    await page.evaluate(() => [...document.querySelectorAll('.tp-orient label')].find((l) => l.textContent.trim() === 'Horizontal').querySelector('input').click()); await sleep(300);
+    let tmm = (await project()).modules.find((m) => m.id === tm.id);
+    check('Tirador personalizado a 120 mm y horizontal', tmm.params.handlePos === 'custom' && tmm.params.handleOffset === 120 && tmm.params.handleOrient === 'horizontal', JSON.stringify([tmm.params.handlePos, tmm.params.handleOffset, tmm.params.handleOrient]));
+    await shot('02f-tirador');
+    await clickText('.tirador button', 'Aplicar a todos los módulos');
+    const all = (await project()).modules.filter((m) => m.params.handlePos !== undefined && !['tapa', 'vista', 'estante', 'escritorio'].includes(m.type));
+    check('Aplicar a todos los módulos', all.every((m) => m.params.handlePos === 'custom' && m.params.handleOrient === 'horizontal'), all.length + ' módulos');
+    for (let i = 0; i < 4; i++) await ctrl('KeyZ');
+    tmm = (await project()).modules.find((m) => m.id === tm.id);
+    check('Deshacer devuelve la posición del tirador', tmm.params.handlePos === tm.params.handlePos, tmm.params.handlePos);
+    await page.keyboard.press('KeyE'); await page.keyboard.press('Escape'); await sleep(200);
+  }
+
   // Arrastrar en vacío rota cámara, no deselecciona errores
   await page.mouse.move(700, 200); await page.mouse.down(); await page.mouse.move(800, 250, { steps: 8 }); await page.mouse.up();
   await sleep(300);

@@ -108,3 +108,5 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .wall-dialog h3 { margin: 0 0 4px; font-size: 15px; }
 .wall-dialog .radio { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .cota.cota-ang { background: #7c3aed; }
+.cota.cota-ruler { background: #1e3a8a; }
+.cota.cota-ruler.mod { background: #6b7280; }

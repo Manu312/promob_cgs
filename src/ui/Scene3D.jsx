@@ -9,7 +9,7 @@ import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
 import { mat3d, metal, stone } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
-import { ModuleDistances, OpeningDims } from './Cotas.jsx';
+import { ModuleDistances, OpeningDims, HeightRuler } from './Cotas.jsx';
 import { DrawTool } from './DrawTool.jsx';
 import { PlanGrid } from './PlanGrid.jsx';
 
@@ -447,6 +447,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
           onWallMenu={renderMode || drawing ? null : onWallMenu}
           selectedOpeningId={renderMode ? null : selectedOpeningId} onOpeningDown={renderMode || drawing ? null : onOpeningDown}
           selectedColumnId={renderMode ? null : selectedColumnId} onColumnDown={renderMode || drawing ? null : onColumnDown} />
+        {view.name === 'frente' && !renderMode && <HeightRuler room={room} modules={project.modules} />}
         {selectedOpeningId && !renderMode && <OpeningDims room={room} id={selectedOpeningId} onEdit={onOpeningDim} />}
         {planta && !renderMode && <PlanGrid room={room} />}
         {planta && !renderMode && !drawing && <NodeHandles room={room} onNodeDown={onNodeDown} />}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Html, Line } from '@react-three/drei';
-import { nearestDistances } from '../domain/dimensions.js';
+import { nearestDistances, heightRuler } from '../domain/dimensions.js';
+import { bounds } from '../domain/walls.js';
 import { roomWalls } from '../domain/room.js';
 import { openingDims } from '../domain/openings.js';
 
@@ -78,4 +79,24 @@ export function OpeningDims({ room, id, onEdit }) {
       <CotaLabel p={P((s0 + s1) / 2)} value={val} className="cota cota-dist" onCommit={onEdit ? (v) => onEdit(id, k, v) : undefined} />
     </group>
   ));
+}
+
+// Regla de alturas (vista Frente): línea vertical junto a la pared del fondo con las
+// alturas de referencia (azul) y la base/tope de los módulos (gris), como en Promob.
+export function HeightRuler({ room, modules }) {
+  const marks = useMemo(() => heightRuler(room, modules), [room, modules]);
+  const b = bounds(room);
+  const x = (b.minX + 120) * S, z = (b.minZ + 40) * S;
+  const top = Math.max(room.h, ...marks.map((m) => m.h)) * S;
+  return (
+    <group>
+      <Line points={[[x, 0, z], [x, top, z]]} color="#1e3a8a" lineWidth={1.4} depthTest={false} renderOrder={5} />
+      {marks.map((m) => (
+        <group key={m.h}>
+          <Line points={[[x - 0.06, m.h * S, z], [x + 0.12, m.h * S, z]]} color={m.kind === 'ref' ? '#1e3a8a' : '#6b7280'} lineWidth={1.4} depthTest={false} renderOrder={5} />
+          <CotaLabel p={[x + 0.24, m.h * S, z]} value={m.h} className={`cota cota-ruler${m.kind === 'ref' ? '' : ' mod'}`} />
+        </group>
+      ))}
+    </group>
+  );
 }

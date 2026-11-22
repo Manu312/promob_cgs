@@ -87,3 +87,20 @@ export function wallDims(room, { arcR = 250, labelR = 420, steps = 16 } = {}) {
   }
   return { linear, angular };
 }
+
+// Alturas: lista "100; 820 1470,…" → números positivos, ordenados y sin repetir.
+export function parseHeights(input) {
+  const list = Array.isArray(input) ? input : String(input).split(/[\s,;]+/);
+  return [...new Set(list.map((v) => Math.round(Number(v))).filter((v) => Number.isFinite(v) && v > 0))].sort((a, b) => a - b);
+}
+
+// Regla de alturas de la vista Frente: alturas de referencia del ambiente + base y tope de
+// cada módulo (sin el piso). Si coinciden, queda la de referencia.
+export function heightRuler(room, modules) {
+  const marks = new Map(parseHeights(room.refHeights || []).map((h) => [h, 'ref']));
+  for (const m of modules) {
+    const y = Math.round(m.y || 0);
+    for (const h of [y, y + Math.round(m.params.height)]) if (h > 0 && !marks.has(h)) marks.set(h, 'mod');
+  }
+  return [...marks].sort((a, b) => a[0] - b[0]).map(([h, kind]) => ({ h, kind }));
+}

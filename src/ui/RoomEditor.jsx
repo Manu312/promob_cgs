@@ -1,6 +1,7 @@
 import { OPENING_TYPES, roomWalls, rid, rebuildFromShape, setWallDefaults } from '../domain/room.js';
 import { useState } from 'react';
-import { NumField, SelField } from './fields.jsx';
+import { NumField, SelField, ListField } from './fields.jsx';
+import { parseHeights } from '../domain/dimensions.js';
 import { TEMPLATES, applyTemplate } from '../domain/drawWalls.js';
 
 const SHAPES = [['rect', 'Rectangular'], ['L', 'En L'], ['libre', 'Libre (puntos)']];
@@ -79,6 +80,8 @@ export default function RoomEditor({ room, onChange, onSelectWall, onDrawWalls, 
       )}
       <NumField label="Alto" unit="mm" value={room.h} min={2000} max={5000} step={50} onChange={(v) => onChange(setWallDefaults(room, { h: v }))} />
       <NumField label="Espesor paredes" unit="mm" value={room.t} min={50} max={400} step={10} onChange={(v) => onChange(setWallDefaults(room, { t: v }))} />
+
+      <ListField label="Regla de alturas (Frente)" value={room.refHeights || []} parse={parseHeights} onChange={(v) => set({ refHeights: v })} />
 
       {onSelectWall && (
         <>

@@ -473,6 +473,19 @@ try {
   p = await project();
   check('Clic en el zócalo de una pared rebajada la restaura', p.room.walls[0].lowered === false);
   check('Sin errores de consola tras rebajar paredes', errors.length === 0, errors.slice(-3).join(' | '));
+
+  // Regla de alturas en vista Frente (#12)
+  await page.keyboard.press('Escape'); await sleep(200);
+  await clickText('.vp-toolbar button', 'Frente'); await sleep(1500);
+  const ruler = await page.$$eval('.cota-ruler', (els) => els.map((e) => e.textContent));
+  check('Frente muestra la regla de alturas (referencias + módulos)', ['100', '820', '1470', '2010', '2280', '870'].every((h) => ruler.includes(h)), ruler.join(', '));
+  await shot('25-regla-alturas');
+  const rh = await fieldInput('Regla de alturas (Frente)');
+  await rh.click({ clickCount: 3 }); await rh.type('100, 900, 2100'); await page.keyboard.press('Enter'); await sleep(500);
+  p = await project();
+  const ruler2 = await page.$$eval('.cota-ruler', (els) => els.map((e) => e.textContent));
+  check('Editar la lista de alturas se guarda en el proyecto', JSON.stringify(p.room.refHeights) === '[100,900,2100]' && ruler2.includes('900') && !ruler2.includes('1470'), ruler2.join(', '));
+  await ctrl('KeyZ');
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

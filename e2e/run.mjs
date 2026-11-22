@@ -365,6 +365,32 @@ try {
     check('Sin errores de consola tras apoyar', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Agregados (#81): tecla A, ruedas en vez de pies, estantes con cantidad
+  {
+    const ag = p.modules.find((m) => m.type === 'bajo_mixto');
+    const agp = await page.evaluate((id) => window.__muebles.screenOf(id, 100), ag.id);
+    await page.mouse.click(agp.x, agp.y); await sleep(400);
+    await page.keyboard.press('KeyA'); await sleep(300);
+    const agRows = await page.$$eval('.aggregates .ag-row label', (els) => els.map((e) => e.textContent.trim()));
+    check('Tecla A abre Herramientas · Agregados', ['Pies', 'Zócalo', 'Zócalo trasero', 'Ruedas', 'Fondo', 'Estantes', 'Divisiones', 'Barral'].every((l) => agRows.includes(l)), agRows.join(', '));
+    const tick = (l) => page.evaluate((l) => [...document.querySelectorAll('.aggregates .ag-row label')].find((e) => e.textContent.trim() === l).querySelector('input').click(), l);
+    await tick('Pies'); await sleep(200); await tick('Ruedas'); await sleep(300);
+    await page.click('.aggregates button[aria-label="Opciones de Estantes"]'); await sleep(200);
+    const qty = await page.$('.aggregates .ag-opts input');
+    await qty.click({ clickCount: 3 }); await qty.type('3'); await page.keyboard.press('Enter'); await sleep(400);
+    let am = (await project()).modules.find((m) => m.id === ag.id);
+    check('Agregados: ruedas en vez de pies y 3 estantes', am.aggs?.ruedas && !am.aggs?.pies && am.params.shelves === 3, JSON.stringify(am.aggs) + ' estantes ' + am.params.shelves);
+    await clickText('.tabs button', 'Presupuesto'); await sleep(400);
+    const rl = await page.$$eval('.page table tbody tr td:first-child', (els) => els.map((e) => e.textContent.trim()));
+    check('Las ruedas van al presupuesto', rl.includes('Rueda giratoria con freno'));
+    await clickText('.tabs button', 'Diseño 3D'); await sleep(500);
+    await shot('02b-agregados');
+    for (let i = 0; i < 3; i++) await ctrl('KeyZ');
+    am = (await project()).modules.find((m) => m.id === ag.id);
+    check('Deshacer los agregados', !am.aggs?.ruedas && am.params.shelves === ag.params.shelves);
+    await page.keyboard.press('KeyE'); await page.keyboard.press('Escape'); await sleep(200);
+  }
+
   // Arrastrar en vacío rota cámara, no deselecciona errores
   await page.mouse.move(700, 200); await page.mouse.down(); await page.mouse.move(800, 250, { steps: 8 }); await page.mouse.up();
   await sleep(300);

@@ -121,12 +121,24 @@ function sanitize(params) {
 const part = (name, role, x, y, z, sx, sy, sz, edge = {}) => ({ name, role, x, y, z, sx, sy, sz, edge });
 const decor = (kind, x, y, z, sx, sy, sz) => ({ decor: kind, x, y, z, sx, sy, sz });
 
-function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {} }) {
+// Base de un módulo (agregados de base): la propia si se tocó en Agregados, o la que sale
+// de la regla "Base" del proyecto (patas + zócalo / zócalo adelante y atrás / sin base).
+export function baseOf(mod, rules = {}) {
+  const a = mod.aggs || {};
+  if (a.baseCustom) return { pies: !!a.pies, zocalo: !!a.zocalo, zocalo_tras: !!a.zocalo_tras, ruedas: !!a.ruedas };
+  const r = rules.base || DEFAULT_RULES.base;
+  return { pies: r === 'patas_zocalo', zocalo: r !== 'ninguna', zocalo_tras: r === 'zocalo', ruedas: false };
+}
+
+function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null }) {
   const p = sanitize(raw);
   const R = { ...DEFAULT_RULES, ...rules };
+  // Agregado "Fondo": pone o saca el fondo de este módulo
+  if (aggs?.fondo) R.backType = aggs.fondo.on ? (R.backType === 'sin' ? 'clavado' : R.backType) : 'sin';
+  const base = baseOf({ aggs }, R);
   const G = R.gap;
   const W = p.width, H = p.height, D = p.depth;
-  const P = R.base === 'ninguna' ? 0 : Math.min(p.plinth || 0, H - 4 * t);
+  const P = !(base.pies || base.zocalo || base.zocalo_tras || base.ruedas) ? 0 : Math.min(p.plinth || 0, H - 4 * t);
   const parts = [], decors = [], hw = {};
   const add = (c, n) => { if (n > 0) hw[c] = (hw[c] || 0) + n; };
 
@@ -153,9 +165,19 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {} }) {
   if (R.backType === 'clavado') parts.push(part('Fondo', 'fondo', 0, y0, 0, W, bodyH, tb));
   else if (R.backType === 'ranurado') parts.push(part('Fondo', 'fondo', t - GROOVE, y0 + t - GROOVE, GROOVE_SET, iw + 2 * GROOVE, bodyH - 2 * t + 2 * GROOVE, tb));
   if (P > 0) {
-    parts.push(part('Zócalo', 'cuerpo', 0, 0, D - t - R.plinthSetback, W, P, t, { x: 1 }));
-    if (R.base === 'patas_zocalo') add('pata', W > 1000 ? 6 : 4);
-    else parts.push(part('Zócalo trasero', 'cuerpo', t, 0, zIn + 30, iw, P, t));
+    if (base.zocalo) parts.push(part('Zócalo', 'cuerpo', 0, 0, D - t - R.plinthSetback, W, P, t, { x: 1 }));
+    if (base.zocalo_tras) parts.push(part('Zócalo trasero', 'cuerpo', t, 0, zIn + 30, iw, P, t));
+    // pies y ruedas en las esquinas (y al medio si el módulo es ancho)
+    const xs = W > 1000 ? [60, W / 2 - 15, W - 90] : [60, W - 90];
+    const spots = xs.flatMap((x) => [[x, zIn + 40], [x, D - R.plinthSetback - t - 70]]);
+    if (base.pies) {
+      add('pata', spots.length);
+      for (const [x, z] of spots) decors.push(decor('pata', x, 0, z, 30, P, 30));
+    }
+    if (base.ruedas) {
+      add('rueda', 4);
+      for (const [x, z] of [[40, zIn + 30], [W - 90, zIn + 30], [40, D - 90], [W - 90, D - 90]]) decors.push(decor('rueda', x, 0, z, 50, Math.min(P, 70), 50));
+    }
   }
 
   // Divisiones verticales → cuerpos
@@ -444,7 +466,7 @@ const BUILDERS = { esquinero: buildEsquinero, escritorio: buildEscritorio, tapa:
 export function buildModule(mod, ctx) {
   const def = MODULE_TYPES[mod.type];
   if (!def) return { parts: [], decors: [], hardware: {} };
-  return (BUILDERS[def.kind] || buildCaja)(mod.params, ctx);
+  return (BUILDERS[def.kind] || buildCaja)(mod.params, { ...ctx, aggs: mod.aggs || null });
 }
 
 // ---- Ubicación en el ambiente ----

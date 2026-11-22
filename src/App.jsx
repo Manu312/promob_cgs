@@ -7,6 +7,8 @@ import { nudgeTarget, rotateAboutCenter, lockAxis, restingHeight } from './domai
 import { withItem } from './domain/library.js';
 import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
 import ModelsPanel from './ui/ModelsPanel.jsx';
+import AggregatesPanel from './ui/AggregatesPanel.jsx';
+import { setAgg } from './domain/aggregates.js';
 import { applyModel } from './domain/models.js';
 import { applyStyle, stylesOf } from './domain/styles.js';
 import StatusToggles from './ui/StatusToggles.jsx';
@@ -20,7 +22,7 @@ import { addAnnotation, removeAnnotation } from './domain/annotations.js';
 import { scalePlanImage } from './domain/planImage.js';
 import { absAngle } from './domain/walls.js';
 import DrawHud from './ui/DrawHud.jsx';
-import { buildAll, computeCutList } from './domain/cutlist.js';
+import { buildAll, computeCutList, resolveRules } from './domain/cutlist.js';
 import { nestAll } from './domain/nesting.js';
 import { computeBudget } from './domain/budget.js';
 import { sampleProject, emptyProject, normalizeProject } from './domain/project.js';
@@ -57,7 +59,7 @@ export default function App() {
   const [ui, setUi] = usePersistent('mueblesapp.ui', { collision: true, magnets: true, autoLower: true });
   const autoLower = ui.autoLower !== false;
   const toggleUi = (k) => setUi((u) => ({ ...u, [k]: u[k] === false }));
-  const tool = ['movimiento', 'modelos'].includes(ui.tool) ? ui.tool : 'propiedades'; // botonera Herramientas
+  const tool = ['movimiento', 'modelos', 'agregados'].includes(ui.tool) ? ui.tool : 'propiedades'; // botonera Herramientas
   const setTool = (t) => setUi((u) => ({ ...u, tool: t }));
   // Traba de eje al arrastrar (teclas X / Y de Promob): 'x' o 'z'.
   const [axisLock, setAxisLock] = useState(null);
@@ -85,7 +87,7 @@ export default function App() {
   const fileRef = useRef(null);
 
   // La geometría no depende de la posición: no recalcular corte/presupuesto al arrastrar.
-  const buildKey = JSON.stringify([project.modules.map((m) => [m.id, m.type, m.params, m.mats, m.rules]), project.defaults, project.rules]);
+  const buildKey = JSON.stringify([project.modules.map((m) => [m.id, m.type, m.params, m.mats, m.rules, m.aggs]), project.defaults, project.rules]);
   const built = useMemo(() => buildAll(project, settings), [buildKey, settings]); // eslint-disable-line react-hooks/exhaustive-deps
   const builtById = useMemo(() => new Map(built.map((b) => [b.id, b])), [built]);
   const cut = useMemo(() => computeCutList(built), [built]);
@@ -362,6 +364,7 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'm') { e.preventDefault(); setTool('movimiento'); return; }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'd') { e.preventDefault(); duplicateSelected(); return; }
       if (plain && key === 'e') { setTool('propiedades'); return; }
+      if (plain && key === 'a') { setTool('agregados'); return; } // Agregados
       if (plain && key === 'o' && selectedId) { setProject((p) => toggleHidden(p, [selectedId])); return; } // visible / oculto
       if (plain && key === 'x') { setAxisLock((l) => (l === 'x' ? null : 'x')); return; }
       if (plain && key === 'y') { setAxisLock((l) => (l === 'z' ? null : 'z')); return; }
@@ -541,6 +544,10 @@ export default function App() {
           </section>
           <div className="tools-col">
           <ToolsNav tool={tool} onTool={setTool} />
+          {tool === 'agregados' && (
+            <AggregatesPanel selected={selected} rules={selected ? resolveRules(selected, project) : null}
+              onAgg={(id, on, qty) => selectedId && setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === selectedId ? setAgg(m, resolveRules(m, p), id, on, qty) : m)) }))} />
+          )}
           {tool === 'modelos' && (
             <ModelsPanel project={project} settings={settings} selected={selected}
               onApply={(slot, id, scope) => setProject((p) => applyModel(p, slot, id, scope, selectedId ? [selectedId] : []))}

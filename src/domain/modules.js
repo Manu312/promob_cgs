@@ -293,12 +293,16 @@ export const isSquare = (rot = 0) => Math.abs(((rot % 90) + 90) % 90) < 1e-6;
 
 
 // Flechas de redimensionar, en el sistema del módulo: eje local y signo hacia afuera.
+// Como Promob: un par por eje, a ambos lados (rojo ancho, verde profundidad, azul alto).
 export const RESIZE_HANDLES = {
   right: { param: 'width', axis: 'x', sign: 1 },
   left: { param: 'width', axis: 'x', sign: -1 },
   front: { param: 'depth', axis: 'z', sign: 1 },
+  back: { param: 'depth', axis: 'z', sign: -1 },
   top: { param: 'height', axis: 'y', sign: 1 },
+  bottom: { param: 'height', axis: 'y', sign: -1 },
 };
+export const AXIS_COLORS = { x: '#e03131', z: '#2f9e44', y: '#1c7ed6' };
 
 // Ejes locales del módulo en planta (x, z del mundo) según su rotación (igual que el 3D: giro sobre y).
 export function localAxes(rot = 0) {
@@ -314,10 +318,12 @@ export function resizeModule(mod, handle, delta) {
   if (!h || !delta) return mod;
   const def = PARAM_DEFS[h.param];
   const old = mod.params[h.param];
-  const val = Math.min(def.max, Math.max(def.min, Math.round(old + delta)));
+  let val = Math.min(def.max, Math.max(def.min, Math.round(old + delta)));
+  if (handle === 'bottom') val = Math.min(val, old + (mod.y || 0)); // no baja del piso
   const eff = val - old;
   if (!eff) return mod;
   const params = { ...mod.params, [h.param]: val };
+  if (handle === 'bottom') return { ...mod, params, y: (mod.y || 0) - eff }; // la cara de arriba queda fija
   if (h.axis === 'y') return { ...mod, params };
   const f0 = footprint(mod);
   const c = [mod.x + f0.fw / 2, mod.z + f0.fd / 2];

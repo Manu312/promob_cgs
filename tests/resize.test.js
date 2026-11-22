@@ -45,3 +45,20 @@ test('delta 0 devuelve el mismo módulo', () => {
   const m = bajo(0, 0);
   assert.equal(resizeModule(m, 'right', 0), m);
 });
+
+// Flechas a ambos lados (#43)
+test('flecha de atrás: estira la profundidad hacia la pared y deja fijo el frente', () => {
+  const m = { ...bajo(0, 100) };
+  const r = resizeModule(m, 'back', 40);
+  assert.deepEqual(pick(r), { w: 600, d: 600, h: 870, x: 0, z: 60 });
+});
+
+test('flecha de abajo: estira hacia el piso dejando fija la cara de arriba, sin pasar el piso', () => {
+  const m = { ...bajo(0, 0), y: 100 };
+  const r = resizeModule(m, 'bottom', 60);
+  assert.deepEqual([r.params.height, r.y], [930, 40]);
+  const tope = resizeModule(m, 'bottom', 500);
+  assert.deepEqual([tope.params.height, tope.y], [970, 0]);
+  const achica = resizeModule(m, 'bottom', -70);
+  assert.deepEqual([achica.params.height, achica.y], [800, 170]);
+});

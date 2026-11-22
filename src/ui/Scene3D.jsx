@@ -88,11 +88,12 @@ function ResizeHandles({ W, H, D, planta, onDown }) {
     ));
 }
 
-function ModuleObject({ mod, b, selected, showSel, onDown, onResizeDown, planta }) {
+function ModuleObject({ mod, b, selected, showSel, onDown, onMenu, onResizeDown, planta }) {
   const { fw, fd } = footprint(mod);
   const W = mod.params.width, D = mod.params.depth, H = mod.params.height;
   return (
-    <group position={[(mod.x + fw / 2) * S, (mod.y || 0) * S, (mod.z + fd / 2) * S]} rotation={[0, ((mod.rot || 0) * Math.PI) / 180, 0]} onPointerDown={(e) => onDown(e, mod)}>
+    <group position={[(mod.x + fw / 2) * S, (mod.y || 0) * S, (mod.z + fd / 2) * S]} rotation={[0, ((mod.rot || 0) * Math.PI) / 180, 0]} onPointerDown={(e) => onDown(e, mod)}
+      onContextMenu={onMenu ? (e) => onMenu(e, mod) : undefined}>
       <group position={[(-W / 2) * S, 0, (-D / 2) * S]}>
         {b.parts.map((p, i) => <PartMesh key={i} p={p} material={mat3d(b.mats[p.role])} />)}
         {b.decors.map((d, i) => <DecorMesh key={'d' + i} d={d} />)}
@@ -336,7 +337,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const dragRef = useRef(null);
@@ -374,6 +375,12 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
     if (!leftButton(e)) return;
     const [rx, rz] = toRoom(e.point);
     startDrag({ kind: 'module', id: mod.id, planeY: e.point.y, offX: rx - mod.x, offZ: rz - mod.z });
+  };
+  // Clic derecho en un módulo: su menú (tamaño máximo, rotar, duplicar, eliminar).
+  const onModuleMenu = (e, mod) => {
+    e.stopPropagation();
+    onSelect(mod.id);
+    onModuleContext?.({ id: mod.id, x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
   };
   // Abertura: se selecciona y se arrastra solo a lo largo de su pared.
   const onOpeningDown = (e, o, g) => {
@@ -483,6 +490,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
           const b = builtById.get(m.id);
           if (!b) return null;
           return <ModuleObject key={m.id} mod={m} b={b} selected={m.id === selectedId} showSel={!renderMode} onDown={onDown}
+            onMenu={renderMode || drawing || annotating ? null : onModuleMenu}
             onResizeDown={onResize ? onResizeDown : null} planta={planta} />;
         })}
       </group>

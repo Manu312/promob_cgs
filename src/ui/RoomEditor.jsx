@@ -7,12 +7,11 @@ const SHAPES = [['rect', 'Rectangular'], ['L', 'En L'], ['libre', 'Libre (puntos
 
 // Editor numérico del ambiente. Las formas regeneran las paredes conservando sus ids
 // (las aberturas siguen en su pared). Se reemplaza por la edición interactiva de la Fase 1.
-export default function RoomEditor({ room, onChange, onSelectWall, onDrawWalls }) {
+export default function RoomEditor({ room, onChange, onSelectWall, onDrawWalls, onSelectItem }) {
   const [tpl, setTpl] = useState({ kind: 'dos', w: 3600, d: 3000 });
   const set = (patch) => onChange({ ...room, ...patch });
   const rebuild = (patch) => onChange(rebuildFromShape(room, patch));
   const walls = roomWalls(room);
-  const wallOpts = walls.map((w) => [w.id, `Pared ${w.i + 1} (${w.len} mm)`]);
   const points = room.points || [];
 
   const setShape = (shape) => rebuild({ shape, ...(shape === 'libre' ? { points: points.map((p) => [...p]) } : {}) });
@@ -25,14 +24,12 @@ export default function RoomEditor({ room, onChange, onSelectWall, onDrawWalls }
   };
   const delPoint = (i) => points.length > 3 && rebuild({ points: points.filter((_, j) => j !== i) });
 
-  const setOpening = (id, patch) => set({ openings: room.openings.map((o) => (o.id === id ? { ...o, ...patch } : o)) });
   const addOpening = (type) => {
     const d = OPENING_TYPES[type];
     const w = walls[0];
     if (!w) return;
     set({ openings: [...room.openings, { id: rid('o'), type, wallId: w.id, offset: Math.max(0, (w.len - d.width) / 2), width: d.width, height: d.height, sill: d.sill }] });
   };
-  const setColumn = (id, patch) => set({ columns: room.columns.map((c) => (c.id === id ? { ...c, ...patch } : c)) });
 
   return (
     <div className="room-editor">
@@ -97,36 +94,28 @@ export default function RoomEditor({ room, onChange, onSelectWall, onDrawWalls }
       )}
 
       <h4>Aberturas</h4>
-      {room.openings.map((o) => (
-        <div key={o.id} className="sub-card">
-          <div className="sub-head">
-            <b>{OPENING_TYPES[o.type]?.label || o.type}</b>
-            <button className="small danger" onClick={() => set({ openings: room.openings.filter((x) => x.id !== o.id) })}>Quitar</button>
-          </div>
-          <SelField label="Pared" value={o.wallId} options={wallOpts} onChange={(v) => setOpening(o.id, { wallId: v })} />
-          <NumField label="Desde inicio de pared" unit="mm" value={Math.round(o.offset)} min={0} max={30000} step={10} onChange={(v) => setOpening(o.id, { offset: v })} />
-          <NumField label="Ancho" unit="mm" value={o.width} min={100} max={10000} step={10} onChange={(v) => setOpening(o.id, { width: v })} />
-          <NumField label="Alto" unit="mm" value={o.height} min={100} max={5000} step={10} onChange={(v) => setOpening(o.id, { height: v })} />
-          {o.type === 'ventana' && <NumField label="Antepecho" unit="mm" value={o.sill} min={0} max={3000} step={10} onChange={(v) => setOpening(o.id, { sill: v })} />}
-        </div>
-      ))}
+      <div className="wall-list">
+        {room.openings.map((o) => {
+          const wi = walls.findIndex((w) => w.id === o.wallId);
+          return (
+            <button key={o.id} className="small" onClick={() => onSelectItem?.({ kind: 'opening', id: o.id })} title="Ver propiedades (también con clic en el 3D)">
+              {OPENING_TYPES[o.type]?.label || o.type} · P{wi + 1}
+            </button>
+          );
+        })}
+      </div>
       <div className="row-btns">
         {Object.entries(OPENING_TYPES).map(([k, d]) => <button key={k} onClick={() => addOpening(k)}>+ {d.label}</button>)}
       </div>
 
       <h4>Columnas / salientes</h4>
-      {room.columns.map((c, i) => (
-        <div key={c.id} className="sub-card">
-          <div className="sub-head">
-            <b>Columna {i + 1}</b>
-            <button className="small danger" onClick={() => set({ columns: room.columns.filter((x) => x.id !== c.id) })}>Quitar</button>
-          </div>
-          <NumField label="X" unit="mm" value={c.x} min={0} max={30000} step={10} onChange={(v) => setColumn(c.id, { x: v })} />
-          <NumField label="Z" unit="mm" value={c.z} min={0} max={30000} step={10} onChange={(v) => setColumn(c.id, { z: v })} />
-          <NumField label="Ancho" unit="mm" value={c.w} min={50} max={3000} step={10} onChange={(v) => setColumn(c.id, { w: v })} />
-          <NumField label="Profundidad" unit="mm" value={c.d} min={50} max={3000} step={10} onChange={(v) => setColumn(c.id, { d: v })} />
-        </div>
-      ))}
+      <div className="wall-list">
+        {room.columns.map((c, i) => (
+          <button key={c.id} className="small" onClick={() => onSelectItem?.({ kind: 'column', id: c.id })} title="Ver propiedades (también con clic en el 3D)">
+            Columna {i + 1} · {c.w}×{c.d}
+          </button>
+        ))}
+      </div>
       <div className="row-btns">
         <button onClick={() => set({ columns: [...room.columns, { id: rid('c'), x: 0, z: 0, w: 300, d: 300 }] })}>+ Columna</button>
       </div>

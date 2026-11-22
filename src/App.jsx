@@ -4,6 +4,7 @@ import { newModule, footprint, snapPosition, resizeModule, uid } from './domain/
 import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls } from './domain/wallEdit.js';
 import { WallContextMenu, WallDeleteDialog } from './ui/WallMenus.jsx';
 import { applyDimEdit } from './domain/dimensions.js';
+import { updateOpening, setOpeningDim, moveColumn, removeOpening, removeColumn } from './domain/openings.js';
 import { addWall, segmentEnd } from './domain/drawWalls.js';
 import { absAngle } from './domain/walls.js';
 import DrawHud from './ui/DrawHud.jsx';
@@ -46,6 +47,10 @@ export default function App() {
   const selectedWallId = selection?.kind === 'wall' ? selection.id : null;
   const setSelectedId = useCallback((id) => setSelection(id ? { kind: 'module', id } : null), []);
   const selectWall = useCallback((id) => setSelection(id ? { kind: 'wall', id } : null), []);
+  const selectedOpeningId = selection?.kind === 'opening' ? selection.id : null;
+  const selectedColumnId = selection?.kind === 'column' ? selection.id : null;
+  const selectOpening = useCallback((id) => setSelection(id ? { kind: 'opening', id } : null), []);
+  const selectColumn = useCallback((id) => setSelection(id ? { kind: 'column', id } : null), []);
   const [renderMode, setRenderMode] = useState(false);
   const [photoreal, setPhotoreal] = useState(false);
   const [samples, setSamples] = useState(0);
@@ -89,6 +94,10 @@ export default function App() {
   const onMoveWall = useCallback((id, dx, dz) => setProject((p) => ({ ...p, room: moveWall(baseRoomRef.current || p.room, id, dx, dz) })), [setProject]);
   const onMoveNode = useCallback((id, x, z) => setProject((p) => ({ ...p, room: moveNode(p.room, id, x, z) })), [setProject]);
   const recenter = () => setView((v) => ({ ...v, tick: v.tick + 1 }));
+  // Aberturas (a lo largo de su pared) y columnas (imán a paredes y grilla).
+  const onMoveOpening = useCallback((id, offset) => setProject((p) => ({ ...p, room: updateOpening(p.room, id, { offset }) })), [setProject]);
+  const onMoveColumn = useCallback((id, x, z) => setProject((p) => ({ ...p, room: moveColumn(p.room, id, x, z, gridStep) })), [setProject, gridStep]);
+  const onOpeningDim = (id, which, value) => setProject((p) => ({ ...p, room: setOpeningDim(p.room, id, which, value) }));
   // Flechas de redimensionar: siempre desde el módulo como estaba al empezar el arrastre.
   const onResize = useCallback((start, handle, delta) => setProject((p) => ({
     ...p, modules: p.modules.map((m) => (m.id === start.id ? resizeModule(start, handle, delta) : m)),
@@ -217,6 +226,12 @@ export default function App() {
       }
       if (e.key === 'Escape') setSelectedId(null);
       if (selectedWallId && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); setDeleteDlg({ wallId: selectedWallId }); return; }
+      if ((selectedOpeningId || selectedColumnId) && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault();
+        setProject((p) => ({ ...p, room: selectedOpeningId ? removeOpening(p.room, selectedOpeningId) : removeColumn(p.room, selectedColumnId) }));
+        setSelection(null);
+        return;
+      }
       if (!selectedId) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); }
       else if (e.key === 'r' || e.key === 'R') rotateSelected();
@@ -276,6 +291,8 @@ export default function App() {
                 onDragStart={onDragStart} onDragEnd={history.commit}
                 drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
                 onWallContext={onWallContext}
+                selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
+                selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoHideWalls} />
             </ErrorBoundary>
@@ -328,6 +345,7 @@ export default function App() {
           <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
             selectedWallId={selectedWallId} onSelectWall={selectWall} onDrawWalls={startDrawWalls}
             onDeleteWall={(id) => setDeleteDlg({ wallId: id })} onSplitWall={doSplit}
+            selectedOpeningId={selectedOpeningId} selectedColumnId={selectedColumnId} onSelectItem={setSelection}
             onParams={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
             onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}

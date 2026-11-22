@@ -18,6 +18,10 @@ const floorMat = new THREE.MeshStandardMaterial({ color: '#d8d1c4', roughness: 0
 const frameMat = new THREE.MeshStandardMaterial({ color: '#f7f7f5', roughness: 0.5 });
 const glassMat = new THREE.MeshStandardMaterial({ color: '#cfe6f3', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.28 });
 const doorMat = new THREE.MeshStandardMaterial({ color: '#c9b49a', roughness: 0.6 });
+const frameSelMat = new THREE.MeshStandardMaterial({ color: '#7fa8f0', roughness: 0.5 });
+const colSelMat = new THREE.MeshStandardMaterial({ color: '#bcd3f7', roughness: 0.9 });
+// Volumen invisible que toma el clic de una abertura (también de un vano sin marco).
+const pickMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 
 const Box = ({ c, s, m }) => (
   <mesh position={c} material={m} castShadow receiveShadow>
@@ -26,11 +30,16 @@ const Box = ({ c, s, m }) => (
 );
 
 // Ventana / puerta dentro del vano, en coordenadas de pared (mm): u a lo largo, v alto, zc centro de espesor.
-function Opening({ o, T, zc }) {
+function Opening({ o, T, zc, selected, onDown }) {
   const F = 50; // ancho de marco
   const u0 = o.offset, u1 = o.offset + o.width, v0 = o.sill, v1 = o.sill + o.height;
   const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
-  if (o.type === 'paso') return null;
+  const pick = onDown && (
+    <mesh position={[cu * S, cv * S, zc * S]} material={pickMat} onPointerDown={onDown} userData={{ openingPick: o.id }}>
+      <boxGeometry args={[o.width * S, o.height * S, (T + 40) * S]} />
+    </mesh>
+  );
+  if (o.type === 'paso') return <group>{pick}</group>;
   const frame = [
     { c: [u0 + F / 2, cv, zc], s: [F, o.height, T] },
     { c: [u1 - F / 2, cv, zc], s: [F, o.height, T] },
@@ -39,7 +48,8 @@ function Opening({ o, T, zc }) {
   if (o.type === 'ventana') frame.push({ c: [cu, v0 + F / 2, zc], s: [o.width, F, T] }, { c: [cu, cv, zc], s: [F * 0.6, o.height - 2 * F, 60] });
   return (
     <group>
-      {frame.map((f, i) => <Box key={i} c={f.c.map((v) => v * S)} s={f.s.map((v) => v * S)} m={frameMat} />)}
+      {pick}
+      {frame.map((f, i) => <Box key={i} c={f.c.map((v) => v * S)} s={f.s.map((v) => v * S)} m={selected ? frameSelMat : frameMat} />)}
       {o.type === 'ventana'
         ? <Box c={[cu * S, cv * S, zc * S]} s={[(o.width - 2 * F) * S, (o.height - 2 * F) * S, 0.006]} m={glassMat} />
         : <Box c={[cu * S, (v0 + (o.height - F) / 2) * S, zc * S]} s={[(o.width - 2 * F) * S, (o.height - F) * S, 0.04]} m={doorMat} />}
@@ -69,7 +79,7 @@ function SlopedWall({ len, h0, h1, T, zc, openings, material }) {
 
 export const LOWERED_H = 100; // alto de una pared rebajada (mm)
 
-function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDown, onMenu }) {
+function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDown, onMenu, selectedOpeningId, onOpeningDown }) {
   const ref = useRef();
   const W = w.wall;
   const T = w.t;
@@ -105,7 +115,10 @@ function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDow
         : pieces.map((p, i) => (
           <Box key={i} c={[((p.u0 + p.u1) / 2) * S, ((p.v0 + p.v1) / 2) * S, zc * S]} s={[(p.u1 - p.u0) * S, (p.v1 - p.v0) * S, T * S]} m={mat} />
         ))}
-      {ops.map((o) => <Opening key={o.id} o={o} T={T} zc={zc} />)}
+      {ops.map((o) => (
+        <Opening key={o.id} o={o} T={T} zc={zc} selected={o.id === selectedOpeningId}
+          onDown={onOpeningDown ? (e) => { if (!ref.current?.visible) return; e.stopPropagation(); onOpeningDown(e, o, w); } : null} />
+      ))}
       {/* Encuentro con la pared que llega a este vértice (esquina), en coordenadas locales de esta pared */}
       {prev && (() => {
         const ox = ((w.n[0] + prev.n[0]) * T) / 2, oz = ((w.n[1] + prev.n[1]) * T) / 2;
@@ -116,7 +129,7 @@ function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDow
   );
 }
 
-export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu }) {
+export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu, selectedOpeningId, onOpeningDown, selectedColumnId, onColumnDown }) {
   const walls = useMemo(() => roomWalls(room).filter((w) => w.wall.visible), [room]);
   // Esquina de cada pared: la pared que llega a su vértice de inicio.
   const incomingOf = useMemo(() => new Map(wallCorners(room).map((c) => [c.outgoing.id, c.incoming])), [room]);
@@ -132,10 +145,14 @@ export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDo
       {walls.map((w) => (
         <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} origin={origin}
           openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide}
-          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu} />
+          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu}
+          selectedOpeningId={selectedOpeningId} onOpeningDown={onOpeningDown} />
       ))}
       {room.columns.map((c) => (
-        <Box key={c.id} c={[(c.x + c.w / 2) * S, (H / 2) * S, (c.z + c.d / 2) * S]} s={[c.w * S, H * S, c.d * S]} m={wallMat} />
+        <mesh key={c.id} position={[(c.x + c.w / 2) * S, (H / 2) * S, (c.z + c.d / 2) * S]} material={c.id === selectedColumnId ? colSelMat : wallMat}
+          castShadow receiveShadow onPointerDown={onColumnDown ? (e) => { e.stopPropagation(); onColumnDown(e, c); } : undefined}>
+          <boxGeometry args={[c.w * S, H * S, c.d * S]} />
+        </mesh>
       ))}
     </group>
   );

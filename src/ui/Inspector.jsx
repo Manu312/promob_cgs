@@ -2,6 +2,7 @@ import { MODULE_TYPES, PARAM_DEFS, RULE_DEFS, DEFAULT_RULES, fieldsFor } from '.
 import { NumField, SelField, TextField, num } from './fields.jsx';
 import RoomEditor from './RoomEditor.jsx';
 import WallPanel from './WallPanel.jsx';
+import { OpeningPanel, ColumnPanel } from './RoomItemPanels.jsx';
 
 // Reglas de construcción. Con `inherit`, cada campo puede quedar "igual al proyecto".
 function RulesEditor({ rules, inherit, onChange }) {
@@ -27,10 +28,17 @@ function MatSelect({ label, value, settings, onChange, allowInherit }) {
   return <SelField label={label} value={value || ''} onChange={(v) => onChange(v || undefined)} options={opts} />;
 }
 
-export default function Inspector({ project, settings, selected, selectedWallId, onSelectWall, onDrawWalls, onDeleteWall, onSplitWall, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onProject }) {
+export default function Inspector({ project, settings, selected, selectedWallId, onSelectWall, onDrawWalls, onDeleteWall, onSplitWall, selectedOpeningId, selectedColumnId, onSelectItem, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onProject }) {
   if (selectedWallId && project.room.walls.some((w) => w.id === selectedWallId)) {
     return <WallPanel room={project.room} wallId={selectedWallId} onBack={() => onSelectWall(null)} onDelete={onDeleteWall} onSplit={onSplitWall}
       onRoom={(fn) => onProject((p) => ({ ...p, room: fn(p.room) }))} />;
+  }
+  const onRoom = (fn) => onProject((p) => ({ ...p, room: fn(p.room) }));
+  if (selectedOpeningId && project.room.openings.some((o) => o.id === selectedOpeningId)) {
+    return <OpeningPanel room={project.room} id={selectedOpeningId} onRoom={onRoom} onBack={() => onSelectItem(null)} />;
+  }
+  if (selectedColumnId && project.room.columns.some((c) => c.id === selectedColumnId)) {
+    return <ColumnPanel room={project.room} id={selectedColumnId} onRoom={onRoom} onBack={() => onSelectItem(null)} />;
   }
   if (!selected) {
     const { room, defaults } = project;
@@ -40,7 +48,7 @@ export default function Inspector({ project, settings, selected, selectedWallId,
         <h3>Proyecto</h3>
         <TextField label="Nombre" value={project.name} onChange={(v) => onProject((p) => ({ ...p, name: v }))} />
         <h4>Ambiente</h4>
-        <RoomEditor room={room} onChange={(r) => onProject((p) => ({ ...p, room: r }))} onSelectWall={onSelectWall} onDrawWalls={onDrawWalls} />
+        <RoomEditor room={room} onChange={(r) => onProject((p) => ({ ...p, room: r }))} onSelectWall={onSelectWall} onDrawWalls={onDrawWalls} onSelectItem={onSelectItem} />
         <h4>Materiales por defecto</h4>
         <MatSelect label="Cuerpo" value={defaults.cuerpo} settings={settings} onChange={(v) => setDef('cuerpo', v)} />
         <MatSelect label="Frentes" value={defaults.frente} settings={settings} onChange={(v) => setDef('frente', v)} />

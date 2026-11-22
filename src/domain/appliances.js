@@ -3,6 +3,7 @@
 // z profundidad (pared = 0, frente = D). Medidas de referencia: docs/MEDIDAS-ELECTRODOMESTICOS.md.
 
 export const FINISHES = [['inox', 'Acero inoxidable'], ['blanco', 'Esmalte blanco'], ['negro', 'Negro'], ['vidrio', 'Vidrio templado negro']];
+export const TIPOS = [['simple', 'Simple / cíclica'], ['nofrost', 'No frost (freezer arriba)'], ['side', 'Side by side'], ['apoyo', 'De apoyo'], ['empotrable', 'Empotrable'], ['frontal', 'Carga frontal'], ['superior', 'Carga superior']];
 
 // Pieza: caja o cilindro (eje vertical 'y' o hacia el frente 'z').
 export const box = (x, y, z, sx, sy, sz, finish) => ({ decor: 'aparato', x, y, z, sx, sy, sz, finish });
@@ -89,7 +90,74 @@ function campana(p) {
   return out;
 }
 
-export const APPLIANCE_BUILDERS = { cocina, anafe, horno, campana };
+// Heladera: 'simple' (freezer chico arriba dentro de la puerta), 'nofrost' (freezer arriba con
+// puerta propia), 'side' (side by side: dos puertas verticales y dispenser).
+function heladera(p) {
+  const { width: W, height: H, depth: D, tipo = 'nofrost', finish = 'inox' } = p;
+  const out = [box(0, 0, 0, W, H, D - 40, finish)];
+  const fz = D - 40, handle = (x, y, h) => out.push(box(x, y, fz + 40, 22, h, 24, 'cromo'));
+  if (tipo === 'side') {
+    const w = (W - 6) / 2;
+    out.push(box(0, 20, fz, w, H - 20, 40, finish), box(w + 6, 20, fz, w, H - 20, 40, finish));
+    out.push(box(70, H * 0.48, fz + 40, w - 140, 300, 4, 'negro')); // dispenser
+    handle(w - 40, H * 0.35, H * 0.4); handle(w + 24, H * 0.35, H * 0.4);
+  } else if (tipo === 'simple') {
+    out.push(box(0, 20, fz, W, H - 20, 40, finish));
+    handle(W - 60, H * 0.55, 300);
+  } else {
+    const fh = Math.round(H * 0.3);
+    out.push(box(0, H - fh, fz, W, fh, 40, finish), box(0, 20, fz, W, H - fh - 26, 40, finish));
+    handle(W - 60, H - fh + 40, fh * 0.6); handle(W - 60, H - fh - 420, 360);
+  }
+  out.push(box(20, 0, 40, W - 40, 20, D - 80, 'negro')); // zócalo
+  return out;
+}
+
+// Microondas: 'apoyo' (cuerpo con ventana y panel a la derecha) o 'empotrable' (frente con marco).
+function microondas(p) {
+  const { width: W, height: H, depth: D, finish = 'inox' } = p;
+  const out = [box(0, 0, 0, W, H, D - 20, finish === 'inox' ? 'inox' : finish)];
+  const panel = Math.max(90, W * 0.22);
+  out.push(box(0, 0, D - 20, W - panel, H, 20, 'negro')); // puerta
+  out.push(box(30, 30, D, W - panel - 60, H - 60, 2, 'vidrio')); // ventana
+  out.push(box(W - panel, 0, D - 20, panel, H, 20, finish)); // panel
+  out.push(box(W - panel + 15, H - 70, D, panel - 30, 30, 2, 'vidrio')); // display
+  out.push(cyl(W - panel / 2, H / 2 - 20, D, 20, 18, 'cromo', 'z'));
+  return out;
+}
+
+// Lavavajillas: frente con manija y panel de comandos arriba.
+function lavavajillas(p) {
+  const { width: W, height: H, depth: D, finish = 'inox' } = p;
+  return [
+    box(0, 0, 0, W, H, D - 20, finish),
+    box(0, 90, D - 20, W, H - 190, 20, finish), // puerta
+    box(0, H - 100, D - 20, W, 100, 20, 'negro'), // panel
+    box(W * 0.3, H - 70, D, W * 0.4, 30, 2, 'vidrio'),
+    box(60, H - 150, D, W - 120, 18, 22, 'cromo'), // manija
+    box(20, 0, D - 60, W - 40, 90, 40, 'negro'), // zócalo
+  ];
+}
+
+// Lavarropas: 'frontal' (ojo de buey) o 'superior' (tapa arriba y panel atrás).
+function lavarropas(p) {
+  const { width: W, height: H, depth: D, tipo = 'frontal', finish = 'blanco' } = p;
+  const out = [box(0, 0, 0, W, H, D, finish)];
+  if (tipo === 'superior') {
+    out.push(box(20, H, 20, W - 40, 10, D * 0.62, finish)); // tapa
+    out.push(box(0, H, D * 0.68, W, 120, D * 0.3, finish)); // panel trasero
+    out.push(box(40, H + 40, D * 0.68 - 2, W - 80, 50, 2, 'vidrio'));
+  } else {
+    out.push(box(0, H - 110, D, W, 110, 2, finish === 'blanco' ? 'blanco' : 'negro')); // panel
+    out.push(box(25, H - 85, D + 2, 150, 60, 2, 'negro')); // cajón de jabón
+    out.push(cyl(W * 0.72, H - 55, D + 2, 26, 18, 'cromo', 'z'));
+    out.push(cyl(W / 2, H * 0.47, D, Math.min(W, H) * 0.3, 24, 'cromo', 'z')); // aro de la puerta
+    out.push(cyl(W / 2, H * 0.47, D + 24, Math.min(W, H) * 0.24, 6, 'vidrio', 'z')); // vidrio
+  }
+  return out;
+}
+
+export const APPLIANCE_BUILDERS = { cocina, anafe, horno, campana, heladera, microondas, lavavajillas, lavarropas };
 
 // Construye un aparato: solo piezas decorativas (no van al despiece) y, si tiene precio, la
 // línea para el presupuesto.

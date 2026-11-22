@@ -98,6 +98,30 @@ export const LIBRARY = [
           it('ele-campana-90', 'campana', 'Campana 90 cm', { width: 900, depth: 500 }),
         ] },
       ] },
+      { id: 'refrigeracion', label: 'Refrigeración', subgroups: [
+        { id: 'heladeras', label: 'Heladeras', items: [
+          it('ele-heladera-simple', 'heladera', 'Heladera simple 215 L', { width: 550, height: 1410, depth: 570, tipo: 'simple', finish: 'blanco' }),
+          it('ele-heladera-nf', 'heladera', 'Heladera no frost'),
+          it('ele-heladera-side', 'heladera', 'Heladera side by side', { width: 912, height: 1780, depth: 716, tipo: 'side' }),
+        ] },
+      ] },
+      { id: 'microondas', label: 'Microondas', subgroups: [
+        { id: 'microondas', label: 'Microondas', items: [
+          it('ele-micro-20', 'microondas', 'Microondas 20 L'),
+          it('ele-micro-28', 'microondas', 'Microondas 28 L', { width: 490, height: 290, depth: 400 }),
+          it('ele-micro-emp', 'microondas', 'Microondas empotrable', { width: 595, height: 389, depth: 321, tipo: 'empotrable' }, null, { y: 1450, rest: false }),
+        ] },
+      ] },
+      { id: 'lavado', label: 'Lavado', subgroups: [
+        { id: 'lavavajillas', label: 'Lavavajillas', items: [
+          it('ele-lavav-60', 'lavavajillas', 'Lavavajillas 60 cm'),
+          it('ele-lavav-45', 'lavavajillas', 'Lavavajillas 45 cm', { width: 450, height: 850, depth: 590 }),
+        ] },
+        { id: 'lavarropas', label: 'Lavarropas', items: [
+          it('ele-lavarropas-frontal', 'lavarropas', 'Lavarropas carga frontal'),
+          it('ele-lavarropas-superior', 'lavarropas', 'Lavarropas carga superior', { width: 600, height: 950, depth: 620, tipo: 'superior' }),
+        ] },
+      ] },
     ],
   },
   {
@@ -145,6 +169,7 @@ export const LIBRARY = [
 // si se apoya (tapas), toma la altura de lo que tiene debajo (o queda a su altura si no hay nada).
 export function withItem(mod, item, modules) {
   let m = item.label !== MODULE_TYPES[item.type].label ? { ...mod, name: item.label } : mod;
+  if (item.rest === false) { const { rest: _r, ...rest } = m; m = rest; } // eslint-disable-line no-unused-vars
   if (m.rest) { const y = restingHeight(m, modules); if (y > 0) m = { ...m, y }; }
   return m;
 }

@@ -125,8 +125,8 @@ export const metal = new THREE.MeshStandardMaterial({ color: '#a3a8ad', metalnes
 
 // Terminaciones de electrodomésticos y accesorios (Fase 6).
 const FINISH_MATS = {
-  inox: new THREE.MeshStandardMaterial({ color: '#c9ccd0', metalness: 0.9, roughness: 0.32 }),
-  cromo: new THREE.MeshStandardMaterial({ color: '#e6e8ea', metalness: 1, roughness: 0.12 }),
+  inox: new THREE.MeshStandardMaterial({ color: '#c7cace', metalness: 0.35, roughness: 0.38 }),
+  cromo: new THREE.MeshStandardMaterial({ color: '#e9ebed', metalness: 0.55, roughness: 0.2 }),
   blanco: new THREE.MeshStandardMaterial({ color: '#f4f4f2', metalness: 0.05, roughness: 0.35 }),
   negro: new THREE.MeshStandardMaterial({ color: '#1c1d1f', metalness: 0.2, roughness: 0.45 }),
   vidrio: new THREE.MeshStandardMaterial({ color: '#0f1113', metalness: 0.4, roughness: 0.08 }),

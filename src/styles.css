@@ -62,6 +62,9 @@ h2 { margin: 0; font-size: 20px; } h3 { margin: 16px 0 8px; font-size: 15px; } h
 .mod-btn.picked { border-color: #5b8def; background: var(--accent-weak); }
 .mod-btn span { font-size: 12px; line-height: 1.2; }
 .mod-btn small { color: var(--muted); font-size: 10.5px; }
+.mod-btn { cursor: pointer; user-select: none; }
+.cb-variant { font-size: 10.5px; padding: 0 2px; max-width: 112px; color: var(--muted); border: 1px solid transparent; background: transparent; }
+.cb-variant:hover { border-color: var(--line); background: #fff; }
 .cb-thumb { width: 70px; height: 70px; }
 img.cb-thumb { object-fit: contain; }
 .viewport { display: flex; flex-direction: column; min-width: 0; min-height: 300px; }

@@ -73,6 +73,17 @@ try {
   await insertFromCatalog('Placard batientes');
   p = await project();
   check('Agregar módulo desde catálogo', p.modules.length === 8);
+  const placard = p.modules.at(-1);
+  check('Módulo nuevo queda seleccionado', (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Placard batientes');
+
+  // Editar medida en inspector
+  const w = await fieldInput('Ancho');
+  await w.click({ clickCount: 3 });
+  await w.type('1500');
+  await page.keyboard.press('Enter');
+  await sleep(400);
+  p = await project();
+  check('Editar ancho desde inspector', p.modules.find((m) => m.id === placard.id).params.width === 1500);
   // Barra de catálogo en 3 niveles (#55)
   check('Catálogo arriba del visor en 3 niveles', !!(await page.$('.viewport > .catalog-bar')) && (await page.$$('.cb-libs .cb-tab')).length >= 5 && !!(await page.$('.cb-groups .cb-tab.on')) && !!(await page.$('.cb-subs .cb-tab.on')));
   await clickText('.cb-libs .cb-tab', 'Cocinas');
@@ -85,17 +96,17 @@ try {
   const thumbs = await page.$$eval('.mod-btn img.cb-thumb', (els) => els.map((e) => e.src.length));
   check('Miniaturas generadas del modelo 3D', thumbs.length > 0 && thumbs.every((n) => n > 3000), `${thumbs.length} miniaturas, ${thumbs.join('/')} bytes`);
   await shot('01b-catalogo');
-  const placard = p.modules.at(-1);
-  check('Módulo nuevo queda seleccionado', (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Placard batientes');
-
-  // Editar medida en inspector
-  const w = await fieldInput('Ancho');
-  await w.click({ clickCount: 3 });
-  await w.type('1500');
-  await page.keyboard.press('Enter');
-  await sleep(400);
+  // Desplegable de variantes de medida (#57)
+  await clickText('.cb-libs .cb-tab', 'Cocinas'); await clickText('.cb-groups .cb-tab', 'Inferiores'); await clickText('.cb-subs .cb-tab', 'Cajoneros');
+  await page.select('.mod-btn .cb-variant', '450'); await sleep(900);
+  const nBefore = (await project()).modules.length;
+  await page.evaluate(() => document.querySelector('.mod-btn').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))); await sleep(500);
   p = await project();
-  check('Editar ancho desde inspector', p.modules.find((m) => m.id === placard.id).params.width === 1500);
+  const added = p.modules.at(-1);
+  check('Variante de medida: inserta el cajonero de 450', p.modules.length === nBefore + 1 && added.type === 'bajo_cajones' && added.params.width === 450, 'ancho ' + added.params.width);
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(400);
+  p = await project();
+  check('Deshacer saca el módulo insertado', p.modules.length === nBefore);
 
   // Seleccionar un bajo mesada con clic en 3D y arrastrarlo
   await page.keyboard.press('Escape');

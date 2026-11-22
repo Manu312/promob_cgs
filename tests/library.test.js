@@ -44,3 +44,19 @@ test('paginado', () => {
   assert.deepEqual(paginate(xs, 9, 3).items, [7]);
   assert.deepEqual(paginate([], 0, 3), { page: 0, pages: 1, items: [] });
 });
+
+// Variantes de medida (#57)
+import { PARAM_DEFS } from '../src/domain/modules.js';
+import { variantValues } from '../src/domain/library.js';
+
+test('variantes: dentro del rango de cada medida e incluyen la medida del ítem', () => {
+  for (const { item } of flatItems()) {
+    if (!item.variants) continue;
+    const def = PARAM_DEFS[item.variants.param];
+    const vs = variantValues(item);
+    assert.ok(vs.includes(itemParams(item)[item.variants.param]), item.id);
+    for (const v of vs) assert.ok(v >= def.min && v <= def.max, `${item.id} ${v}`);
+    assert.deepEqual(vs, [...vs].sort((a, b) => a - b));
+  }
+  assert.deepEqual(variantValues({ id: 'x', type: 'bajo' }), []);
+});

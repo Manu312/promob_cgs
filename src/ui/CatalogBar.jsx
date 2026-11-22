@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { LIBRARY, resolvePath, mostUsed, paginate, itemSize } from '../domain/library.js';
+import { LIBRARY, resolvePath, mostUsed, paginate, itemSize, variantValues } from '../domain/library.js';
 import { ModelThumb, Silhouette } from './thumbnails.jsx';
 
 const MAS = '__mas'; // pestaña "Más usados"
@@ -14,6 +14,7 @@ export default function CatalogBar({ nav, setNav, counts = {}, onInsert, thumbCt
   const [hist, setHist] = useState({ back: [], fwd: [] });
   const [page, setPage] = useState(0);
   const [picked, setPicked] = useState(null);
+  const [variant, setVariant] = useState({}); // medida elegida en el desplegable, por ítem
   const [perPage, setPerPage] = useState(6);
   const boxRef = useRef(null);
   useEffect(() => {
@@ -51,14 +52,25 @@ export default function CatalogBar({ nav, setNav, counts = {}, onInsert, thumbCt
       <div className="cb-items-row">
         <button className="cb-page" disabled={pg.page === 0} onClick={() => setPage(pg.page - 1)} aria-label="Página anterior">◀</button>
         <div className="cb-items" ref={boxRef}>
-          {pg.items.map((item) => (
-            <button key={item.id} className={`mod-btn${picked === item.id ? ' picked' : ''}`} title="Doble clic para insertar"
-              onClick={() => setPicked(item.id)} onDoubleClick={() => onInsert(item)}>
-              {thumbCtx ? <ModelThumb item={item} ctx={thumbCtx} /> : <Silhouette item={item} />}
-              <span>{item.label}</span>
-              <small>{itemSize(item)}</small>
-            </button>
-          ))}
+          {pg.items.map((item) => {
+            const vs = variantValues(item);
+            const v = variant[item.id] ?? null;
+            return (
+              <div key={item.id} className={`mod-btn${picked === item.id ? ' picked' : ''}`} role="button" tabIndex={0} title="Doble clic para insertar"
+                onClick={() => setPicked(item.id)} onDoubleClick={() => onInsert(item, v)}>
+                {thumbCtx ? <ModelThumb item={item} variant={v} ctx={thumbCtx} /> : <Silhouette item={item} />}
+                <span>{item.label}</span>
+                {vs.length > 0 ? (
+                  <select className="cb-variant" value={v ?? ''} title="Medida a insertar"
+                    onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setVariant((m) => ({ ...m, [item.id]: e.target.value === '' ? null : Number(e.target.value) }))}>
+                    <option value="">{itemSize(item)}</option>
+                    {vs.map((w) => <option key={w} value={w}>{itemSize(item, w)}</option>)}
+                  </select>
+                ) : <small>{itemSize(item)}</small>}
+              </div>
+            );
+          })}
           {!pg.items.length && <p className="hint cb-empty">{masUsados ? 'Todavía no insertaste módulos: los más usados aparecen acá.' : 'Sin ítems.'}</p>}
         </div>
         <button className="cb-page" disabled={pg.page >= pg.pages - 1} onClick={() => setPage(pg.page + 1)} aria-label="Página siguiente">▶</button>

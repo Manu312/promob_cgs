@@ -356,11 +356,11 @@ export function snapPosition(mod, others, room, thr = 40, step = 10) {
 }
 
 // Módulo nuevo: a continuación de la fila apoyada en la pared del fondo (la de menor z).
-export function newModule(type, project) {
+export function newModule(type, project, params = null) {
   const def = MODULE_TYPES[type];
   const { room } = project;
   const b = room.nodes?.length ? bounds(room) : { minX: 0, minZ: 0, maxX: room.w, maxZ: room.d };
-  const m = { id: uid(), type, params: { ...def.defaults }, x: b.minX, z: b.minZ, y: def.y || 0, rot: 0, mats: {} };
+  const m = { id: uid(), type, params: { ...def.defaults, ...(params || {}) }, x: b.minX, z: b.minZ, y: def.y || 0, rot: 0, mats: {} };
   const high = m.y >= 1000;
   const row = project.modules.filter((o) => (o.rot || 0) === 0 && o.z <= b.minZ + 10 && (o.y >= 1000) === high);
   const x = row.reduce((acc, o) => Math.max(acc, o.x + footprint(o).fw), b.minX);

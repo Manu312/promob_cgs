@@ -20,7 +20,8 @@ import { nestAll } from './domain/nesting.js';
 import { computeBudget } from './domain/budget.js';
 import { sampleProject, emptyProject, normalizeProject } from './domain/project.js';
 import Scene3D from './ui/Scene3D.jsx';
-import Catalog from './ui/Catalog.jsx';
+import CatalogBar from './ui/CatalogBar.jsx';
+import { itemParams } from './domain/library.js';
 import Inspector from './ui/Inspector.jsx';
 import CutPlan from './ui/CutPlan.jsx';
 import Budget from './ui/Budget.jsx';
@@ -273,8 +274,10 @@ export default function App() {
     else if (action === 'delete') deleteSelected();
   };
 
-  const addModule = (type) => {
-    const m = newModule(type, project);
+  // Insertar desde el catálogo (doble clic): posición siguiente libre; cuenta para "Más usados".
+  const insertItem = (item, variant = null) => {
+    setUi((u) => ({ ...u, catalogUse: { ...(u.catalogUse || {}), [item.id]: ((u.catalogUse || {})[item.id] || 0) + 1 } }));
+    const m = newModule(item.type, project, itemParams(item, variant));
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));
     setSelectedId(m.id);
     setTab('diseno');
@@ -384,8 +387,9 @@ export default function App() {
 
       {tab === 'diseno' && (
         <main className="design">
-          <Catalog onAdd={addModule} />
           <section className="viewport">
+            <CatalogBar nav={ui.catalogPath} setNav={(p) => setUi((u) => ({ ...u, catalogPath: p }))} counts={ui.catalogUse} onInsert={insertItem} />
+            <div className="vp-area">
             <ErrorBoundary onReset={() => { setPhotoreal(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
                 selectedWallId={selectedWallId} onSelectWall={selectWall}
@@ -468,6 +472,7 @@ export default function App() {
               <span className="sb-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</span>
               <StatusToggles ui={ui} onToggle={toggleUi} showDims={showDims} onShowDims={setShowDims}
                 planImage={project.planImage} onPlanImage={(visible) => setProject((p) => ({ ...p, planImage: { ...p.planImage, visible } }))} />
+            </div>
             </div>
           </section>
           <div className="tools-col">

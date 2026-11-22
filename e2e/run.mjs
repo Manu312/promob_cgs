@@ -36,6 +36,23 @@ const clickText = async (sel, text) => {
   if (!ok) throw new Error(`No encontré "${text}"`);
   await sleep(400);
 };
+// Catálogo (barra de modulación): navegar biblioteca → familia → subfamilia y doble clic en el ítem.
+const PATHS = {
+  'Placard batientes': ['Dormitorios', 'Placares', 'Batientes'],
+  'Cajonera interior': ['Dormitorios', 'Componentes', 'Cajoneras'],
+  'Bajo mesada puertas': ['Cocinas', 'Inferiores', 'Puertas'],
+};
+const insertFromCatalog = async (label) => {
+  const [l, g, sg] = PATHS[label];
+  await clickText('.cb-libs .cb-tab', l); await clickText('.cb-groups .cb-tab', g); await clickText('.cb-subs .cb-tab', sg);
+  const ok = await page.evaluate((label) => {
+    const b = [...document.querySelectorAll('.mod-btn')].find((e) => e.querySelector('span')?.textContent.trim() === label);
+    if (b) b.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    return !!b;
+  }, label);
+  if (!ok) throw new Error('No encontré ' + label + ' en el catálogo');
+  await sleep(400);
+};
 const fieldInput = (label) => page.evaluateHandle((label) => {
   const f = [...document.querySelectorAll('.inspector label.field')].find((l) => l.querySelector('span')?.textContent.trim() === label);
   return f?.querySelector('input,select');
@@ -53,9 +70,18 @@ try {
   check('Proyecto de ejemplo cargado', p.modules.length === 7, `${p.modules.length} módulos`);
 
   // Agregar módulo desde catálogo
-  await clickText('.mod-btn span', 'Placard batientes');
+  await insertFromCatalog('Placard batientes');
   p = await project();
   check('Agregar módulo desde catálogo', p.modules.length === 8);
+  // Barra de catálogo en 3 niveles (#55)
+  check('Catálogo arriba del visor en 3 niveles', !!(await page.$('.viewport > .catalog-bar')) && (await page.$$('.cb-libs .cb-tab')).length >= 5 && !!(await page.$('.cb-groups .cb-tab.on')) && !!(await page.$('.cb-subs .cb-tab.on')));
+  await clickText('.cb-libs .cb-tab', 'Cocinas');
+  await clickText('.cb-libs .cb-tab', '★ Más usados');
+  const usados = await page.$$eval('.mod-btn span', (els) => els.map((e) => e.textContent.trim()));
+  check('Más usados muestra lo que se insertó', usados.includes('Placard batientes'), usados.join(', '));
+  await clickText('.cb-subs .cb-nav', '⟵');
+  check('Atrás vuelve a la biblioteca anterior', (await page.$eval('.cb-libs .cb-tab.on', (e) => e.textContent.trim())) === 'Cocinas');
+  await shot('01b-catalogo');
   const placard = p.modules.at(-1);
   check('Módulo nuevo queda seleccionado', (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Placard batientes');
 
@@ -217,7 +243,7 @@ try {
   // Apoyar sobre lo de abajo (#46): una cajonera sobre la mesada de un bajo
   {
     const bajoC = (await project()).modules.find((m) => m.type === 'bajo_cajones');
-    await clickText('.mod-btn span', 'Cajonera interior'); await sleep(300);
+    await insertFromCatalog('Cajonera interior'); await sleep(300);
     const setField = async (label, v) => { const f = await fieldInput(label); await f.click({ clickCount: 3 }); await f.type(String(v)); await page.keyboard.press('Enter'); await sleep(300); };
     await setField('X (desde pared izq.)', bajoC.x);
     await setField('Z (desde pared fondo)', 0);
@@ -327,7 +353,7 @@ try {
   await shot('11-proyecto-v1-migrado');
 
   // Vista Planta ortográfica con grilla magnética de 50 mm
-  await clickText('.mod-btn span', 'Cajonera interior');
+  await insertFromCatalog('Cajonera interior');
   p = await project();
   const caj = p.modules.at(-1);
   await clickText('.vp-toolbar button', 'Planta'); await sleep(1200);
@@ -380,7 +406,7 @@ try {
     for (let i = 1; i <= 8; i++) { await page.mouse.move(pt.x + (dx * i) / 8, pt.y + (dy * i) / 8); await sleep(30); }
     await page.mouse.up(); await sleep(500);
   };
-  await clickText('.catalog button', 'Bajo mesada puertas'); await page.keyboard.press('Escape'); await sleep(300); // uno apoyado en el fondo
+  await insertFromCatalog('Bajo mesada puertas'); await page.keyboard.press('Escape'); await sleep(300); // uno apoyado en el fondo
   p = await project();
   const onBack = p.modules.filter((m) => m.z === 0 && !m.rot).map((m) => m.id); // apoyados en la pared del fondo
   const bp = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2000, 75), p.room.walls[0].id);
@@ -529,7 +555,7 @@ try {
   await clickText('.room-editor button', 'Aplicar plantilla'); await sleep(800);
   p = await project();
   check('Aplicar plantilla rectangular', p.room.walls.length === 4 && p.room.points?.length === 4, `${p.room.walls.length} paredes`);
-  await clickText('.mod-btn span', 'Bajo mesada puertas'); await sleep(400);
+  await insertFromCatalog('Bajo mesada puertas'); await sleep(400);
   await page.keyboard.press('Escape'); await sleep(200);
   p = await project();
   const backWall = p.room.walls[0];

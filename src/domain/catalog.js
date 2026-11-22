@@ -1,13 +1,34 @@
 // Catálogo de materiales, herrajes y precios por defecto.
 // PRECIOS DE EJEMPLO: reemplazarlos por la lista real en la pestaña "Precios".
 
+// Biblioteca de materiales (como la de Promob): cada uno con su ruta (`path`) y su tipo.
+// 'placa': se corta (espesor, medidas y precio por placa). 'piedra': tapas y mesadas
+// (precio por m², color base + color del grano; textura procedural propia).
+const placa = (id, path, name, color, price, extra = {}) => ({ id, kind: 'placa', path, name, t: 18, L: 2600, W: 1830, color, wood: false, edge: true, price, ...extra });
+const piedra = (id, path, color, grain, pattern, priceM2) => ({ id, kind: 'piedra', path, name: path.at(-1), color, grain, pattern, priceM2 });
+
 export const DEFAULT_MATERIALS = [
-  { id: 'mel18_blanco', name: 'Melamina 18mm Blanco', t: 18, L: 2600, W: 1830, color: '#f1f0eb', wood: false, edge: true, price: 85000 },
-  { id: 'mel18_gris', name: 'Melamina 18mm Gris Grafito', t: 18, L: 2600, W: 1830, color: '#4b4e53', wood: false, edge: true, price: 98000 },
-  { id: 'mel18_negro', name: 'Melamina 18mm Negro', t: 18, L: 2600, W: 1830, color: '#222222', wood: false, edge: true, price: 98000 },
-  { id: 'mel18_roble', name: 'Melamina 18mm Roble', t: 18, L: 2600, W: 1830, color: '#b98b5c', wood: true, edge: true, price: 105000 },
-  { id: 'mel18_nogal', name: 'Melamina 18mm Nogal', t: 18, L: 2600, W: 1830, color: '#6e4b33', wood: true, edge: true, price: 105000 },
-  { id: 'fibro3_blanco', name: 'Fibrofácil 3mm Blanco (fondos)', t: 3, L: 2600, W: 1830, color: '#ecebe6', wood: false, edge: false, price: 18000 },
+  placa('mel18_blanco', ['Colores', 'Blanco'], 'Melamina 18mm Blanco', '#f1f0eb', 85000),
+  placa('mel18_arena', ['Colores', 'Arena'], 'Melamina 18mm Arena', '#d9cdb8', 98000),
+  placa('mel18_gris', ['Colores', 'Gris grafito'], 'Melamina 18mm Gris Grafito', '#4b4e53', 98000),
+  placa('mel18_negro', ['Colores', 'Negro'], 'Melamina 18mm Negro', '#222222', 98000),
+  placa('mel18_roble', ['Maderas', 'Roble'], 'Melamina 18mm Roble', '#b98b5c', 105000, { wood: true }),
+  placa('mel18_fresno', ['Maderas', 'Fresno'], 'Melamina 18mm Fresno', '#cbb592', 105000, { wood: true }),
+  placa('mel18_cerezo', ['Maderas', 'Cerezo'], 'Melamina 18mm Cerezo', '#9b5a3c', 105000, { wood: true }),
+  placa('mel18_nogal', ['Maderas', 'Nogal'], 'Melamina 18mm Nogal', '#6e4b33', 105000, { wood: true }),
+  placa('fibro3_blanco', ['Fondos', 'Fibrofácil blanco'], 'Fibrofácil 3mm Blanco (fondos)', '#ecebe6', 18000, { t: 3, edge: false }),
+  piedra('gra_gris_mara', ['Granitos', 'Gris', 'Gris Mara'], '#8e8d8a', '#2e2e2e', 'granito', 145000),
+  piedra('gra_gris_perla', ['Granitos', 'Gris', 'Gris Perla'], '#a9a7a3', '#555350', 'granito', 150000),
+  piedra('gra_negro_brasil', ['Granitos', 'Negro', 'Negro Brasil'], '#232326', '#6a6a6e', 'granito', 165000),
+  piedra('gra_negro_absoluto', ['Granitos', 'Negro', 'Negro Absoluto'], '#141416', '#2c2c30', 'granito', 190000),
+  piedra('gra_blanco_dallas', ['Granitos', 'Blanco', 'Blanco Dallas'], '#d9d5cd', '#4f4942', 'granito', 160000),
+  piedra('gra_verde_ubatuba', ['Granitos', 'Verde', 'Verde Ubatuba'], '#22302a', '#73805a', 'granito', 150000),
+  piedra('gra_cafe_imperial', ['Granitos', 'Marrón', 'Café Imperial'], '#4b3023', '#1a0f0a', 'granito', 170000),
+  piedra('gra_amarillo_ornamental', ['Granitos', 'Amarillo', 'Amarillo Ornamental'], '#c8a978', '#5a4530', 'granito', 150000),
+  piedra('mar_carrara', ['Mármoles', 'Carrara'], '#ecebe7', '#8d8d8d', 'marmol', 260000),
+  piedra('mar_travertino', ['Mármoles', 'Travertino'], '#d8c6a4', '#a68f68', 'marmol', 220000),
+  piedra('cua_blanco_estelar', ['Cuarzo', 'Blanco Estelar'], '#f2f1ee', '#c7c3bb', 'cuarzo', 320000),
+  piedra('cua_gris_concreto', ['Cuarzo', 'Gris Concreto'], '#9a9893', '#6f6d69', 'cuarzo', 300000),
 ];
 
 export const DEFAULT_HARDWARE = [
@@ -38,12 +59,49 @@ export const DEFAULT_SETTINGS = {
 export function mergeSettings(s) {
   const base = { ...DEFAULT_SETTINGS, ...(s || {}) };
   if (!Array.isArray(base.materials) || base.materials.length === 0) base.materials = DEFAULT_MATERIALS;
+  base.materials = migrateMaterials(base.materials);
   const hw = Array.isArray(base.hardware) ? [...base.hardware] : [];
   for (const d of DEFAULT_HARDWARE) if (!hw.find((h) => h.code === d.code)) hw.push(d);
   base.hardware = hw;
   return base;
 }
 
+// Placa por id (si no existe, la primera placa: un id viejo o borrado no rompe el despiece).
 export function matById(settings, id) {
-  return settings.materials.find((m) => m.id === id) || settings.materials[0];
+  return settings.materials.find((m) => m.id === id && m.kind !== 'piedra') || settings.materials.find((m) => m.kind !== 'piedra');
+}
+
+// Materiales de antes de la biblioteca: se les completa tipo y ruta, y se suman las
+// piedras de la biblioteca que falten (las placas borradas a propósito no vuelven).
+export function migrateMaterials(list) {
+  const defs = new Map(DEFAULT_MATERIALS.map((m) => [m.id, m]));
+  const out = list.map((m) => {
+    if (m.kind && Array.isArray(m.path) && m.path.length) return m;
+    const d = defs.get(m.id);
+    if (d) return { ...d, ...m, kind: d.kind, path: d.path };
+    const folder = m.wood ? 'Maderas' : (m.t || 18) < 10 ? 'Fondos' : 'Colores';
+    return { ...m, kind: 'placa', path: [folder, m.name] };
+  });
+  const have = new Set(out.map((m) => m.id));
+  for (const d of DEFAULT_MATERIALS) if (d.kind === 'piedra' && !have.has(d.id)) out.push(d);
+  return out;
+}
+
+export const pathLabel = (m) => (m?.path || [m?.name || '']).join(' > ');
+
+// Árbol para el menú en cascada: carpetas por la ruta (menos el último tramo, que es el
+// nombre del material) y, en cada carpeta, sus materiales. `kind` filtra placas o piedras.
+export function libraryTree(materials, kind = null) {
+  const root = { name: '', folders: [], items: [] };
+  for (const m of materials) {
+    if (kind && m.kind !== kind) continue;
+    let node = root;
+    for (const seg of (m.path || [m.name]).slice(0, -1)) {
+      let f = node.folders.find((x) => x.name === seg);
+      if (!f) { f = { name: seg, folders: [], items: [] }; node.folders.push(f); }
+      node = f;
+    }
+    node.items.push(m);
+  }
+  return root;
 }

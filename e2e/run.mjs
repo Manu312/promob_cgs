@@ -396,7 +396,11 @@ try {
   check('Presupuesto con total', /\d/.test(total1), total1);
   await clickText('.tabs button', 'Precios'); await sleep(500);
   const [platesTable] = await page.$$('table.edit');
-  const priceInputs = await platesTable.$$('tbody tr:first-child input[type=number]');
+  // Biblioteca de materiales (#71): placas con ruta y piedras con precio por m²
+  const libPaths = await page.$$eval('table.edit tbody tr td:first-child input[type=text]', (els) => els.map((e) => e.value));
+  check('Precios muestra la biblioteca (Colores, Maderas, Granitos › color › nombre…)', libPaths.includes('Colores > Blanco') && libPaths.includes('Maderas > Roble') && libPaths.includes('Granitos > Gris > Gris Mara') && libPaths.includes('Cuarzo > Blanco Estelar'), libPaths.length + ' materiales');
+  const blancoRow = await page.evaluateHandle(() => [...document.querySelectorAll('table.edit tbody tr')].find((r) => [...r.querySelectorAll('input[type=text]')].some((i) => i.value === 'Melamina 18mm Blanco')));
+  const priceInputs = await blancoRow.$$('input[type=number]');
   await priceInputs.at(-1).click({ clickCount: 3 });
   await priceInputs.at(-1).type('200000');
   await page.keyboard.press('Enter'); await sleep(500);

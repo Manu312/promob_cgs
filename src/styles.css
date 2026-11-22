@@ -40,7 +40,12 @@ h2 { margin: 0; font-size: 20px; } h3 { margin: 16px 0 8px; font-size: 15px; } h
 .grid-ctl select { width: auto; padding: 4px 6px; }
 button:disabled { opacity: .5; cursor: default; }
 .vp-toolbar .sep { width: 8px; box-shadow: none; }
-.vp-stats { position: absolute; bottom: 10px; left: 10px; background: rgba(255,255,255,.9); padding: 4px 9px; border-radius: 6px; font-size: 12px; color: var(--muted); }
+.vp-toolbar button, .vp-toolbar select { padding: 4px 9px; font-size: 12.5px; }
+.statusbar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; gap: 12px; padding: 4px 10px; background: rgba(255,255,255,.93); border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.statusbar .sb-sel { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.statusbar .sb-stats { white-space: nowrap; }
+.wall-list { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.wall-list button.muted { color: var(--muted); border-style: dashed; }
 
 .field { display: grid; grid-template-columns: 1fr 1.1fr; align-items: center; gap: 8px; margin-bottom: 6px; }
 .field > span { font-size: 12.5px; color: #374151; }

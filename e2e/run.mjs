@@ -218,6 +218,31 @@ try {
   await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(1200);
   check('Volver a Perspectiva restaura la cámara', (await page.evaluate(() => window.__muebles.cameraType)) === 'PerspectiveCamera');
   await shot('13-vuelta-perspectiva');
+
+  // Seleccionar una pared: panel de propiedades, barra de estado, largo y alto final
+  p = await project();
+  const w0 = p.room.walls[0];
+  const wp = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2000), w0.id);
+  await page.mouse.click(wp.x, wp.y); await sleep(500);
+  check('Clic en pared la selecciona', (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Pared 1');
+  const sb = await page.$eval('.statusbar .sb-sel', (e) => e.textContent);
+  check('Barra de estado describe la pared', sb.startsWith('Pared 1 · 4000 × 150 × 2600'), sb);
+  const largo = await fieldInput('Largo');
+  await largo.click({ clickCount: 3 }); await largo.type('4500'); await page.keyboard.press('Enter'); await sleep(500);
+  p = await project();
+  check('Cambiar largo corre la pared siguiente y el ambiente sigue cerrado', p.room.w === 4500 && p.room.points?.length === 6, `w=${p.room.w}`);
+  await page.mouse.click(wp.x, wp.y + 400); await sleep(200); // foco fuera del input
+  await page.keyboard.press('Escape'); await sleep(200);
+  await ctrl('KeyZ');
+  p = await project();
+  check('Deshacer el cambio de largo', p.room.w === 4000, `w=${p.room.w}`);
+  await page.mouse.click(wp.x, wp.y); await sleep(500);
+  const altoFinal = await fieldInput('Alto final');
+  await altoFinal.click({ clickCount: 3 }); await altoFinal.type('2000'); await page.keyboard.press('Enter'); await sleep(600);
+  p = await project();
+  check('Alto final distinto deja la pared inclinada', p.room.walls[0].h0 === 2600 && p.room.walls[0].h1 === 2000);
+  await shot('14-pared-seleccionada-inclinada');
+  check('Sin errores de consola tras editar paredes', errors.length === 0, errors.slice(-3).join(' | '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

@@ -52,6 +52,26 @@ export function wallGeometry(room) {
   });
 }
 
+const r2 = (v) => Math.round(v * 100) / 100; // centésimas de grado
+const norm360 = (a) => { const v = ((r2(a) % 360) + 360) % 360; return v === 360 ? 0 : v; };
+// Ángulo absoluto en planta (grados, antihorario en pantalla, 0 = hacia +x).
+export const absAngle = (u) => norm360((Math.atan2(-u[1], u[0]) * 180) / Math.PI);
+
+// Por pared: ángulo absoluto y relativo (ángulo entre la pared anterior y esta, medido
+// del lado interior: 90 en un rectángulo, 270 en una esquina entrante; null sin anterior).
+export function wallAngles(room) {
+  const geo = wallGeometry(room);
+  const byEnd = new Map();
+  for (const g of geo) if (!byEnd.has(g.n1)) byEnd.set(g.n1, g);
+  return geo.map((g) => {
+    const abs = absAngle(g.u);
+    const prev = byEnd.get(g.n0);
+    if (!prev || prev === g) return { id: g.id, abs, rel: null, prevId: null };
+    const turn = ((((abs - absAngle(prev.u)) + 540) % 360) + 360) % 360 - 180;
+    return { id: g.id, abs, rel: norm360(180 + turn), prevId: prev.id };
+  });
+}
+
 // Contornos cerrados, siguiendo n0 → n1. Devuelve listas de puntos.
 export function wallLoops(room) {
   const nm = nodeMap(room);

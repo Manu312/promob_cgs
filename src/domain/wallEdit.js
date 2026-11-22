@@ -28,12 +28,26 @@ function slidEnd(geo, g, nodeId, d, pos) {
   return (o && intersect(moved, g.u, p, o.u)) || moved;
 }
 
+// Aplica posiciones nuevas a vértices. Tras una edición a mano el ambiente deja de ser
+// una forma del editor numérico (rect / L): pasa a "libre" para no regenerarse encima.
+function withMoves(room, moves) {
+  return normalizeRoom({
+    ...room,
+    shape: 'libre',
+    nodes: room.nodes.map((n) => (moves.has(n.id) ? { ...n, x: r3(moves.get(n.id)[0]), z: r3(moves.get(n.id)[1]) } : n)),
+  });
+}
+
+const posFn = (room) => {
+  const nodes = new Map(room.nodes.map((n) => [n.id, [n.x, n.z]]));
+  return (id) => nodes.get(id);
+};
+
 // Lleva el final (n1) de la pared a `newEnd`. La pared siguiente se traslada con el
 // mismo vector (conserva su ángulo) y su otro extremo se desliza sobre la pared que sigue.
 function moveEnd(room, g, newEnd) {
   const geo = wallGeometry(room);
-  const nodes = new Map(room.nodes.map((n) => [n.id, [n.x, n.z]]));
-  const pos = (id) => nodes.get(id);
+  const pos = posFn(room);
   const end = pos(g.n1);
   const d = [newEnd[0] - end[0], newEnd[1] - end[1]];
   const moves = new Map([[g.n1, newEnd]]);
@@ -42,10 +56,23 @@ function moveEnd(room, g, newEnd) {
     const far = next.n0 === g.n1 ? next.n1 : next.n0;
     if (far !== g.n0) moves.set(far, slidEnd(geo, next, far, d, pos));
   }
-  return normalizeRoom({
-    ...room,
-    nodes: room.nodes.map((n) => (moves.has(n.id) ? { ...n, x: r3(moves.get(n.id)[0]), z: r3(moves.get(n.id)[1]) } : n)),
-  });
+  return withMoves(room, moves);
+}
+
+// Arrastrar una pared: se traslada (dx, dz) y cada extremo se desliza sobre la pared
+// vecina de ese vértice, así las vecinas se estiran o acortan sin cambiar de ángulo.
+export function moveWall(room, wallId, dx, dz) {
+  const geo = wallGeometry(room);
+  const g = geo.find((w) => w.id === wallId);
+  if (!g || (!dx && !dz)) return room;
+  const pos = posFn(room);
+  return withMoves(room, new Map([g.n0, g.n1].map((id) => [id, slidEnd(geo, g, id, [dx, dz], pos)])));
+}
+
+// Arrastrar un vértice: las paredes que lo usan lo siguen.
+export function moveNode(room, nodeId, x, z) {
+  if (!room.nodes.some((n) => n.id === nodeId)) return room;
+  return withMoves(room, new Map([[nodeId, [x, z]]]));
 }
 
 export function setWallLength(room, wallId, length) {

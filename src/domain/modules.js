@@ -4,6 +4,7 @@
 // alineada a ejes; la misma geometría alimenta el 3D y el despiece.
 
 import { snapCandidates } from './room.js';
+import { bounds } from './walls.js';
 
 const SLIDES = [250, 300, 350, 400, 450, 500, 550, 600];
 const GROOVE = 8; // profundidad de ranura para fondo
@@ -283,10 +284,6 @@ export function footprint(mod) {
   return r % 180 === 0 ? { fw: W, fd: D } : { fw: D, fd: W };
 }
 
-export function clampToRoom(mod, room) {
-  const { fw, fd } = footprint(mod);
-  return { ...mod, x: Math.max(0, Math.min(room.w - fw, mod.x)), z: Math.max(0, Math.min(room.d - fd, mod.z)) };
-}
 
 // `step`: paso al que se redondea cuando no hay imán cerca (10 mm, o la grilla magnética en Planta).
 export function snapPosition(mod, others, room, thr = 40, step = 10) {
@@ -303,18 +300,21 @@ export function snapPosition(mod, others, room, thr = 40, step = 10) {
     for (const c of cands) { const d = Math.abs(c - v); if (d < bd) { bd = d; best = c; } }
     return best;
   };
-  const x = Math.max(0, Math.min(room.w - fw, near(mod.x, cx)));
-  const z = Math.max(0, Math.min(room.d - fd, near(mod.z, cz)));
-  return { x: Math.round(x), z: Math.round(z) };
+  // Sin límite duro: con paredes que se mueven o ambientes abiertos, el imán y la
+  // colisión (Fase 2) ordenan los módulos.
+  return { x: Math.round(near(mod.x, cx)), z: Math.round(near(mod.z, cz)) };
 }
 
+// Módulo nuevo: a continuación de la fila apoyada en la pared del fondo (la de menor z).
 export function newModule(type, project) {
   const def = MODULE_TYPES[type];
-  const m = { id: uid(), type, params: { ...def.defaults }, x: 0, z: 0, y: def.y || 0, rot: 0, mats: {} };
+  const { room } = project;
+  const b = room.nodes?.length ? bounds(room) : { minX: 0, minZ: 0, maxX: room.w, maxZ: room.d };
+  const m = { id: uid(), type, params: { ...def.defaults }, x: b.minX, z: b.minZ, y: def.y || 0, rot: 0, mats: {} };
   const high = m.y >= 1000;
-  const row = project.modules.filter((o) => (o.rot || 0) === 0 && o.z <= 10 && (o.y >= 1000) === high);
-  const x = row.reduce((acc, o) => Math.max(acc, o.x + footprint(o).fw), 0);
-  if (x + m.params.width <= project.room.w) m.x = x;
-  else { m.x = 0; m.z = Math.max(0, project.room.d / 2 - m.params.depth / 2); }
-  return clampToRoom(m, project.room);
+  const row = project.modules.filter((o) => (o.rot || 0) === 0 && o.z <= b.minZ + 10 && (o.y >= 1000) === high);
+  const x = row.reduce((acc, o) => Math.max(acc, o.x + footprint(o).fw), b.minX);
+  if (x + m.params.width <= b.maxX) m.x = x;
+  else { m.x = b.minX; m.z = Math.round((b.minZ + b.maxZ) / 2 - m.params.depth / 2); }
+  return m;
 }

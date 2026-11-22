@@ -39,7 +39,8 @@ export function shapePoints(r) {
     const cw = Math.min(Math.max(r.cutW, 100), w - 100), cd = Math.min(Math.max(r.cutD, 100), d - 100);
     return [[0, 0], [w, 0], [w, d - cd], [w - cw, d - cd], [w - cw, d], [0, d]];
   }
-  if (r.shape === 'libre' && Array.isArray(r.points) && r.points.length >= 3) return r.points.map(([x, z]) => [Math.max(0, +x || 0), Math.max(0, +z || 0)]);
+  // Puntos libres: pueden ser negativos (paredes arrastradas fuera del origen).
+  if (r.shape === 'libre' && Array.isArray(r.points) && r.points.length >= 3) return r.points.map(([x, z]) => [+x || 0, +z || 0]);
   return [[0, 0], [w, 0], [w, d], [0, d]];
 }
 

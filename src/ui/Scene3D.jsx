@@ -76,13 +76,15 @@ function CameraRig({ view, room, controlsRef }) {
     const c = controlsRef.current;
     if (!!camera.isOrthographicCamera !== planta || (c && c.object !== camera)) return;
     pending.current = false;
+    const b = bounds(room);
+    const depth = (b.maxZ - b.minZ) * S;
     let pos, tgt;
     if (planta) {
       pos = [0, 40, 0.001]; tgt = [0, 0, 0];
-      camera.zoom = planFitZoom(bounds(room), size.width, size.height);
+      camera.zoom = planFitZoom(b, size.width, size.height);
       camera.updateProjectionMatrix();
-    } else if (view.name === 'frente') { pos = [0, 1.3, (room.d * S) / 2 + 2.8]; tgt = [0, 1.1, -(room.d * S) / 4]; }
-    else { pos = [1.6, 2.3, (room.d * S) / 2 + 2.6]; tgt = [0, 0.9, -(room.d * S) / 5]; }
+    } else if (view.name === 'frente') { pos = [0, 1.3, depth / 2 + 2.8]; tgt = [0, 1.1, -depth / 4]; }
+    else { pos = [1.6, 2.3, depth / 2 + 2.6]; tgt = [0, 0.9, -depth / 5]; }
     camera.position.set(...pos);
     if (c) { c.target.set(...tgt); c.update(); } else camera.lookAt(...tgt);
   });
@@ -153,40 +155,56 @@ function Capturer({ captureRef, photoreal }) {
   return null;
 }
 
-// Solo en desarrollo: permite a los tests e2e ubicar módulos en pantalla.
-function DevProbe({ project }) {
+// Solo en desarrollo: permite a los tests e2e ubicar módulos, paredes y vértices en pantalla.
+function DevProbe({ project, origin }) {
   const { camera, gl } = useThree();
   useEffect(() => {
     if (!import.meta.env.DEV) return;
+    const toScreen = (x, y, z) => {
+      const v = new THREE.Vector3((x - origin.x) * S, y * S, (z - origin.z) * S).project(camera);
+      const r = gl.domElement.getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    };
     window.__muebles = {
       cameraType: camera.type,
       screenOf(id, dy = 0) {
         const m = project.modules.find((o) => o.id === id);
         if (!m) return null;
         const { fw, fd } = footprint(m);
-        const v = new THREE.Vector3(
-          (m.x + fw / 2 - project.room.w / 2) * S,
-          ((m.y || 0) + m.params.height / 2 + dy) * S,
-          (m.z + fd - project.room.d / 2) * S,
-        ).project(camera);
-        const r = gl.domElement.getBoundingClientRect();
-        return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+        return toScreen(m.x + fw / 2, (m.y || 0) + m.params.height / 2 + dy, m.z + fd);
       },
-      // Punto de la cara interior de una pared, a la altura `y` (mm).
-      screenOfWall(id, y = 1500) {
+      // Punto de una pared a la altura `y` (mm), corrido `side` mm sobre su normal (−2 = cara interior).
+      screenOfWall(id, y = 1500, side = -2) {
         const g = roomWalls(project.room).find((w) => w.id === id);
         if (!g) return null;
-        const mx = (g.a[0] + g.b[0]) / 2 - g.n[0] * 2, mz = (g.a[1] + g.b[1]) / 2 - g.n[1] * 2;
-        const v = new THREE.Vector3((mx - project.room.w / 2) * S, y * S, (mz - project.room.d / 2) * S).project(camera);
-        const r = gl.domElement.getBoundingClientRect();
-        return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+        return toScreen((g.a[0] + g.b[0]) / 2 + g.n[0] * side, y, (g.a[1] + g.b[1]) / 2 + g.n[1] * side);
+      },
+      screenOfNode(id) {
+        const n = project.room.nodes.find((o) => o.id === id);
+        return n ? toScreen(n.x, project.room.h + 20, n.z) : null;
       },
     };
   });
   return null;
 }
 
-function DragController({ drag, setDrag, onMove, onDragEnd, controlsRef, room }) {
+// Manijas de los vértices (solo en Planta): se arrastran para mover esquinas.
+function NodeHandles({ room, onNodeDown }) {
+  const top = Math.max(room.h, ...room.walls.map((w) => Math.max(w.h0, w.h1))) + 20;
+  return room.nodes.map((n) => (
+    <mesh key={n.id} position={[n.x * S, top * S, n.z * S]} renderOrder={2}
+      onPointerDown={(e) => onNodeDown(e, n)}
+      onPointerOver={() => { document.body.style.cursor = 'move'; }}
+      onPointerOut={() => { document.body.style.cursor = ''; }}>
+      <cylinderGeometry args={[0.07, 0.07, 0.01, 24]} />
+      <meshBasicMaterial color="#2563eb" />
+    </mesh>
+  ));
+}
+
+// Arrastre en el plano horizontal: módulos (posición), paredes (desplazamiento sobre
+// su normal, redondeado al paso) y vértices (posición redondeada al paso).
+function DragController({ drag, setDrag, onMove, onMoveWall, onMoveNode, onDragEnd, controlsRef, origin }) {
   const { camera, gl } = useThree();
   useEffect(() => {
     if (!drag) return;
@@ -194,37 +212,73 @@ function DragController({ drag, setDrag, onMove, onDragEnd, controlsRef, room })
     const ray = new THREE.Raycaster();
     const v = new THREE.Vector2();
     const pt = new THREE.Vector3();
+    const snap = (val) => Math.round(val / drag.step) * drag.step;
     const move = (ev) => {
       const r = gl.domElement.getBoundingClientRect();
       v.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(v, camera);
-      if (ray.ray.intersectPlane(plane, pt)) {
-        onMove(drag.id, pt.x / S + room.w / 2 - drag.offX, pt.z / S + room.d / 2 - drag.offZ);
+      if (!ray.ray.intersectPlane(plane, pt)) return;
+      const rx = pt.x / S + origin.x, rz = pt.z / S + origin.z;
+      if (drag.kind === 'wall') {
+        const q = snap((rx - drag.sx) * drag.n[0] + (rz - drag.sz) * drag.n[1]);
+        onMoveWall(drag.id, drag.n[0] * q, drag.n[1] * q);
+      } else if (drag.kind === 'node') {
+        onMoveNode(drag.id, snap(rx + drag.offX), snap(rz + drag.offZ));
+      } else {
+        onMove(drag.id, rx - drag.offX, rz - drag.offZ);
       }
     };
     const up = () => { setDrag(null); onDragEnd?.(); if (controlsRef.current) controlsRef.current.enabled = true; };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-  }, [drag, camera, gl, onMove, onDragEnd, setDrag, controlsRef, room]);
+  }, [drag, camera, gl, onMove, onMoveWall, onMoveNode, onDragEnd, setDrag, controlsRef, origin]);
   return null;
 }
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+// Centro de la caja envolvente del ambiente (mm).
+const roomCenter = (room) => {
+  const b = bounds(room);
+  return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
+};
+
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const { room } = project;
   const planta = view.name === 'planta';
-  const cx = (room.w * S) / 2, cz = (room.d * S) / 2;
+  // Origen del visor (mm del ambiente en el centro de la escena). Se fija al cambiar de
+  // vista, no en cada cambio: si se recentrara mientras se arrastra una pared, la escena
+  // se movería debajo del mouse.
+  const [origin, setOrigin] = useState(() => roomCenter(room));
+  useEffect(() => setOrigin(roomCenter(room)), [view.tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toRoom = (p) => [p.x / S + origin.x, p.z / S + origin.z];
 
+  const startDrag = (d) => {
+    onDragStart?.(); // el arrastre completo es un solo paso de deshacer
+    setDrag(d);
+    if (controlsRef.current) controlsRef.current.enabled = false;
+  };
   const onDown = (e, mod) => {
     if (renderMode) return;
     e.stopPropagation();
     onSelect(mod.id);
-    const rx = e.point.x / S + room.w / 2, rz = e.point.z / S + room.d / 2;
-    onDragStart?.(); // el arrastre completo es un solo paso de deshacer
-    setDrag({ id: mod.id, planeY: e.point.y, offX: rx - mod.x, offZ: rz - mod.z });
-    if (controlsRef.current) controlsRef.current.enabled = false;
+    const [rx, rz] = toRoom(e.point);
+    startDrag({ kind: 'module', id: mod.id, planeY: e.point.y, offX: rx - mod.x, offZ: rz - mod.z });
+  };
+  // Pared: se selecciona siempre; se arrastra en Planta, o en 3D si es movible.
+  const onWallDown = (e, g) => {
+    if (renderMode) return;
+    onSelectWall(g.id);
+    if (!(planta || g.wall.movable)) return;
+    const [rx, rz] = toRoom(e.point);
+    startDrag({ kind: 'wall', id: g.id, planeY: e.point.y, sx: rx, sz: rz, n: g.n, step });
+  };
+  const onNodeDown = (e, n) => {
+    if (renderMode) return;
+    e.stopPropagation();
+    const [rx, rz] = toRoom(e.point);
+    startDrag({ kind: 'node', id: n.id, planeY: e.point.y, offX: n.x - rx, offZ: n.z - rz, step });
   };
 
   return (
@@ -260,9 +314,10 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
           <Lightformer intensity={0.8} position={[0, 2, 6]} rotation-y={Math.PI} scale={[10, 3, 1]} />
         </Environment>
       )}
-      <group position={[-cx, 0, -cz]}>
-        <Room3D room={room} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onSelectWall={renderMode ? null : onSelectWall} />
+      <group position={[-origin.x * S, 0, -origin.z * S]}>
+        <Room3D room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown} />
         {planta && !renderMode && <PlanGrid room={room} />}
+        {planta && !renderMode && <NodeHandles room={room} onNodeDown={onNodeDown} />}
         {showDims && !renderMode && <Dimensions room={room} modules={project.modules} />}
         {project.modules.map((m) => {
           const b = builtById.get(m.id);
@@ -277,8 +332,8 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       <CameraRig view={view} room={room} controlsRef={controlsRef} />
       {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
       <Capturer captureRef={captureRef} photoreal={photoreal} />
-      <DevProbe project={project} />
-      <DragController drag={drag} setDrag={setDrag} onMove={onMove} onDragEnd={onDragEnd} controlsRef={controlsRef} room={room} />
+      <DevProbe project={project} origin={origin} />
+      <DragController drag={drag} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
     </Canvas>
   );
 }

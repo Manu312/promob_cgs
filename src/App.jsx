@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
-import { newModule, footprint, snapPosition, clampToRoom, uid } from './domain/modules.js';
+import { newModule, footprint, snapPosition, uid } from './domain/modules.js';
+import { moveWall, moveNode } from './domain/wallEdit.js';
 import { buildAll, computeCutList } from './domain/cutlist.js';
 import { nestAll } from './domain/nesting.js';
 import { computeBudget } from './domain/budget.js';
@@ -59,7 +60,7 @@ export default function App() {
   const selected = project.modules.find((m) => m.id === selectedId) || null;
 
   const mapModule = useCallback((id, fn) => setProject((p) => ({
-    ...p, modules: p.modules.map((m) => (m.id === id ? clampToRoom(fn(m), p.room) : m)),
+    ...p, modules: p.modules.map((m) => (m.id === id ? fn(m) : m)),
   })), [setProject]);
 
   // En Planta, con grilla magnética, los arrastres se redondean al paso de la grilla.
@@ -74,6 +75,16 @@ export default function App() {
   }), [setProject, gridStep]);
   const setGrid = (patch) => setProject((p) => ({ ...p, room: { ...p.room, grid: { ...grid, ...patch } } }));
 
+  // Arrastre de paredes y vértices: cada movimiento parte del ambiente que había al
+  // empezar el arrastre (sin acumular errores) y todo el arrastre es un paso de deshacer.
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  const baseRoomRef = useRef(null);
+  const onDragStart = useCallback(() => { baseRoomRef.current = projectRef.current.room; history.begin(); }, [history.begin]);
+  const onMoveWall = useCallback((id, dx, dz) => setProject((p) => ({ ...p, room: moveWall(baseRoomRef.current || p.room, id, dx, dz) })), [setProject]);
+  const onMoveNode = useCallback((id, x, z) => setProject((p) => ({ ...p, room: moveNode(p.room, id, x, z) })), [setProject]);
+  const recenter = () => setView((v) => ({ ...v, tick: v.tick + 1 }));
+
   const addModule = (type) => {
     const m = newModule(type, project);
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));
@@ -87,7 +98,7 @@ export default function App() {
   };
   const duplicateSelected = () => {
     if (!selected) return;
-    const copy = clampToRoom({ ...selected, id: uid(), x: selected.x + footprint(selected).fw, params: { ...selected.params }, mats: { ...selected.mats } }, project.room);
+    const copy = { ...selected, id: uid(), x: selected.x + footprint(selected).fw, params: { ...selected.params }, mats: { ...selected.mats } };
     setProject((p) => ({ ...p, modules: [...p.modules, copy] }));
     setSelectedId(copy.id);
   };
@@ -127,10 +138,10 @@ export default function App() {
     try {
       const p = JSON.parse(await file.text());
       if (!p || !Array.isArray(p.modules) || !p.room) throw new Error('formato');
-      setProject(normalizeProject(p)); setSelectedId(null);
+      setProject(normalizeProject(p)); setSelectedId(null); recenter();
     } catch { window.alert('El archivo no es un proyecto válido.'); }
   };
-  const newProject = () => { if (window.confirm('¿Empezar un proyecto vacío? (exportá el actual si lo querés guardar)')) { setProject(emptyProject()); setSelectedId(null); } };
+  const newProject = () => { if (window.confirm('¿Empezar un proyecto vacío? (exportá el actual si lo querés guardar)')) { setProject(emptyProject()); setSelectedId(null); recenter(); } };
 
   return (
     <div className="app">
@@ -157,7 +168,8 @@ export default function App() {
             <ErrorBoundary onReset={() => { setPhotoreal(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
                 selectedWallId={selectedWallId} onSelectWall={selectWall}
-                onDragStart={history.begin} onDragEnd={history.commit}
+                onMoveWall={onMoveWall} onMoveNode={onMoveNode} step={gridStep}
+                onDragStart={onDragStart} onDragEnd={history.commit}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoHideWalls} />
             </ErrorBoundary>
@@ -204,7 +216,7 @@ export default function App() {
             onParams={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
             onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}
-            onProject={(fn) => setProject((p) => { const np = normalizeProject(fn(p)); return { ...np, modules: np.modules.map((m) => clampToRoom(m, np.room)) }; })} />
+            onProject={(fn) => setProject((p) => normalizeProject(fn(p)))} />
         </main>
       )}
       {tab === 'corte' && <CutPlan cut={cut} nesting={nesting} settings={settings} project={project} />}

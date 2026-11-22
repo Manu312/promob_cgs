@@ -6,6 +6,7 @@ import { roomWalls, wallPieces } from '../domain/room.js';
 import { wallCorners, floorPolygon } from '../domain/walls.js';
 import { footprint } from '../domain/modules.js';
 import { CotaLabel } from './Cotas.jsx';
+import { wallDims } from '../domain/dimensions.js';
 
 const S = 0.001;
 const wallMat = new THREE.MeshStandardMaterial({ color: '#eeebe5', roughness: 0.95 });
@@ -147,8 +148,9 @@ const Label = ({ p, children, small }) => (
 );
 
 // Cotas: largo de cada pared (por fuera, editable) y ancho de cada módulo.
-export function Dimensions({ room, modules, onWallLength }) {
+export function Dimensions({ room, modules, onWallLength, onWallAngle }) {
   const walls = useMemo(() => roomWalls(room), [room]);
+  const angular = useMemo(() => wallDims(room).angular, [room]);
   const y = 0.01;
   return (
     <group>
@@ -166,6 +168,14 @@ export function Dimensions({ room, modules, onWallLength }) {
           </group>
         );
       })}
+      {/* Cotas angulares en cada esquina (editables: giran la pared que sale de la esquina) */}
+      {angular.map((c) => (
+        <group key={'ang' + c.nodeId}>
+          <Line points={c.arc.map(([x, z]) => [x * S, y, z * S])} color="#7c3aed" lineWidth={1.2} />
+          <CotaLabel p={[c.label[0] * S, y, c.label[1] * S]} value={c.deg} text={`${Math.round(c.deg * 10) / 10}°`} className="cota cota-ang"
+            onCommit={onWallAngle ? (v) => onWallAngle(c.wallId, v) : undefined} />
+        </group>
+      ))}
       {modules.map((m) => {
         const { fw, fd } = footprint(m);
         return <Label key={m.id} small p={[(m.x + fw / 2) * S, ((m.y || 0) + m.params.height + 60) * S, (m.z + fd / 2) * S]}>{m.params.width}</Label>;

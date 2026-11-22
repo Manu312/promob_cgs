@@ -32,7 +32,7 @@ export function obstaclesFor(mod, room, modules) {
   }
   for (const c of room.columns || []) out.push({ kind: 'column', id: c.id, y0: 0, y1: room.h, poly: rectPoly(c.x, c.z, c.x + c.w, c.z + c.d) });
   for (const o of modules) {
-    if (o.id === mod.id) continue;
+    if (o.id === mod.id || o.hidden) continue; // oculto (Lista de módulos): no estorba
     const y0 = o.y || 0;
     out.push({ kind: 'module', id: o.id, y0, y1: y0 + o.params.height, poly: modulePoly(o) });
   }

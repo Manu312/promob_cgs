@@ -521,12 +521,12 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
         {planta && !renderMode && annotating && <AnnotateTool room={room} modules={project.modules} tool={annotating} origin={origin} onPoint={onAnnotatePoint} onFinish={onAnnotateFinish} />}
         {!renderMode && <Annotations annotations={project.annotations || []} selectedId={selectedDimId} onSelect={onSelectDim} />}
         {planta && !renderMode && drawing && <DrawTool room={room} draw={drawing} origin={origin} cursorRef={drawCursorRef} onPoint={onDrawPoint} onFinish={onDrawFinish} />}
-        {showDims && !renderMode && <Dimensions room={room} modules={project.modules} onWallLength={onWallLength} onWallAngle={onWallAngle} />}
+        {showDims && !renderMode && <Dimensions room={room} modules={project.modules.filter((m) => !m.hidden)} onWallLength={onWallLength} onWallAngle={onWallAngle} />}
         {selectedMod && !renderMode && <ModuleDistances room={room} modules={project.modules} mod={selectedMod} onEdit={onDimEdit} vertical={!planta} />}
         {ghost && <GhostBox mod={ghost} />}
         {project.modules.map((m) => {
           const b = builtById.get(m.id);
-          if (!b) return null;
+          if (!b || m.hidden) return null; // oculto desde la Lista de módulos
           return <ModuleObject key={m.id} mod={m} b={b} selected={m.id === selectedId} showSel={!renderMode} onDown={onDown}
             onMenu={renderMode || drawing || annotating ? null : onModuleMenu}
             onResizeDown={onResize ? onResizeDown : null} planta={planta} />;

@@ -126,6 +126,32 @@ try {
   check('Al soltar inserta contra la pared del fondo', p.modules.length === nBefore + 1 && dropped.type === 'bajo_cajones' && dropped.z === 0 && dropped.rot === 0 && !(await page.evaluate(() => window.__muebles.ghostShown)), '(' + dropped.x + ',' + dropped.z + ') rot ' + dropped.rot);
   await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(400);
   check('Deshacer saca el módulo arrastrado', (await project()).modules.length === nBefore);
+  // Lista de Módulos (#60)
+  await clickText('.side-tab', 'Lista de Módulos');
+  const planes = await page.$$eval('.ml-plane-btn', (els) => els.map((e) => e.textContent.trim()));
+  const rows = await page.$$eval('.ml-row span', (els) => els.length);
+  check('Lista de Módulos por plano de inserción', !!(await page.$('.module-list')) && planes.some((t) => t.startsWith('⊟ Pared 1')) && rows === nBefore, planes.join(' | ') + ' · ' + rows + ' filas');
+  await shot('01e-lista-modulos');
+  const firstId = (await project()).modules[0].id;
+  await page.click('.ml-row .ml-bulb'); await sleep(400);
+  p = await project();
+  const hid = p.modules.filter((m) => m.hidden).length;
+  check('La lamparita oculta el módulo', hid === 1 && (await page.$$('.ml-row.off')).length === 1);
+  await page.click('.ml-row .ml-bulb'); await sleep(300);
+  await clickText('.ml-row span', 'M1 ·');
+  await page.keyboard.press('KeyO'); await sleep(300);
+  check('Tecla O oculta el seleccionado', (await project()).modules.find((m) => m.id === firstId)?.hidden === true);
+  await page.keyboard.press('KeyO'); await sleep(300);
+  const m2 = await page.evaluateHandle(() => [...document.querySelectorAll('.ml-row span')].find((e) => e.textContent.startsWith('M2 ·')));
+  await page.keyboard.down('Control'); await m2.click(); await page.keyboard.up('Control'); await sleep(300);
+  await clickText('.ml-actions button', 'Remover');
+  p = await project();
+  check('Ctrl+clic y Remover borra varios', p.modules.length === nBefore - 2, p.modules.length + ' módulos');
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(400);
+  p = await project();
+  check('Deshacer devuelve los módulos removidos', p.modules.length === nBefore && p.modules.every((m) => !m.hidden));
+  await clickText('.side-tab', 'Lista de Módulos');
+  await page.keyboard.press('Escape'); await sleep(200);
   // Localizar Rápido (#59)
   await page.keyboard.down('Control'); await page.keyboard.press('KeyL'); await page.keyboard.up('Control'); await sleep(400);
   check('Ctrl+L abre Localizar Rápido', !!(await page.$('.quickfind')));

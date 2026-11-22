@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
-import { newModule, footprint, snapPosition, resizeModule, uid, isSquare, MODULE_TYPES } from './domain/modules.js';
+import { newModule, footprint, snapPosition, resizeModule, uid, isSquare, MODULE_TYPES, fieldsFor } from './domain/modules.js';
 import { insertPose } from './domain/insert.js';
 import { collideMove, collideLift } from './domain/collision.js';
 import { nudgeTarget, rotateAboutCenter, lockAxis, restingHeight } from './domain/movement.js';
@@ -10,6 +10,7 @@ import ModelsPanel from './ui/ModelsPanel.jsx';
 import AggregatesPanel from './ui/AggregatesPanel.jsx';
 import AutoInsertPanel from './ui/AutoInsertPanel.jsx';
 import AperturasPanel from './ui/AperturasPanel.jsx';
+import TiradorPanel from './ui/TiradorPanel.jsx';
 import { frontsOf, invertHinge } from './domain/fronts.js';
 import { applyAuto, withAutoInsert } from './domain/autoInsert.js';
 import { setAgg } from './domain/aggregates.js';
@@ -66,7 +67,7 @@ export default function App() {
   // Paneles laterales (pestañas verticales a la izquierda): Lista de Módulos o Inserción Automática.
   const side = ui.side ?? (ui.listOpen ? 'lista' : null);
   const setSide = (s) => setUi((u) => ({ ...u, listOpen: undefined, side: (u.side ?? (u.listOpen ? 'lista' : null)) === s ? null : s }));
-  const tool = ['movimiento', 'modelos', 'agregados', 'aperturas'].includes(ui.tool) ? ui.tool : 'propiedades'; // botonera Herramientas
+  const tool = ['movimiento', 'modelos', 'agregados', 'aperturas', 'tirador'].includes(ui.tool) ? ui.tool : 'propiedades'; // botonera Herramientas
   // Aperturas: qué frentes están abiertos (solo de la vista: no se guarda ni va al historial).
   const [openFronts, setOpenFronts] = useState({}); // { [moduleId]: { open: { [k]: true }, cascade } }
   const toggleFront = (id, k) => setOpenFronts((o) => { const st = o[id] || {}; return { ...o, [id]: { open: { ...(st.open || {}), [k]: !st.open?.[k] }, cascade: false } }; });
@@ -564,6 +565,11 @@ export default function App() {
           {tool === 'agregados' && (
             <AggregatesPanel selected={selected} rules={selected ? resolveRules(selected, project) : null}
               onAgg={(id, on, qty) => selectedId && setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === selectedId ? setAgg(m, resolveRules(m, p), id, on, qty) : m)) }))} />
+          )}
+          {tool === 'tirador' && (
+            <TiradorPanel selected={selected}
+              onSet={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
+              onSetAll={(patch) => setProject((p) => ({ ...p, modules: p.modules.map((m) => (fieldsFor(m.type).includes('handlePos') ? { ...m, params: { ...m.params, ...patch } } : m)) }))} />
           )}
           {tool === 'aperturas' && (
             <AperturasPanel selected={selected} built={selected ? builtById.get(selected.id) : null} state={openFronts}

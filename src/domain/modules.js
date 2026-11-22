@@ -43,7 +43,9 @@ export const PARAM_DEFS = {
   doors: { label: 'Cantidad de puertas', type: 'num', min: 0, max: 8, step: 1 },
   drawers: { label: 'Cajones (solo 1 cuerpo)', type: 'num', min: 0, max: 8, step: 1 },
   drawerH: { label: 'Alto frente cajón (si hay puertas)', type: 'num', min: 100, max: 400, step: 10, unit: 'mm' },
-  handlePos: { label: 'Manijas', type: 'sel', options: [['top', 'Arriba'], ['middle', 'Medio'], ['bottom', 'Abajo'], ['none', 'Sin manijas']] },
+  handlePos: { label: 'Manijas', type: 'sel', options: [['top', 'Arriba'], ['middle', 'Medio'], ['bottom', 'Abajo'], ['custom', 'Personalizada (mm)'], ['none', 'Sin manijas']] },
+  handleOffset: { label: 'Tirador: desde el borde de arriba', type: 'num', min: 0, max: 2000, step: 5, unit: 'mm' },
+  handleOrient: { label: 'Tirador: orientación', type: 'sel', options: [['auto', 'Automática'], ['vertical', 'Vertical'], ['horizontal', 'Horizontal']] },
   mesada: { label: 'Mesada', type: 'sel', options: [['no', 'No'], ['si', 'Sí']] },
   mesadaT: { label: 'Espesor mesada', type: 'num', min: 10, max: 60, step: 1, unit: 'mm' },
   mesadaOver: { label: 'Vuelo frontal mesada', type: 'num', min: 0, max: 400, step: 5, unit: 'mm' },
@@ -54,8 +56,8 @@ export const PARAM_DEFS = {
   side: { label: 'Lado de la esquina', type: 'sel', options: [['izq', 'Izquierda'], ['der', 'Derecha']] },
 };
 
-const CAJA_FIELDS = ['width', 'height', 'depth', 'plinth', 'top', 'dividers', 'shelves', 'interior', 'doorType', 'doors', 'drawers', 'drawerH', 'handlePos', 'mesada', 'mesadaT', 'mesadaOver', 'nicheH', 'nicheY'];
-const caja = (d) => ({ top: 'techo', dividers: 1, shelves: 1, interior: 'estantes', doorType: 'batientes', doors: 2, drawers: 0, drawerH: 180, handlePos: 'top', plinth: 0, mesada: 'no', mesadaT: 20, mesadaOver: 20, nicheH: 0, nicheY: 0, ...d });
+const CAJA_FIELDS = ['width', 'height', 'depth', 'plinth', 'top', 'dividers', 'shelves', 'interior', 'doorType', 'doors', 'drawers', 'drawerH', 'handlePos', 'handleOffset', 'handleOrient', 'mesada', 'mesadaT', 'mesadaOver', 'nicheH', 'nicheY'];
+const caja = (d) => ({ top: 'techo', dividers: 1, shelves: 1, interior: 'estantes', doorType: 'batientes', doors: 2, drawers: 0, drawerH: 180, handlePos: 'top', handleOffset: 40, handleOrient: 'auto', plinth: 0, mesada: 'no', mesadaT: 20, mesadaOver: 20, nicheH: 0, nicheY: 0, ...d });
 const conMesada = (d) => caja({ mesada: 'si', ...d });
 
 export const MODULE_TYPES = {
@@ -272,6 +274,13 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null }) {
     }
   });
 
+  // Altura del tirador (su borde de abajo) en el frente `f`: arriba, medio, abajo o
+  // personalizada (`handleOffset` mm desde el borde de arriba del frente hasta el tirador).
+  const handleY = (f, L, top, bottom) => {
+    const hp0 = p.handlePos;
+    if (hp0 === 'custom') return Math.max(f.y + 5, f.y + f.h - (p.handleOffset ?? 40) - L);
+    return hp0 === 'top' ? f.y + f.h - top - L : hp0 === 'bottom' ? f.y + bottom : f.y + f.h / 2 - L / 2;
+  };
   // Puertas y cajones. Cada pieza de un frente lleva `front` (índice) para las aperturas;
   // las puertas, además, `hinge` (lado de la bisagra; `params.hinges` lo invierte por puerta).
   const hp = p.handlePos;
@@ -290,9 +299,11 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null }) {
       parts.push(part('Trasero cajón', 'cajon', bx + tc, by, bz, bw - 2 * tc, bh, tc, { x: 1 }));
       parts.push(part('Fondo cajón', 'fondo', bx, by - tb, bz, bw, tb, L));
       add('corredera', 1);
-      if (hp !== 'none') {
-        const hy = hp === 'top' ? f.y + f.h - 45 : hp === 'bottom' ? f.y + 30 : f.y + f.h / 2 - 6;
-        decors.push(decor('manija', f.x + f.w / 2 - 64, hy, zf + tf, 128, 12, 25));
+      if (hp !== 'none') { // cajón: horizontal al centro (o vertical si se pide y entra)
+        const vert = p.handleOrient === 'vertical' && f.h >= 170;
+        const L = vert ? 128 : 12; // alto del tirador
+        const hy = handleY(f, L, 33, 30);
+        decors.push(vert ? decor('manija', f.x + f.w / 2 - 6, hy, zf + tf, 12, 128, 25) : decor('manija', f.x + f.w / 2 - 64, hy, zf + tf, 128, 12, 25));
         add('manija', 1);
       }
     } else {
@@ -301,9 +312,13 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null }) {
       add('bisagra', hingesFor(f.h));
       if (hp !== 'none') {
         const hingeLeft = hinge === 'izq';
-        const hx = hingeLeft ? f.x + f.w - 46 : f.x + 34;
-        const hy = hp === 'top' ? f.y + f.h - 168 : hp === 'bottom' ? f.y + 40 : f.y + f.h / 2 - 64;
-        decors.push(decor('manija', hx, hy, zf + tf, 12, 128, 25));
+        if (p.handleOrient === 'horizontal') { // puerta: horizontal del lado opuesto a la bisagra
+          const hy = handleY(f, 12, 50, 40);
+          decors.push(decor('manija', hingeLeft ? f.x + f.w - 40 - 128 : f.x + 40, hy, zf + tf, 128, 12, 25));
+        } else {
+          const hx = hingeLeft ? f.x + f.w - 46 : f.x + 34;
+          decors.push(decor('manija', hx, handleY(f, 128, 40, 40), zf + tf, 12, 128, 25));
+        }
         add('manija', 1);
       }
     }

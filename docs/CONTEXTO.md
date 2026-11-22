@@ -57,7 +57,11 @@ diseño 3D, renderizado, plan de corte y presupuesto. Se quieren todas las funci
    procedurales propias; material por tipo de pieza (cajas, externo, puertas, frentes, fondos, cajones, tapas) en 3D,
    despiece y presupuesto (la mesada por m² de su piedra); panel Herramientas · Modelos con menú en cascada, Mostrar todos y
    ámbito Todos / Selección; accesorios con modelos y precio (tiradores, bisagras, correderas, patas, acabado); estilos.
-   Siguiente: Fase 5 (#18) — agregados, inserción automática, aperturas y tiradores.
+3f. ✅ **Paridad con Promob — Fase 5, agregados, inserción automática, aperturas y tiradores** (ver `docs/PLAN-FASE-5.md`,
+   issues #81–#85): panel Agregados (tecla A: pies, zócalos, ruedas, fondo, estantes, divisiones, barral, cajones internos,
+   tapa, cierre, marco, cornisa, vistas), Inserción Automática (Inserción / Ambiente por categoría), Aperturas (abrir, abrir
+   todos, cascada, invertir bisagra, diagrama del frente, doble clic en el 3D) y Posición del Tirador (presets, mm, orientación).
+   Siguiente: Fase 6 (#19) — electrodomésticos y accesorios.
 4. ⏳ **Esquineros y especiales**: bajo esquinero L, alacena esquinera, horno/anafe, heladera, rebatibles, cajonera interna, alacena sobre heladera.
 5. ⏳ **Corte para taller**: orden de cortes, etiquetas por pieza imprimibles, sobrantes reutilizables.
 6. ⏳ **Módulo libre** a medida (editor por piezas).

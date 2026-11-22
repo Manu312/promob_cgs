@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { buildAll } from '../domain/cutlist.js';
 import { itemParams } from '../domain/library.js';
+import { MODULE_TYPES } from '../domain/modules.js';
 import { mat3d, metal, finishMat } from './materials3d.js';
 
 // Miniaturas del catálogo generadas con el mismo modelo 3D que el visor (como Promob):
@@ -34,7 +35,8 @@ function box({ x, y, z, sx, sy, sz, ry = 0, shape, axis }, material) {
 
 function render(item, variant, ctx) {
   const params = itemParams(item, variant);
-  const mod = { id: 'thumb', type: item.type, params, x: 0, z: 0, y: 0, rot: 0, mats: {} };
+  // a su altura de inserción (el pie del lavatorio, por ejemplo, se dibuja hasta el piso)
+  const mod = { id: 'thumb', type: item.type, params, x: 0, z: 0, y: item.y ?? MODULE_TYPES[item.type]?.y ?? 0, rot: 0, mats: {} };
   const [b] = buildAll({ ...ctx.project, modules: [mod] }, ctx.settings);
   const scene = new THREE.Scene();
   scene.add(new THREE.AmbientLight(0xffffff, 0.7));
@@ -54,7 +56,7 @@ function render(item, variant, ctx) {
   scene.add(g);
   // Cámara de frente, un poco de costado y desde arriba; encuadra la esfera que envuelve al módulo.
   const cam = new THREE.PerspectiveCamera(28, 1, 0.01, 100);
-  const r = 0.5 * Math.hypot(W, H, D) * S;
+  const r = 0.5 * Math.hypot(W, Math.max(H, hi('y', 'sy') - lo('y')), D) * S; // encuadra todo lo dibujado
   const dist = (r / Math.sin(((cam.fov / 2) * Math.PI) / 180)) * 1.02;
   cam.position.copy(new THREE.Vector3(0.55, 0.35, 1).normalize().multiplyScalar(dist));
   cam.lookAt(0, 0, 0);

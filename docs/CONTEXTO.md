@@ -61,7 +61,11 @@ diseño 3D, renderizado, plan de corte y presupuesto. Se quieren todas las funci
    issues #81–#85): panel Agregados (tecla A: pies, zócalos, ruedas, fondo, estantes, divisiones, barral, cajones internos,
    tapa, cierre, marco, cornisa, vistas), Inserción Automática (Inserción / Ambiente por categoría), Aperturas (abrir, abrir
    todos, cascada, invertir bisagra, diagrama del frente, doble clic en el 3D) y Posición del Tirador (presets, mm, orientación).
-   Siguiente: Fase 6 (#19) — electrodomésticos y accesorios.
+3g. ✅ **Paridad con Promob — Fase 6, electrodomésticos y accesorios** (ver `docs/PLAN-FASE-6.md` y
+   `docs/MEDIDAS-ELECTRODOMESTICOS.md`, issues #91–#94): aparatos paramétricos propios con medidas de fichas públicas
+   (cocinas, anafes, horno, campanas, heladeras, microondas, lavavajillas, lavarropas), bachas y griferías que calan la
+   mesada (3D + presupuesto), sanitarios de baño; no van al despiece y tienen precio opcional al presupuesto.
+   Siguiente: Fase 7 (#20) — configuración del render.
 4. ⏳ **Esquineros y especiales**: bajo esquinero L, alacena esquinera, horno/anafe, heladera, rebatibles, cajonera interna, alacena sobre heladera.
 5. ⏳ **Corte para taller**: orden de cortes, etiquetas por pieza imprimibles, sobrantes reutilizables.
 6. ⏳ **Módulo libre** a medida (editor por piezas).

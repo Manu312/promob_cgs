@@ -4,7 +4,7 @@
 // alineada a ejes; la misma geometría alimenta el 3D y el despiece.
 
 import { snapCandidates } from './room.js';
-import { buildAparato, FINISHES, TIPOS, splitAround } from './appliances.js';
+import { buildAparato, FINISHES, TIPOS, CARGAS, CANIOS, splitAround } from './appliances.js';
 import { bounds } from './walls.js';
 
 const SLIDES = [250, 300, 350, 400, 450, 500, 550, 600];
@@ -55,8 +55,10 @@ export const PARAM_DEFS = {
   bachas: { label: 'Bachas', type: 'num', min: 0, max: 2, step: 1 },
   hornallas: { label: 'Hornallas', type: 'num', min: 2, max: 6, step: 1 },
   tipo: { label: 'Tipo', type: 'sel', options: TIPOS },
+  carga: { label: 'Carga', type: 'sel', options: CARGAS },
+  canio: { label: 'Caño', type: 'sel', options: CANIOS },
   bowls: { label: 'Cubetas', type: 'num', min: 1, max: 2, step: 1 },
-  montaje: { label: 'Montaje', type: 'sel', options: [['apoyo', 'De apoyo'], ['bajo', 'Bajo mesada']] },
+  montaje: { label: 'Montaje', type: 'sel', options: [['apoyo', 'De apoyo'], ['bajo', 'Bajo mesada'], ['pie', 'Con pie'], ['colgar', 'De colgar']] },
   bowlDepth: { label: 'Profundidad de cubeta', type: 'num', min: 100, max: 300, step: 10, unit: 'mm' },
   reach: { label: 'Alcance del caño', type: 'num', min: 100, max: 350, step: 5, unit: 'mm' },
   finish: { label: 'Terminación', type: 'sel', options: FINISHES },
@@ -115,10 +117,15 @@ export const MODULE_TYPES = {
   heladera: { label: 'Heladera', cat: 'Electrodomésticos', kind: 'aparato', ap: 'heladera', y: 0, fields: ['width', 'height', 'depth', 'tipo', 'finish', 'price'], defaults: { width: 700, height: 1845, depth: 755, tipo: 'nofrost', finish: 'inox', price: 0 } },
   microondas: { label: 'Microondas', cat: 'Electrodomésticos', kind: 'aparato', ap: 'microondas', y: 890, rest: true, fields: ['width', 'height', 'depth', 'finish', 'price'], defaults: { width: 440, height: 260, depth: 340, finish: 'inox', price: 0 } },
   lavavajillas: { label: 'Lavavajillas', cat: 'Electrodomésticos', kind: 'aparato', ap: 'lavavajillas', y: 0, fields: ['width', 'height', 'depth', 'finish', 'price'], defaults: { width: 600, height: 850, depth: 600, finish: 'inox', price: 0 } },
-  lavarropas: { label: 'Lavarropas', cat: 'Electrodomésticos', kind: 'aparato', ap: 'lavarropas', y: 0, fields: ['width', 'height', 'depth', 'tipo', 'finish', 'price'], defaults: { width: 595, height: 850, depth: 550, tipo: 'frontal', finish: 'blanco', price: 0 } },
+  lavarropas: { label: 'Lavarropas', cat: 'Electrodomésticos', kind: 'aparato', ap: 'lavarropas', y: 0, fields: ['width', 'height', 'depth', 'carga', 'finish', 'price'], defaults: { width: 595, height: 850, depth: 550, carga: 'frontal', finish: 'blanco', price: 0 } },
   // Accesorios de cocina (Fase 6.2): la bacha cala la mesada sobre la que se apoya.
   bacha: { label: 'Bacha', cat: 'Accesorios', kind: 'aparato', ap: 'bacha', y: 870, rest: true, fields: ['width', 'depth', 'bowls', 'montaje', 'bowlDepth', 'price'], defaults: { width: 710, height: 10, depth: 482, bowls: 1, montaje: 'apoyo', bowlDepth: 180, price: 0 } },
-  griferia: { label: 'Grifería', cat: 'Accesorios', kind: 'aparato', ap: 'griferia', y: 870, rest: true, fields: ['height', 'reach', 'tipo', 'finish', 'price'], defaults: { width: 60, height: 334, depth: 240, reach: 210, tipo: 'alto', finish: 'cromo', price: 0 } },
+  griferia: { label: 'Grifería', cat: 'Accesorios', kind: 'aparato', ap: 'griferia', y: 870, rest: true, fields: ['height', 'reach', 'canio', 'finish', 'price'], defaults: { width: 60, height: 334, depth: 240, reach: 210, canio: 'alto', finish: 'cromo', price: 0 } },
+  // Sanitarios de baño (Fase 6.3)
+  inodoro: { label: 'Inodoro con mochila', cat: 'Baño', kind: 'aparato', ap: 'inodoro', y: 0, fields: ['width', 'height', 'depth', 'price'], defaults: { width: 380, height: 780, depth: 690, price: 0 } },
+  bidet: { label: 'Bidet', cat: 'Baño', kind: 'aparato', ap: 'bidet', y: 0, fields: ['width', 'height', 'depth', 'price'], defaults: { width: 352, height: 400, depth: 500, price: 0 } },
+  lavatorio: { label: 'Lavatorio', cat: 'Baño', kind: 'aparato', ap: 'lavatorio', y: 680, fields: ['width', 'height', 'depth', 'montaje', 'price'], defaults: { width: 412, height: 170, depth: 468, montaje: 'pie', price: 0 } },
+  griferia_bano: { label: 'Grifería de lavatorio', cat: 'Baño', kind: 'aparato', ap: 'griferiaBano', y: 850, rest: true, fields: ['height', 'reach', 'finish', 'price'], defaults: { width: 50, height: 160, depth: 150, reach: 120, finish: 'cromo', price: 0 } },
   mostrador: { label: 'Mostrador', cat: 'Oficina', kind: 'caja', y: 0, defaults: caja({ width: 1500, height: 1050, depth: 500, plinth: 100, dividers: 2, doorType: 'ninguna', doors: 0, shelves: 1, handlePos: 'none' }) },
 };
 
@@ -545,7 +552,7 @@ const BUILDERS = { esquinero: buildEsquinero, escritorio: buildEscritorio, tapa:
 export function buildModule(mod, ctx) {
   const def = MODULE_TYPES[mod.type];
   if (!def) return { parts: [], decors: [], hardware: {} };
-  if (def.kind === 'aparato') return buildAparato(def.ap, { ...def.defaults, ...mod.params }, mod.name || def.label);
+  if (def.kind === 'aparato') return buildAparato(def.ap, { ...def.defaults, ...mod.params, y: mod.y ?? def.y ?? 0 }, mod.name || def.label);
   return (BUILDERS[def.kind] || buildCaja)(mod.params, { ...ctx, aggs: mod.aggs || null, holes: ctx.holes || [] });
 }
 

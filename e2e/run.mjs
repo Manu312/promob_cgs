@@ -215,6 +215,15 @@ try {
     await clickText('.tabs button', 'Diseño 3D'); await sleep(400);
     for (let i = 0; i < 10; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(200); }
     check('Deshacer saca la bacha y la grifería', (await project()).modules.length === nBefore);
+    // Sanitarios de baño (#94)
+    await clickText('.cb-libs .cb-tab', 'Baños'); await clickText('.cb-groups .cb-tab', 'Sanitarios');
+    await clickText('.cb-subs .cb-tab', 'Inodoros y bidets'); await dbl('Inodoro con mochila'); await sleep(300); await dbl('Bidet'); await sleep(300);
+    await clickText('.cb-subs .cb-tab', 'Lavatorios'); await dbl('Lavatorio con pie'); await sleep(300);
+    p = await project();
+    const san = p.modules.slice(-3).map((m) => m.type);
+    check('Sanitarios: inodoro, bidet y lavatorio con pie', JSON.stringify(san) === '["inodoro","bidet","lavatorio"]', san.join(','));
+    await shot('01l-sanitarios');
+    for (let i = 0; i < 3; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(250); }
     await page.keyboard.press('Escape'); await sleep(200);
   }
   // Lista de Módulos (#60)

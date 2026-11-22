@@ -109,7 +109,7 @@ export const LIBRARY = [
         { id: 'microondas', label: 'Microondas', items: [
           it('ele-micro-20', 'microondas', 'Microondas 20 L'),
           it('ele-micro-28', 'microondas', 'Microondas 28 L', { width: 490, height: 290, depth: 400 }),
-          it('ele-micro-emp', 'microondas', 'Microondas empotrable', { width: 595, height: 389, depth: 321, tipo: 'empotrable' }, null, { y: 1450, rest: false }),
+          it('ele-micro-emp', 'microondas', 'Microondas empotrable', { width: 595, height: 389, depth: 321 }, null, { y: 1450, rest: false }),
         ] },
       ] },
       { id: 'lavado', label: 'Lavado', subgroups: [
@@ -119,7 +119,7 @@ export const LIBRARY = [
         ] },
         { id: 'lavarropas', label: 'Lavarropas', items: [
           it('ele-lavarropas-frontal', 'lavarropas', 'Lavarropas carga frontal'),
-          it('ele-lavarropas-superior', 'lavarropas', 'Lavarropas carga superior', { width: 600, height: 950, depth: 620, tipo: 'superior' }),
+          it('ele-lavarropas-superior', 'lavarropas', 'Lavarropas carga superior', { width: 600, height: 950, depth: 620, carga: 'superior' }),
         ] },
       ] },
     ],
@@ -139,8 +139,8 @@ export const LIBRARY = [
       { id: 'griferias', label: 'Griferías', subgroups: [
         { id: 'cocina', label: 'Cocina', items: [
           it('acc-grif-alto', 'griferia', 'Monocomando caño alto'),
-          it('acc-grif-bajo', 'griferia', 'Monocomando caño bajo', { height: 230, reach: 210, tipo: 'bajo' }),
-          it('acc-grif-extraible', 'griferia', 'Monocomando extraíble', { height: 400, reach: 220, tipo: 'extraible' }),
+          it('acc-grif-bajo', 'griferia', 'Monocomando caño bajo', { height: 230, reach: 210, canio: 'bajo' }),
+          it('acc-grif-extraible', 'griferia', 'Monocomando extraíble', { height: 400, reach: 220, canio: 'extraible' }),
         ] },
       ] },
     ],
@@ -167,6 +167,14 @@ export const LIBRARY = [
       ] },
       { id: 'columnas', label: 'Columnas', subgroups: [
         { id: 'columnas', label: 'Columnas', items: [it('ban-col', 'columna_bano')] },
+      ] },
+      { id: 'sanitarios', label: 'Sanitarios', subgroups: [
+        { id: 'inodoros', label: 'Inodoros y bidets', items: [it('ban-inodoro', 'inodoro'), it('ban-bidet', 'bidet')] },
+        { id: 'lavatorios', label: 'Lavatorios', items: [
+          it('ban-lavatorio-pie', 'lavatorio', 'Lavatorio con pie'),
+          it('ban-lavatorio-colgar', 'lavatorio', 'Lavatorio de colgar', { montaje: 'colgar' }, null, { y: 700 }),
+        ] },
+        { id: 'griferias', label: 'Griferías', items: [it('ban-grif', 'griferia_bano')] },
       ] },
     ],
   },

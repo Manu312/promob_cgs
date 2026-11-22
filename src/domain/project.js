@@ -29,11 +29,12 @@ export function sampleProject() {
     mk('alacena', 1200, { params: { width: 800 } }),
     mk('alacena', 2000, { params: { width: 800 } }),
   ];
+  const walls = p.room.walls;
   p.room = normalizeRoom({
     ...p.room,
     openings: [
-      { id: rid('o'), type: 'ventana', wall: 1, offset: 900, width: 1200, height: 1100, sill: 1000 },
-      { id: rid('o'), type: 'puerta', wall: 3, offset: 500, width: 800, height: 2050, sill: 0 },
+      { id: rid('o'), type: 'ventana', wallId: walls[1].id, offset: 900, width: 1200, height: 1100, sill: 1000 },
+      { id: rid('o'), type: 'puerta', wallId: walls[3].id, offset: 500, width: 800, height: 2050, sill: 0 },
     ],
   });
   return p;

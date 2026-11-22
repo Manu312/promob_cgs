@@ -64,7 +64,7 @@ function SlopedWall({ len, h0, h1, T, zc, openings, material }) {
 
 export const LOWERED_H = 100; // alto de una pared rebajada (mm)
 
-function Wall({ w, prev, room, openings, autoHide, selected, onSelect }) {
+function Wall({ w, prev, origin, openings, autoHide, selected, onDown: onWallDown }) {
   const ref = useRef();
   const W = w.wall;
   const T = w.t;
@@ -83,14 +83,14 @@ function Wall({ w, prev, room, openings, autoHide, selected, onSelect }) {
   useFrame(({ camera }) => {
     if (!ref.current) return;
     if (!autoHide) { ref.current.visible = true; return; }
-    const cx = camera.position.x / S + room.w / 2, cz = camera.position.z / S + room.d / 2;
+    const cx = camera.position.x / S + origin.x, cz = camera.position.z / S + origin.z;
     ref.current.visible = (cx - mid[0]) * w.n[0] + (cz - mid[1]) * w.n[1] < 200;
   });
   // Solo toma el clic si se ve: una pared oculta deja pasar el clic a lo que tiene detrás.
   const onDown = (e) => {
-    if (!onSelect || !ref.current?.visible) return;
+    if (!onWallDown || !ref.current?.visible) return;
     e.stopPropagation();
-    onSelect(w.id);
+    onWallDown(e, w);
   };
   return (
     <group ref={ref} position={[w.a[0] * S, gap * S, w.a[1] * S]} rotation={[0, theta, 0]} onPointerDown={onDown}>
@@ -110,7 +110,7 @@ function Wall({ w, prev, room, openings, autoHide, selected, onSelect }) {
   );
 }
 
-export function Room3D({ room, autoHide = true, selectedWallId, onSelectWall }) {
+export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown }) {
   const walls = useMemo(() => roomWalls(room).filter((w) => w.wall.visible), [room]);
   // Esquina de cada pared: la pared que llega a su vértice de inicio.
   const incomingOf = useMemo(() => new Map(wallCorners(room).map((c) => [c.outgoing.id, c.incoming])), [room]);
@@ -124,9 +124,9 @@ export function Room3D({ room, autoHide = true, selectedWallId, onSelectWall }) 
     <group>
       <mesh geometry={floorGeo} rotation={[-Math.PI / 2, 0, 0]} material={floorMat} receiveShadow />
       {walls.map((w) => (
-        <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} room={room}
+        <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} origin={origin}
           openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide}
-          selected={w.id === selectedWallId} onSelect={onSelectWall} />
+          selected={w.id === selectedWallId} onDown={onWallDown} />
       ))}
       {room.columns.map((c) => (
         <Box key={c.id} c={[(c.x + c.w / 2) * S, (H / 2) * S, (c.z + c.d / 2) * S]} s={[c.w * S, H * S, c.d * S]} m={wallMat} />

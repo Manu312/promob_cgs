@@ -243,6 +243,40 @@ try {
   check('Alto final distinto deja la pared inclinada', p.room.walls[0].h0 === 2600 && p.room.walls[0].h1 === 2000);
   await shot('14-pared-seleccionada-inclinada');
   check('Sin errores de consola tras editar paredes', errors.length === 0, errors.slice(-3).join(' | '));
+
+  // Arrastrar paredes y vértices en Planta (grilla magnética de 50 mm)
+  await page.keyboard.press('Escape'); await sleep(200);
+  await clickText('.vp-toolbar button', 'Planta'); await sleep(1200);
+  p = await project();
+  const dragFrom = async (pt, dx, dy) => {
+    await page.mouse.move(pt.x, pt.y); await page.mouse.down();
+    for (let i = 1; i <= 8; i++) { await page.mouse.move(pt.x + (dx * i) / 8, pt.y + (dy * i) / 8); await sleep(30); }
+    await page.mouse.up(); await sleep(500);
+  };
+  const bp = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2000, 75), p.room.walls[0].id);
+  await dragFrom(bp, 0, -50);
+  p = await project();
+  const zBack = p.room.points[0][1];
+  check('Arrastrar la pared del fondo la corre en paralelo y estira las vecinas', zBack < 0 && zBack % 50 === 0 && p.room.points[1][1] === zBack && p.room.points.length === 6, `z=${zBack}`);
+  await shot('15-planta-pared-arrastrada');
+  await ctrl('KeyZ');
+  p = await project();
+  check('Deshacer el arrastre de pared en un paso', p.room.points[0][1] === 0, `z=${p.room.points[0][1]}`);
+  const corner = p.room.nodes[1];
+  const cp = await page.evaluate((id) => window.__muebles.screenOfNode(id), corner.id);
+  await dragFrom(cp, 40, 0);
+  p = await project();
+  const c2 = p.room.nodes.find((n) => n.id === corner.id);
+  check('Arrastrar un vértice mueve la esquina', c2.x > corner.x && c2.x % 50 === 0 && c2.z === corner.z, `(${corner.x},${corner.z}) → (${c2.x},${c2.z})`);
+  await shot('16-planta-vertice-arrastrado');
+  await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(1200);
+  p = await project();
+  const nodesBefore = JSON.stringify(p.room.nodes);
+  const pp = await page.evaluate((id) => window.__muebles.screenOfWall(id, 1500), p.room.walls[0].id);
+  await dragFrom(pp, 0, 60);
+  p = await project();
+  check('En 3D una pared no movible se selecciona pero no se arrastra', JSON.stringify(p.room.nodes) === nodesBefore && (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Pared 1');
+  check('Sin errores de consola tras arrastrar paredes', errors.length === 0, errors.slice(-3).join(' | '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

@@ -19,6 +19,7 @@ export const ROOM_DEFAULTS = {
   openings: [],
   columns: [],
   refHeights: [100, 820, 1470, 2010, 2280],
+  lowerH: 100, // alto de una pared rebajada (mm)
   grid: { size: 50, magnetic: true },
   draw: { linear: 50, angular: 5 },
   floor: { auto: true },

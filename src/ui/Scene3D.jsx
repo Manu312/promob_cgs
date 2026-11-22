@@ -314,7 +314,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const dragRef = useRef(null);
@@ -382,6 +382,8 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
     const op = e.intersections?.find((i) => i.object.userData?.openingPick);
     const o = op && room.openings.find((x) => x.id === op.object.userData.openingPick && x.wallId === g.id);
     if (o) { onOpeningDown({ ...e, point: op.point }, o, g); return; }
+    // Clic en una pared rebajada a mano: se restaura (como hacer clic en su zócalo en Promob).
+    if (g.wall.lowered && leftButton(e)) { onSelectWall(g.id); onRestoreWall?.(g.id); return; }
     onSelectWall(g.id);
     if (!leftButton(e) || !(planta || g.wall.movable)) return;
     const [rx, rz] = toRoom(e.point);

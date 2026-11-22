@@ -37,7 +37,7 @@ const TABS = [['diseno', 'Diseño 3D'], ['corte', 'Plan de corte'], ['presupuest
 export default function App() {
   const [project, setProject, history] = useHistoryState('mueblesapp.project', sampleProject, normalizeProject);
   const [showDims, setShowDims] = useState(false);
-  const [autoHideWalls, setAutoHideWalls] = useState(true);
+  const [autoLower, setAutoLower] = useState(true); // Auto Rebajar (como Promob)
   const [rawSettings, setSettings] = usePersistent('mueblesapp.settings', DEFAULT_SETTINGS);
   const settings = useMemo(() => mergeSettings(rawSettings), [rawSettings]);
   const [tab, setTab] = useState('diseno');
@@ -291,17 +291,18 @@ export default function App() {
                 onDragStart={onDragStart} onDragEnd={history.commit}
                 drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
                 onWallContext={onWallContext}
+                onRestoreWall={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, id, { lowered: false }) }))}
                 selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
-                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoHideWalls} />
+                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower} />
             </ErrorBoundary>
             <div className="vp-toolbar">
               {[['perspectiva', 'Perspectiva'], ['frente', 'Frente'], ['planta', 'Planta']].map(([k, l]) => (
                 <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => { setView((v) => ({ name: k, tick: v.tick + 1 })); if (k === 'planta') setShowDims(true); else stopDrawWalls(); }}>{l}</button>
               ))}
               <button className={showDims ? 'active-soft' : ''} onClick={() => setShowDims((s) => !s)} title="Mostrar medidas de paredes y módulos">Cotas</button>
-              <button className={autoHideWalls ? 'active-soft' : ''} onClick={() => setAutoHideWalls((s) => !s)} title="Ocultar las paredes que tapan la vista">Paredes auto</button>
+              <button className={autoLower ? 'active-soft' : ''} onClick={() => setAutoLower((s) => !s)} title="Auto Rebajar: las paredes que tapan la vista bajan a zócalo">Auto rebajar</button>
               <button className={drawing ? 'active' : ''} onClick={() => (drawing ? stopDrawWalls() : startDrawWalls())} title="Construir paredes (Ctrl+Shift+P)">✏ Paredes</button>
               {view.name === 'planta' && (
                 <span className="grid-ctl">

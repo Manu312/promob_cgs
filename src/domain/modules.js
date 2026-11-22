@@ -324,6 +324,37 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null }) {
     add('kit_corrediza', nd);
   }
 
+  // Agregados de terminación
+  if (aggs?.cajones_int && n === 1 && nDoors > 0) { // cajones internos detrás de las puertas, abajo
+    const q = Math.max(1, Math.min(4, Math.round(aggs.cajones_int.qty || 1)));
+    const ch = 130, L = slideFor(D - zInt - dFront - 30), bw = iw - 2 * R.slideGap, bx = t + R.slideGap, bz = zf - dFront - L - 20;
+    for (let j = 0; j < q; j++) {
+      const by = yIn0 + 10 + j * (ch + 20);
+      if (by + ch > yIn1 - 50) break;
+      parts.push(part('Frente cajón interno', 'cajon', bx, by, bz + L - tc, bw, ch, tc, { x: 1 }));
+      parts.push(part('Lateral cajón', 'cajon', bx, by, bz, tc, ch - 20, L - tc, { z: 1 }));
+      parts.push(part('Lateral cajón', 'cajon', bx + bw - tc, by, bz, tc, ch - 20, L - tc, { z: 1 }));
+      parts.push(part('Trasero cajón', 'cajon', bx + tc, by, bz, bw - 2 * tc, ch - 20, tc, { x: 1 }));
+      parts.push(part('Fondo cajón', 'fondo', bx, by - tb, bz, bw, tb, L));
+      add('corredera', 1);
+    }
+  }
+  const top = H + (aggs?.tapa ? t : 0);
+  if (aggs?.tapa) parts.push(part('Tapa', 'cuerpo', 0, H, 0, W, t, D + tf, { x: 2, z: 1 }));
+  if (aggs?.cierre) parts.push(part('Cierre de tapa', 'frente', 0, H - 40, D + tf, W, 40, tf, { x: 2 }));
+  const marcoH = aggs?.marco ? 60 : 0;
+  if (aggs?.marco) {
+    parts.push(part('Marco superior', 'frente', 0, top, D + tf - t, W, marcoH, t, { x: 2 }));
+    parts.push(part('Marco superior', 'frente', 0, top, 0, t, marcoH, D + tf - t, { z: 1 }));
+    parts.push(part('Marco superior', 'frente', W - t, top, 0, t, marcoH, D + tf - t, { z: 1 }));
+  }
+  if (aggs?.cornisa) parts.push(part('Cornisa', 'frente', -30, top + marcoH, 0, W + 60, 30, D + tf + 30, { x: 2, z: 1 }));
+  if (aggs?.vistas) {
+    const side = aggs.vistas.side || 'ambas';
+    if (side !== 'der') parts.push(part('Vista', 'frente', -tf, 0, 0, tf, top, D + tf, { y: 2, z: 1 }));
+    if (side !== 'izq') parts.push(part('Vista', 'frente', W, 0, 0, tf, top, D + tf, { y: 2, z: 1 }));
+  }
+
   add('kit_armado', 1);
   return { parts, decors, hardware: hw };
 }

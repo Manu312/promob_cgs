@@ -4,6 +4,7 @@
 // alineada a ejes; la misma geometría alimenta el 3D y el despiece.
 
 import { snapCandidates } from './room.js';
+import { buildAparato, FINISHES } from './appliances.js';
 import { bounds } from './walls.js';
 
 const SLIDES = [250, 300, 350, 400, 450, 500, 550, 600];
@@ -52,6 +53,10 @@ export const PARAM_DEFS = {
   nicheH: { label: 'Hueco p/ electrodoméstico (alto)', type: 'num', min: 0, max: 2200, step: 10, unit: 'mm' },
   nicheY: { label: 'Hueco: altura desde abajo', type: 'num', min: 0, max: 2200, step: 10, unit: 'mm' },
   bachas: { label: 'Bachas', type: 'num', min: 0, max: 2, step: 1 },
+  hornallas: { label: 'Hornallas', type: 'num', min: 2, max: 6, step: 1 },
+  finish: { label: 'Terminación', type: 'sel', options: FINISHES },
+  chimneyH: { label: 'Chimenea (alto)', type: 'num', min: 0, max: 1500, step: 10, unit: 'mm' },
+  price: { label: 'Precio (opcional, al presupuesto)', type: 'num', min: 0, max: 1e9, step: 1000, unit: '$' },
   armD: { label: 'Profundidad del cuerpo', type: 'num', min: 250, max: 700, step: 10, unit: 'mm' },
   side: { label: 'Lado de la esquina', type: 'sel', options: [['izq', 'Izquierda'], ['der', 'Derecha']] },
 };
@@ -96,13 +101,19 @@ export const MODULE_TYPES = {
   // queda a la izquierda (atrás-izquierda); "Derecha" = atrás-derecha.
   esq_l: { label: 'Esquinero L', cat: 'Cocina', kind: 'esquinero', y: 0, defaults: { width: 950, depth: 950, height: 870, armD: 560, plinth: 150, doors: 2, side: 'izq', shape: 'l', handlePos: 'top', mesada: 'si', mesadaT: 20, mesadaOver: 20 } },
   esq_oblicuo: { label: 'Esquinero oblicuo', cat: 'Cocina', kind: 'esquinero', y: 0, defaults: { width: 900, depth: 900, height: 870, armD: 560, plinth: 150, doors: 1, side: 'izq', shape: 'oblicuo', handlePos: 'top', mesada: 'si', mesadaT: 20, mesadaOver: 20 } },
+  // Electrodomésticos (Fase 6): modelos propios con medidas de fichas públicas
+  // (docs/MEDIDAS-ELECTRODOMESTICOS.md). No van al despiece; el precio es opcional.
+  cocina: { label: 'Cocina', cat: 'Electrodomésticos', kind: 'aparato', ap: 'cocina', y: 0, fields: ['width', 'height', 'depth', 'hornallas', 'finish', 'price'], defaults: { width: 560, height: 850, depth: 580, hornallas: 4, finish: 'inox', price: 0 } },
+  anafe: { label: 'Anafe', cat: 'Electrodomésticos', kind: 'aparato', ap: 'anafe', y: 870, rest: true, cut: { w: 560, d: 490 }, fields: ['width', 'depth', 'hornallas', 'finish', 'price'], defaults: { width: 585, height: 50, depth: 520, hornallas: 4, finish: 'vidrio', price: 0 } },
+  horno: { label: 'Horno empotrable', cat: 'Electrodomésticos', kind: 'aparato', ap: 'horno', y: 850, fields: ['width', 'height', 'depth', 'finish', 'price'], defaults: { width: 595, height: 595, depth: 575, finish: 'inox', price: 0 } },
+  campana: { label: 'Campana', cat: 'Electrodomésticos', kind: 'aparato', ap: 'campana', y: 1650, fields: ['width', 'height', 'depth', 'chimneyH', 'finish', 'price'], defaults: { width: 600, height: 300, depth: 480, chimneyH: 600, finish: 'inox', price: 0 } },
   mostrador: { label: 'Mostrador', cat: 'Oficina', kind: 'caja', y: 0, defaults: caja({ width: 1500, height: 1050, depth: 500, plinth: 100, dividers: 2, doorType: 'ninguna', doors: 0, shelves: 1, handlePos: 'none' }) },
 };
 
 const KIND_FIELDS = { esquinero: ['width', 'depth', 'armD', 'height', 'plinth', 'doors', 'side', 'handlePos', 'mesada', 'mesadaT', 'mesadaOver'], escritorio: ['width', 'height', 'depth'], tapa: ['width', 'depth', 'mesadaT', 'bachas'], vista: ['height', 'depth'], estante: ['width', 'depth'] };
 
 export function fieldsFor(type) {
-  return KIND_FIELDS[MODULE_TYPES[type]?.kind] || CAJA_FIELDS;
+  return MODULE_TYPES[type]?.fields || KIND_FIELDS[MODULE_TYPES[type]?.kind] || CAJA_FIELDS;
 }
 
 export const hingesFor = (h) => (h <= 900 ? 2 : h <= 1600 ? 3 : h <= 2000 ? 4 : 5);
@@ -517,6 +528,7 @@ const BUILDERS = { esquinero: buildEsquinero, escritorio: buildEscritorio, tapa:
 export function buildModule(mod, ctx) {
   const def = MODULE_TYPES[mod.type];
   if (!def) return { parts: [], decors: [], hardware: {} };
+  if (def.kind === 'aparato') return buildAparato(def.ap, { ...def.defaults, ...mod.params }, mod.name || def.label);
   return (BUILDERS[def.kind] || buildCaja)(mod.params, { ...ctx, aggs: mod.aggs || null });
 }
 

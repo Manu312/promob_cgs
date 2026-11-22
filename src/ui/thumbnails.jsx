@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { buildAll } from '../domain/cutlist.js';
 import { itemParams } from '../domain/library.js';
-import { mat3d, metal } from './materials3d.js';
+import { mat3d, metal, finishMat } from './materials3d.js';
 
 // Miniaturas del catálogo generadas con el mismo modelo 3D que el visor (como Promob):
 // un único renderer fuera de pantalla, de a una por vez, con caché por ítem + medidas + materiales.
@@ -23,8 +23,10 @@ function getRenderer() {
   return renderer;
 }
 
-function box({ x, y, z, sx, sy, sz, ry = 0 }, material) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(sx * S, sy * S, sz * S), material);
+function box({ x, y, z, sx, sy, sz, ry = 0, shape, axis }, material) {
+  const geo = shape === 'cyl' ? new THREE.CylinderGeometry((sx / 2) * S, (sx / 2) * S, (axis === 'z' ? sz : sy) * S, 20) : new THREE.BoxGeometry(sx * S, sy * S, sz * S);
+  const m = new THREE.Mesh(geo, material);
+  if (shape === 'cyl' && axis === 'z') m.rotation.x = Math.PI / 2;
   m.position.set((x + sx / 2) * S, (y + sy / 2) * S, (z + sz / 2) * S);
   m.rotation.y = ry;
   return m;
@@ -42,9 +44,13 @@ function render(item, variant, ctx) {
   scene.add(sun);
   const { width: W, height: H, depth: D } = params;
   const g = new THREE.Group();
-  g.position.set((-W / 2) * S, (-H / 2) * S, (-D / 2) * S);
+  // centrado en la caja de lo que se dibuja (los aparatos pueden salirse de su medida: chimenea, cuerpo del anafe)
+  const all = [...b.parts, ...b.decors];
+  const lo = (k) => Math.min(0, ...all.map((o) => o[k])), hi = (k, s) => Math.max(0, ...all.map((o) => o[k] + o[s]));
+  const cy = (lo('y') + hi('y', 'sy')) / 2;
+  g.position.set((-W / 2) * S, -cy * S, (-D / 2) * S);
   for (const p of b.parts) g.add(box(p, mat3d(b.mats[p.slot])));
-  for (const d of b.decors) g.add(box(d, d.decor === 'mesada' ? mat3d(b.mats.tapas) : metal));
+  for (const d of b.decors) g.add(box(d, d.decor === 'mesada' ? mat3d(b.mats.tapas) : d.decor === 'aparato' ? finishMat(d.finish) : metal));
   scene.add(g);
   // Cámara de frente, un poco de costado y desde arriba; encuadra la esfera que envuelve al módulo.
   const cam = new THREE.PerspectiveCamera(28, 1, 0.01, 100);

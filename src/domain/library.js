@@ -78,6 +78,29 @@ export const LIBRARY = [
     ],
   },
   {
+    id: 'electro', label: 'Electrodomésticos', groups: [
+      { id: 'coccion', label: 'Cocción', subgroups: [
+        { id: 'cocinas', label: 'Cocinas', items: [
+          it('ele-cocina-50', 'cocina', 'Cocina 50 cm', { width: 500, height: 850, depth: 550 }),
+          it('ele-cocina-56', 'cocina', 'Cocina 56 cm'),
+          it('ele-cocina-60', 'cocina', 'Cocina 60 cm', { width: 600, height: 850, depth: 600 }),
+          it('ele-cocina-76', 'cocina', 'Cocina 76 cm 5 hornallas', { width: 765, height: 905, depth: 675, hornallas: 5 }),
+          it('ele-cocina-90', 'cocina', 'Cocina 90 cm 5 hornallas', { width: 900, height: 900, depth: 600, hornallas: 5 }),
+        ] },
+        { id: 'anafes', label: 'Anafes', items: [
+          it('ele-anafe-60', 'anafe', 'Anafe 60 cm 4 hornallas'),
+          it('ele-anafe-75', 'anafe', 'Anafe 75 cm 5 hornallas', { width: 750, depth: 520, hornallas: 5 }),
+          it('ele-anafe-90', 'anafe', 'Anafe 90 cm 5 hornallas', { width: 860, height: 40, depth: 510, hornallas: 5, finish: 'inox' }),
+        ] },
+        { id: 'hornos', label: 'Hornos', items: [it('ele-horno-60', 'horno', 'Horno empotrable 60 cm')] },
+        { id: 'campanas', label: 'Campanas', items: [
+          it('ele-campana-60', 'campana', 'Campana 60 cm'),
+          it('ele-campana-90', 'campana', 'Campana 90 cm', { width: 900, depth: 500 }),
+        ] },
+      ] },
+    ],
+  },
+  {
     id: 'dormitorios', label: 'Dormitorios', groups: [
       { id: 'placares', label: 'Placares', subgroups: [
         { id: 'batientes', label: 'Batientes', items: [it('dor-pla-bat', 'placard_bat', null, null, W(900, 1200, 1500, 1800, 2100, 2400))] },

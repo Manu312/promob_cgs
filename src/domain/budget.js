@@ -15,6 +15,9 @@ export function computeBudget(cut, nesting, settings) {
     const m2 = r2(s.m2);
     lines.push({ group: 'Tapas', desc: `Tapa ${s.name}`, qty: m2, unit: 'm²', unitPrice: s.priceM2, total: m2 * s.priceM2 });
   }
+  for (const e of Object.values(cut.extras || {})) {
+    lines.push({ group: 'Electrodomésticos', desc: e.name, qty: e.qty, unit: 'u', unitPrice: e.price, total: e.qty * e.price });
+  }
   for (const a of Object.values(cut.accItems || {})) {
     const q = r2(a.qty);
     lines.push({ group: 'Herrajes', desc: a.name, qty: q, unit: a.unit, unitPrice: a.price, total: q * a.price });

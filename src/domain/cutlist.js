@@ -66,7 +66,9 @@ export function computeCutList(built) {
   const edgeMeters = {};
   const stones = {};
   const accItems = {};
+  const extras = {}; // electrodomésticos con precio (no van al despiece)
   for (const b of built) {
+    if (b.extra) { const k = `${b.extra.name}|${b.extra.price}`; extras[k] = extras[k] || { ...b.extra, qty: 0 }; extras[k].qty++; }
     for (const [c, q] of Object.entries(b.hardware)) {
       const fam = ACC_FAMILIES.find((f) => f.code === c);
       if (c === 'mesada') { // tapas: m² por piedra
@@ -101,5 +103,5 @@ export function computeCutList(built) {
       edgeMeters[k].m += m;
     }
   });
-  return { rows, hardware, edgeMeters, stones, accItems };
+  return { rows, hardware, edgeMeters, stones, accItems, extras };
 }

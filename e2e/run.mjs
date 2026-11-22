@@ -486,6 +486,34 @@ try {
   const ruler2 = await page.$$eval('.cota-ruler', (els) => els.map((e) => e.textContent));
   check('Editar la lista de alturas se guarda en el proyecto', JSON.stringify(p.room.refHeights) === '[100,900,2100]' && ruler2.includes('900') && !ruler2.includes('1470'), ruler2.join(', '));
   await ctrl('KeyZ');
+
+  // Cotas manuales lineales y angulares (#13)
+  await page.keyboard.press('Escape'); await sleep(200);
+  await clickText('.vp-toolbar button', '↔ Cota'); await sleep(1500);
+  const at = (x, z) => page.evaluate((x, z) => window.__muebles.screenOfPoint(x, z), x, z);
+  let q = await at(605, 555); await page.mouse.click(q.x, q.y); await sleep(300); // esquina del bajo (imán a vértice)
+  q = await at(3590, 560); await page.mouse.click(q.x, q.y); await sleep(500);   // pared derecha (imán a la arista)
+  p = await project();
+  let man = await page.$$eval('.cota-man', (els) => els.map((e) => e.textContent));
+  check('Cota lineal entre la esquina del módulo y la pared', p.annotations?.length === 1 && man.includes('3000'), man.join(', '));
+  await page.evaluate(() => [...document.querySelectorAll('.draw-hud label')].find((l) => l.textContent.includes('Angular')).querySelector('input').click()); await sleep(200);
+  for (const [x, z] of [[0, 2990], [5, 5], [3590, 0]]) { q = await at(x, z); await page.mouse.click(q.x, q.y); await sleep(300); }
+  await sleep(300);
+  p = await project();
+  man = await page.$$eval('.cota-man', (els) => els.map((e) => e.textContent));
+  check('Cota angular entre dos paredes muestra 90°', p.annotations?.length === 2 && man.includes('90°'), man.join(', '));
+  await shot('26-cotas-manuales');
+  await page.keyboard.press('Escape'); await sleep(300);
+  check('Esc termina la herramienta de cotas', !(await page.$('.draw-hud')));
+  await clickCota('.cota-man', '3000');
+  check('Clic en una cota manual la selecciona', (await page.$eval('.statusbar .sb-sel', (e) => e.textContent)) === 'Cota lineal · 3000 mm');
+  await page.keyboard.press('Delete'); await sleep(400);
+  p = await project();
+  check('Supr borra la cota manual', p.annotations.length === 1);
+  await ctrl('KeyZ');
+  p = await project();
+  check('Deshacer el borrado de la cota', p.annotations.length === 2);
+  check('Sin errores de consola tras cotas manuales', errors.length === 0, errors.slice(-3).join(' | '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

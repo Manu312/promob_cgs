@@ -2,6 +2,7 @@
 
 import { roomWalls, OPENING_TYPES } from './room.js';
 import { MODULE_TYPES } from './modules.js';
+import { annotationValue } from './annotations.js';
 
 const area = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -23,6 +24,11 @@ export function describeSelection(project, sel) {
   if (sel.kind === 'column') {
     const c = project.room.columns.find((x) => x.id === sel.id);
     return c ? `Columna · ${c.w} × ${c.d}` : '';
+  }
+  if (sel.kind === 'dim') {
+    const a = (project.annotations || []).find((x) => x.id === sel.id);
+    if (!a) return '';
+    return a.kind === 'lin' ? `Cota lineal · ${annotationValue(a)} mm` : `Cota angular · ${annotationValue(a)}°`;
   }
   if (sel.kind === 'module') {
     const m = project.modules.find((x) => x.id === sel.id);

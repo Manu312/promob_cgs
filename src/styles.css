@@ -110,3 +110,8 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .cota.cota-ang { background: #7c3aed; }
 .cota.cota-ruler { background: #1e3a8a; }
 .cota.cota-ruler.mod { background: #6b7280; }
+.cota.cota-man { background: #0f766e; }
+.cota.cota-man.sel { background: #f59e0b; }
+.cota.selectable { cursor: pointer; }
+.draw-hud input[type=radio], .draw-hud input[type=checkbox] { width: auto; }
+.draw-hud label.radio { display: inline-flex; align-items: center; gap: 4px; }

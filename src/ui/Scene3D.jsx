@@ -1,11 +1,17 @@
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, Lightformer, ContactShadows } from '@react-three/drei';
+import { OrbitControls, OrthographicCamera, Environment, Lightformer, ContactShadows } from '@react-three/drei';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { WebGLPathTracer, GradientEquirectTexture } from 'three-gpu-pathtracer';
 import { footprint } from '../domain/modules.js';
+import { bounds } from '../domain/walls.js';
+import { planFitZoom } from '../domain/grid.js';
 import { mat3d, metal, stone } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
+import { PlanGrid } from './PlanGrid.jsx';
+
+const ROTATE_BUTTONS = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+const PLAN_BUTTONS = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 
 const S = 0.001; // mm → m
 
@@ -56,18 +62,29 @@ function ModuleObject({ mod, b, selected, showSel, onDown }) {
   );
 }
 
+// Ubica la cámara al cambiar de vista. Al entrar/salir de Planta cambia la cámara
+// (ortográfica ↔ perspectiva) y drei recrea los controles en el render siguiente:
+// se espera a que ambos estén listos antes de aplicar la vista.
 function CameraRig({ view, room, controlsRef }) {
-  const { camera } = useThree();
-  useEffect(() => {
-    const big = Math.max(room.w, room.d) * S;
+  const pending = useRef(true);
+  const { size } = useThree();
+  useEffect(() => { pending.current = true; }, [view.tick]);
+  useFrame(({ camera }) => {
+    if (!pending.current) return;
+    const planta = view.name === 'planta';
+    const c = controlsRef.current;
+    if (!!camera.isOrthographicCamera !== planta || (c && c.object !== camera)) return;
+    pending.current = false;
     let pos, tgt;
-    if (view.name === 'planta') { pos = [0, big * 1.5 + 1.5, 0.001]; tgt = [0, 0, 0]; }
-    else if (view.name === 'frente') { pos = [0, 1.3, (room.d * S) / 2 + 2.8]; tgt = [0, 1.1, -(room.d * S) / 4]; }
+    if (planta) {
+      pos = [0, 40, 0.001]; tgt = [0, 0, 0];
+      camera.zoom = planFitZoom(bounds(room), size.width, size.height);
+      camera.updateProjectionMatrix();
+    } else if (view.name === 'frente') { pos = [0, 1.3, (room.d * S) / 2 + 2.8]; tgt = [0, 1.1, -(room.d * S) / 4]; }
     else { pos = [1.6, 2.3, (room.d * S) / 2 + 2.6]; tgt = [0, 0.9, -(room.d * S) / 5]; }
     camera.position.set(...pos);
-    const c = controlsRef.current;
     if (c) { c.target.set(...tgt); c.update(); } else camera.lookAt(...tgt);
-  }, [view.tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
   return null;
 }
 
@@ -141,6 +158,7 @@ function DevProbe({ project }) {
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     window.__muebles = {
+      cameraType: camera.type,
       screenOf(id, dy = 0) {
         const m = project.modules.find((o) => o.id === id);
         if (!m) return null;
@@ -186,6 +204,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, onMo
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const { room } = project;
+  const planta = view.name === 'planta';
   const cx = (room.w * S) / 2, cz = (room.d * S) / 2;
 
   const onDown = (e, mod) => {
@@ -233,6 +252,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, onMo
       )}
       <group position={[-cx, 0, -cz]}>
         <Room3D room={room} autoHide={autoHideWalls} />
+        {planta && !renderMode && <PlanGrid room={room} />}
         {showDims && !renderMode && <Dimensions room={room} modules={project.modules} />}
         {project.modules.map((m) => {
           const b = builtById.get(m.id);
@@ -241,7 +261,9 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, onMo
         })}
       </group>
       {renderMode && !photoreal && <ContactShadows position={[0, 0.002, 0]} scale={12} blur={2.2} opacity={0.45} far={2.5} />}
-      <OrbitControls ref={controlsRef} makeDefault maxPolarAngle={view.name === 'planta' ? Math.PI : Math.PI / 2 - 0.02} minDistance={0.5} maxDistance={20} />
+      {planta && <OrthographicCamera makeDefault near={0.1} far={200} position={[0, 40, 0.001]} />}
+      <OrbitControls ref={controlsRef} makeDefault maxPolarAngle={planta ? Math.PI : Math.PI / 2 - 0.02} minDistance={0.5} maxDistance={20}
+        enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={planta ? PLAN_BUTTONS : ROTATE_BUTTONS} />
       <CameraRig view={view} room={room} controlsRef={controlsRef} />
       {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
       <Capturer captureRef={captureRef} photoreal={photoreal} />

@@ -198,6 +198,26 @@ try {
   check('Proyecto v1 se migra a paredes v2', p.room.version === 2 && p.room.walls.length === 6 && p.room.nodes.length === 6, `${p.room.walls?.length} paredes`);
   check('Abertura del proyecto v1 queda en su pared', p.room.openings.length === 1 && wallIds.has(p.room.openings[0].wallId));
   await shot('11-proyecto-v1-migrado');
+
+  // Vista Planta ortográfica con grilla magnética de 50 mm
+  await clickText('.mod-btn span', 'Cajonera interior');
+  p = await project();
+  const caj = p.modules.at(-1);
+  await clickText('.vp-toolbar button', 'Planta'); await sleep(1200);
+  check('Planta usa cámara ortográfica', (await page.evaluate(() => window.__muebles.cameraType)) === 'OrthographicCamera');
+  check('Planta muestra controles de grilla', await page.evaluate(() => !!document.querySelector('.grid-ctl select')));
+  const gp = await page.evaluate((id) => window.__muebles.screenOf(id), caj.id);
+  await page.mouse.move(gp.x, gp.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) { await page.mouse.move(gp.x + 17 * i, gp.y + 13 * i); await sleep(30); }
+  await page.mouse.up(); await sleep(500);
+  p = await project();
+  const cm = p.modules.find((m) => m.id === caj.id);
+  check('Arrastre en Planta queda en múltiplos de la grilla (50 mm)', (cm.x !== caj.x || cm.z !== caj.z) && cm.x % 50 === 0 && cm.z % 50 === 0, `(${caj.x},${caj.z}) → (${cm.x},${cm.z})`);
+  await shot('12-planta-grilla');
+  await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(1200);
+  check('Volver a Perspectiva restaura la cámara', (await page.evaluate(() => window.__muebles.cameraType)) === 'PerspectiveCamera');
+  await shot('13-vuelta-perspectiva');
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

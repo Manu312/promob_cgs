@@ -56,13 +56,17 @@ export default function App() {
     ...p, modules: p.modules.map((m) => (m.id === id ? clampToRoom(fn(m), p.room) : m)),
   })), [setProject]);
 
+  // En Planta, con grilla magnética, los arrastres se redondean al paso de la grilla.
+  const grid = project.room.grid || { size: 50, magnetic: true };
+  const gridStep = view.name === 'planta' && grid.magnetic ? grid.size : 10;
   const onMove = useCallback((id, x, z) => setProject((p) => {
     const m = p.modules.find((o) => o.id === id);
     if (!m) return p;
-    const pos = snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id), p.room);
+    const pos = snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id), p.room, 40, gridStep);
     if (pos.x === m.x && pos.z === m.z) return p;
     return { ...p, modules: p.modules.map((o) => (o.id === id ? { ...o, ...pos } : o)) };
-  }), [setProject]);
+  }), [setProject, gridStep]);
+  const setGrid = (patch) => setProject((p) => ({ ...p, room: { ...p.room, grid: { ...grid, ...patch } } }));
 
   const addModule = (type) => {
     const m = newModule(type, project);
@@ -156,6 +160,15 @@ export default function App() {
               ))}
               <button className={showDims ? 'active-soft' : ''} onClick={() => setShowDims((s) => !s)} title="Mostrar medidas de paredes y módulos">Cotas</button>
               <button className={autoHideWalls ? 'active-soft' : ''} onClick={() => setAutoHideWalls((s) => !s)} title="Ocultar las paredes que tapan la vista">Paredes auto</button>
+              {view.name === 'planta' && (
+                <span className="grid-ctl">
+                  <button className={grid.magnetic ? 'active-soft' : ''} onClick={() => setGrid({ magnetic: !grid.magnetic })}
+                    title="Grilla magnética: al arrastrar en Planta, las posiciones se redondean al paso de la grilla">Grilla</button>
+                  <select value={grid.size} onChange={(e) => setGrid({ size: +e.target.value })} title="Paso de la grilla">
+                    {[10, 25, 50, 100, 250, 500].map((v) => <option key={v} value={v}>{v} mm</option>)}
+                  </select>
+                </span>
+              )}
               <span className="sep" />
               <button className={renderMode && !photoreal ? 'active' : ''} disabled={photoreal} onClick={() => { setRenderMode((r) => !r); setSelectedId(null); }}>
                 {renderMode && !photoreal ? '✓ Modo render' : 'Modo render'}

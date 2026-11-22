@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Html, Line } from '@react-three/drei';
 import { nearestDistances } from '../domain/dimensions.js';
+import { roomWalls } from '../domain/room.js';
+import { openingDims } from '../domain/openings.js';
 
 const S = 0.001;
 
@@ -59,4 +61,21 @@ export function ModuleDistances({ room, modules, mod, onEdit }) {
       </group>
     );
   });
+}
+
+// Cotas de la abertura seleccionada: distancia a cada extremo de su pared (editables).
+export function OpeningDims({ room, id, onEdit }) {
+  const o = room.openings.find((x) => x.id === id);
+  const g = o && roomWalls(room).find((w) => w.id === o.wallId);
+  if (!g) return null;
+  const d = openingDims(room, id);
+  const y = 0.02;
+  const P = (s) => [(g.a[0] + g.u[0] * s - g.n[0] * 180) * S, y, (g.a[1] + g.u[1] * s - g.n[1] * 180) * S];
+  const segs = [['start', 0, o.offset, d.start], ['end', o.offset + o.width, g.len, d.end]].filter(([, s0, s1]) => s1 - s0 >= 1);
+  return segs.map(([k, s0, s1, val]) => (
+    <group key={k}>
+      <Line points={[P(s0), P(s1)]} color="#e4572e" lineWidth={1.6} depthTest={false} renderOrder={5} />
+      <CotaLabel p={P((s0 + s1) / 2)} value={val} className="cota cota-dist" onCommit={onEdit ? (v) => onEdit(id, k, v) : undefined} />
+    </group>
+  ));
 }

@@ -9,7 +9,7 @@ import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
 import { mat3d, metal, stone } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
-import { ModuleDistances } from './Cotas.jsx';
+import { ModuleDistances, OpeningDims } from './Cotas.jsx';
 import { DrawTool } from './DrawTool.jsx';
 import { PlanGrid } from './PlanGrid.jsx';
 
@@ -209,6 +209,13 @@ function DevProbe({ project, origin }) {
         return n ? toScreen(n.x, project.room.h + 20, n.z) : null;
       },
       screenOfPoint(x, z, y = 0) { return toScreen(x, y, z); },
+      screenOfOpening(id) {
+        const o = project.room.openings.find((x) => x.id === id);
+        const g = o && roomWalls(project.room).find((w) => w.id === o.wallId);
+        if (!g) return null;
+        const s = o.offset + o.width / 2;
+        return toScreen(g.a[0] + g.u[0] * s - g.n[0] * 2, o.sill + o.height / 2, g.a[1] + g.u[1] * s - g.n[1] * 2);
+      },
       screenOfHandle(id, handle) {
         const m = project.modules.find((o) => o.id === id);
         if (!m) return null;
@@ -240,10 +247,10 @@ function NodeHandles({ room, onNodeDown }) {
 // flechas de redimensionar. Los listeners están siempre registrados y el arrastre vive en
 // una ref que se carga en el mismo pointerdown: si se registraran al empezar (en un efecto),
 // un clic rápido soltaría el botón antes y el arrastre quedaría "pegado" al mouse.
-function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onResize, onDragEnd, controlsRef, origin }) {
+function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onDragEnd, controlsRef, origin }) {
   const { camera, gl } = useThree();
   const live = useRef();
-  live.current = { camera, gl, onMove, onMoveWall, onMoveNode, onResize, onDragEnd, origin };
+  live.current = { camera, gl, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onDragEnd, origin };
   useEffect(() => {
     const ray = new THREE.Raycaster();
     const v = new THREE.Vector2();
@@ -274,6 +281,10 @@ function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onRe
       if (drag.kind === 'resize') {
         const delta = drag.vertical ? (pt.y - drag.p0.y) / S : (rx - drag.sx) * drag.dir[0] + (rz - drag.sz) * drag.dir[1];
         cb.onResize(drag.start, drag.handle, snap(delta));
+      } else if (drag.kind === 'opening') {
+        cb.onMoveOpening(drag.id, drag.offset0 + snap((rx - drag.sx) * drag.u[0] + (rz - drag.sz) * drag.u[1]));
+      } else if (drag.kind === 'column') {
+        cb.onMoveColumn(drag.id, rx - drag.offX, rz - drag.offZ);
       } else if (drag.kind === 'wall') {
         const q = snap((rx - drag.sx) * drag.n[0] + (rz - drag.sz) * drag.n[1]);
         cb.onMoveWall(drag.id, drag.n[0] * q, drag.n[1] * q);
@@ -303,7 +314,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const dragRef = useRef(null);
@@ -342,6 +353,22 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
     const [rx, rz] = toRoom(e.point);
     startDrag({ kind: 'module', id: mod.id, planeY: e.point.y, offX: rx - mod.x, offZ: rz - mod.z });
   };
+  // Abertura: se selecciona y se arrastra solo a lo largo de su pared.
+  const onOpeningDown = (e, o, g) => {
+    if (renderMode || handleHit(e)) return;
+    onSelectOpening(o.id);
+    if (!leftButton(e)) return;
+    const [rx, rz] = toRoom(e.point);
+    startDrag({ kind: 'opening', id: o.id, planeY: e.point.y, sx: rx, sz: rz, u: g.u, offset0: o.offset, step });
+  };
+  // Columna: se selecciona y se arrastra (imán a paredes y grilla).
+  const onColumnDown = (e, c) => {
+    if (renderMode || handleHit(e)) return;
+    onSelectColumn(c.id);
+    if (!leftButton(e)) return;
+    const [rx, rz] = toRoom(e.point);
+    startDrag({ kind: 'column', id: c.id, planeY: e.point.y, offX: rx - c.x, offZ: rz - c.z, step });
+  };
   // Clic derecho en una pared: menú contextual en la posición del mouse (offset = punto sobre la pared).
   const onWallMenu = (e, g) => {
     const [rx, rz] = toRoom(e.point);
@@ -351,6 +378,10 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
   const onWallDown = (e, g) => {
     if (renderMode) return;
     if (handleHit(e)) return;
+    // En Planta el dintel tapa la abertura desde arriba: si el rayo pasa por una abertura de esta pared, es de la abertura.
+    const op = e.intersections?.find((i) => i.object.userData?.openingPick);
+    const o = op && room.openings.find((x) => x.id === op.object.userData.openingPick && x.wallId === g.id);
+    if (o) { onOpeningDown({ ...e, point: op.point }, o, g); return; }
     onSelectWall(g.id);
     if (!leftButton(e) || !(planta || g.wall.movable)) return;
     const [rx, rz] = toRoom(e.point);
@@ -411,7 +442,10 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       )}
       <group position={[-origin.x * S, 0, -origin.z * S]}>
         <Room3D room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown}
-          onWallMenu={renderMode || drawing ? null : onWallMenu} />
+          onWallMenu={renderMode || drawing ? null : onWallMenu}
+          selectedOpeningId={renderMode ? null : selectedOpeningId} onOpeningDown={renderMode || drawing ? null : onOpeningDown}
+          selectedColumnId={renderMode ? null : selectedColumnId} onColumnDown={renderMode || drawing ? null : onColumnDown} />
+        {selectedOpeningId && !renderMode && <OpeningDims room={room} id={selectedOpeningId} onEdit={onOpeningDim} />}
         {planta && !renderMode && <PlanGrid room={room} />}
         {planta && !renderMode && !drawing && <NodeHandles room={room} onNodeDown={onNodeDown} />}
         {planta && !renderMode && drawing && <DrawTool room={room} draw={drawing} origin={origin} cursorRef={drawCursorRef} onPoint={onDrawPoint} onFinish={onDrawFinish} />}
@@ -432,7 +466,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
       <Capturer captureRef={captureRef} photoreal={photoreal} />
       <DevProbe project={project} origin={origin} />
-      <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
+      <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
     </Canvas>
   );
 }

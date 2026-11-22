@@ -404,6 +404,44 @@ try {
   await ctrl('KeyZ');
   const angs3 = await page.$$eval('.cota-ang', (els) => els.map((e) => e.textContent));
   check('Deshacer la edición de ángulo', angs3.length === 4 && angs3.every((t) => t === '90°'), angs3.join(', '));
+
+  // Aberturas y columnas arrastrables (#10)
+  await page.keyboard.press('Escape'); await sleep(200);
+  await clickText('.room-editor .row-btns button', '+ Ventana'); await sleep(400);
+  p = await project();
+  const win = p.room.openings.at(-1);
+  await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(1500);
+  const wp1 = await page.evaluate((id) => window.__muebles.screenOfOpening(id), win.id);
+  await dragFrom(wp1, 60, 0);
+  p = await project();
+  const win2 = p.room.openings.find((o) => o.id === win.id);
+  check('Clic en una ventana la selecciona', (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Ventana' && (await page.$eval('.statusbar .sb-sel', (e) => e.textContent)).startsWith('Ventana · 1200 × 1100'));
+  check('Arrastrar la ventana la corre a lo largo de su pared', win2.wallId === win.wallId && win2.offset !== win.offset && win2.offset % 10 === 0, `${win.offset} → ${win2.offset}`);
+  const ods = await page.$$eval('.cota-dist', (els) => els.map((e) => e.textContent));
+  check('La ventana muestra sus cotas a los extremos de la pared', ods.includes(String(win2.offset)), ods.join(', '));
+  await clickCota('.cota-dist', String(win2.offset));
+  await page.keyboard.type('500'); await page.keyboard.press('Enter'); await sleep(500);
+  p = await project();
+  check('Editar la cota de la ventana la ubica', p.room.openings.find((o) => o.id === win.id).offset === 500);
+  await shot('22-ventana-seleccionada');
+  await page.mouse.click(5, 450); await sleep(100); // foco fuera de inputs
+  const wp2 = await page.evaluate((id) => window.__muebles.screenOfOpening(id), win.id);
+  await page.mouse.click(wp2.x, wp2.y); await sleep(300);
+  await page.keyboard.press('Delete'); await sleep(400);
+  p = await project();
+  check('Supr quita la ventana seleccionada', !p.room.openings.some((o) => o.id === win.id));
+  await ctrl('KeyZ');
+  await page.keyboard.press('Escape'); await sleep(200);
+  await clickText('.room-editor .row-btns button', '+ Columna'); await sleep(400);
+  p = await project();
+  const col = p.room.columns.at(-1);
+  await clickText('.vp-toolbar button', 'Planta'); await sleep(1500);
+  const cpt = await page.evaluate(() => window.__muebles.screenOfPoint(150, 150, 2600));
+  await dragFrom(cpt, 150, 130);
+  p = await project();
+  const col2 = p.room.columns.find((c) => c.id === col.id);
+  check('Arrastrar una columna en Planta (grilla de 50)', (col2.x !== col.x || col2.z !== col.z) && col2.x % 50 === 0 && col2.z % 50 === 0 && (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Columna', `(${col.x},${col.z}) → (${col2.x},${col2.z})`);
+  check('Sin errores de consola tras aberturas y columnas', errors.length === 0, errors.slice(-3).join(' | '));
   check('Sin errores de consola al final', errors.length === 0, errors.slice(-3).join(' | '));
 } catch (e) {
   check('Ejecución del escenario', false, e.message + (errors.length ? ' | consola: ' + errors.slice(-3).join(' | ').slice(0, 800) : ''));

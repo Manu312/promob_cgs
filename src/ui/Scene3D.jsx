@@ -199,6 +199,42 @@ function Capturer({ captureRef, photoreal }) {
   return null;
 }
 
+// Proyecta un punto de la pantalla al plano horizontal y = `y` (mm) del ambiente: lo usa
+// el arrastre desde el catálogo para ubicar el recuadro verde.
+function Picker({ pickRef, origin }) {
+  const { camera, gl } = useThree();
+  useEffect(() => {
+    const ray = new THREE.Raycaster();
+    pickRef.current = (cx, cy, y = 0) => {
+      const r = gl.domElement.getBoundingClientRect();
+      ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), camera);
+      const pt = new THREE.Vector3();
+      if (!ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -y * S), pt)) return null;
+      if (!camera.isOrthographicCamera && pt.distanceTo(camera.position) > MAX_DRAG_DIST) return null;
+      return [pt.x / S + origin.x, pt.z / S + origin.z];
+    };
+  }, [camera, gl, origin, pickRef]);
+  return null;
+}
+
+// Recuadro verde de la posición de inserción (arrastre desde el catálogo).
+const ghostFill = new THREE.MeshBasicMaterial({ color: '#22c55e', transparent: true, opacity: 0.22, depthWrite: false });
+function GhostBox({ mod }) {
+  const { fw, fd } = footprint(mod);
+  const W = mod.params.width, H = mod.params.height, D = mod.params.depth;
+  const edges = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(W * S, H * S, D * S)), [W, H, D]);
+  return (
+    <group position={[(mod.x + fw / 2) * S, (mod.y || 0) * S, (mod.z + fd / 2) * S]} rotation={[0, ((mod.rot || 0) * Math.PI) / 180, 0]} name="insertGhost">
+      <mesh position={[0, (H * S) / 2, 0]} material={ghostFill} raycast={() => null} renderOrder={4}>
+        <boxGeometry args={[W * S, H * S, D * S]} />
+      </mesh>
+      <lineSegments geometry={edges} position={[0, (H * S) / 2, 0]} raycast={() => null} renderOrder={4}>
+        <lineBasicMaterial color="#16a34a" />
+      </lineSegments>
+    </group>
+  );
+}
+
 // Solo en desarrollo: permite a los tests e2e ubicar módulos, paredes y vértices en pantalla.
 function DevProbe({ project, origin }) {
   const { camera, gl, scene } = useThree();
@@ -212,6 +248,7 @@ function DevProbe({ project, origin }) {
     window.__muebles = {
       cameraType: camera.type,
       planImageShown: !!scene.getObjectByName('planImage'),
+      ghostShown: !!scene.getObjectByName('insertGhost'),
       screenOf(id, dy = 0) {
         const m = project.modules.find((o) => o.id === id);
         if (!m) return null;
@@ -337,7 +374,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true, pickRef, ghost }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const dragRef = useRef(null);
@@ -486,6 +523,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
         {planta && !renderMode && drawing && <DrawTool room={room} draw={drawing} origin={origin} cursorRef={drawCursorRef} onPoint={onDrawPoint} onFinish={onDrawFinish} />}
         {showDims && !renderMode && <Dimensions room={room} modules={project.modules} onWallLength={onWallLength} onWallAngle={onWallAngle} />}
         {selectedMod && !renderMode && <ModuleDistances room={room} modules={project.modules} mod={selectedMod} onEdit={onDimEdit} vertical={!planta} />}
+        {ghost && <GhostBox mod={ghost} />}
         {project.modules.map((m) => {
           const b = builtById.get(m.id);
           if (!b) return null;
@@ -502,6 +540,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
       <Capturer captureRef={captureRef} photoreal={photoreal} />
       <DevProbe project={project} origin={origin} />
+      {pickRef && <Picker pickRef={pickRef} origin={origin} />}
       <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
     </Canvas>
   );

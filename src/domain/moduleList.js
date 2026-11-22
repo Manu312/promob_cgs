@@ -1,6 +1,6 @@
 // Lista de Módulos (como Promob): los módulos agrupados por plano de inserción. Un módulo
 // apoyado en una pared (espalda contra su cara interior) va en esa pared; el resto, en el piso.
-import { MODULE_TYPES } from './modules.js';
+import { moduleName } from './modules.js';
 import { roomWalls } from './room.js';
 import { modulesOnWall } from './wallEdit.js';
 
@@ -23,7 +23,7 @@ export function moduleRowLabel(project, id) {
   const m = project.modules[i];
   if (!m) return '';
   const { width, height, depth } = m.params;
-  return `M${i + 1} · ${MODULE_TYPES[m.type]?.label || m.type} · ${width}×${height}×${depth}`;
+  return `M${i + 1} · ${moduleName(m)} · ${width}×${height}×${depth}`;
 }
 
 export const toggleHidden = (project, ids) => {

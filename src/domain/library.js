@@ -2,8 +2,10 @@
 // biblioteca (Cocinas, Dormitorios…) → familia (Inferiores, Altos…) → subfamilia (Cajoneros…).
 // Un ítem es un tipo de módulo con medidas propias: el mismo tipo da varios ítems.
 import { MODULE_TYPES } from './modules.js';
+import { restingHeight } from './movement.js';
 
-const it = (id, type, label, params, variants) => ({ id, type, label: label ?? MODULE_TYPES[type].label, ...(params ? { params } : {}), ...(variants ? { variants } : {}) });
+// `extra`: { y } altura de inserción propia (p. ej. superiores bajos más arriba).
+const it = (id, type, label, params, variants, extra) => ({ id, type, label: label ?? MODULE_TYPES[type].label, ...(params ? { params } : {}), ...(variants ? { variants } : {}), ...(extra || {}) });
 // Desplegable de medidas (anchos de fábrica habituales).
 const W = (...values) => ({ param: 'width', values });
 const W_BAJO = W(300, 350, 400, 450, 500, 600, 700, 800, 900, 1000);
@@ -14,16 +16,54 @@ export const LIBRARY = [
   {
     id: 'cocinas', label: 'Cocinas', groups: [
       { id: 'inferiores', label: 'Inferiores', subgroups: [
-        { id: 'puertas', label: 'Puertas', items: [it('coc-inf-2p', 'bajo', null, null, W_BAJO)] },
-        { id: 'cajoneros', label: 'Cajoneros', items: [it('coc-inf-caj', 'bajo_cajones', null, null, W_CAJ)] },
-        { id: 'especiales', label: 'Especiales', items: [it('coc-inf-mixto', 'bajo_mixto', null, null, W(600, 700, 800, 900, 1000))] },
+        { id: 'puertas', label: 'Puertas', items: [
+          it('coc-inf-2p', 'bajo', null, null, W_BAJO),
+          it('coc-inf-1p', 'bajo', 'Bajo mesada 1 puerta', { width: 450, doors: 1 }, W(300, 350, 400, 450, 500, 600)),
+        ] },
+        { id: 'cajoneros', label: 'Cajoneros', items: [
+          it('coc-inf-caj', 'bajo_cajones', null, null, W_CAJ),
+          it('coc-inf-caj4', 'bajo_cajones', 'Cajonero 4 cajones', { drawers: 4 }, W_CAJ),
+          it('coc-inf-arch', 'bajo_cajones', 'Archivero 3 cajones', { width: 450 }, W(300, 400, 450, 500)),
+        ] },
+        { id: 'especiales', label: 'Especiales', items: [
+          it('coc-inf-mixto', 'bajo_mixto', null, null, W(600, 700, 800, 900, 1000)),
+          it('coc-inf-1c1p', 'bajo_mixto', 'Bajo 1 cajón + 1 puerta', { width: 450, doors: 1, drawers: 1 }, W(400, 450, 500, 600)),
+          it('coc-inf-2c1p', 'bajo_mixto', 'Bajo 2 cajones + 1 puerta', { width: 500, doors: 1, drawers: 2, drawerH: 150 }, W(400, 450, 500, 600)),
+        ] },
+        { id: 'electro', label: 'Módulos p/Electrodomésticos', items: [it('coc-inf-horno', 'bajo_horno')] },
         { id: 'lavaplatos', label: 'Lavaplatos', items: [it('coc-inf-bacha', 'bajo_bacha', null, null, W(600, 800, 900, 1000, 1200))] },
       ] },
       { id: 'altos', label: 'Altos', subgroups: [
-        { id: 'alacenas', label: 'Alacenas', items: [it('coc-alt-2p', 'alacena', null, null, W_ALTO), it('coc-alt-1p', 'alacena_1p', null, null, W(300, 350, 400, 450, 500))] },
-      ] },
-      { id: 'columnas', label: 'Columnas', subgroups: [
         { id: 'torres', label: 'Torres', items: [it('coc-col-torre', 'columna', null, null, W(450, 500, 600, 700))] },
+        { id: 'electro', label: 'Módulos p/Electrodomésticos', items: [it('coc-alt-horno', 'torre_horno'), it('coc-alt-heladera', 'torre_heladera', null, null, W(700, 800, 900, 1000))] },
+      ] },
+      { id: 'islas', label: 'Islas', subgroups: [
+        { id: 'islas', label: 'Islas', items: [it('coc-isla', 'bajo', 'Isla con desayunador', { width: 1500, depth: 900, doors: 3, mesadaOver: 250 }, W(1200, 1500, 1800, 2100))] },
+      ] },
+      { id: 'sup-bajos', label: 'Superiores Bajos', subgroups: [
+        { id: 'puertas', label: 'Puertas', items: [it('coc-sb-2p', 'alacena', 'Superior bajo 2 puertas', { height: 350, shelves: 0 }, W_ALTO, { y: 1800 })] },
+      ] },
+      { id: 'sup-medios', label: 'Sup Medios', subgroups: [
+        { id: 'puertas', label: 'Puertas', items: [it('coc-alt-2p', 'alacena', null, null, W_ALTO), it('coc-alt-1p', 'alacena_1p', null, null, W(300, 350, 400, 450, 500))] },
+        { id: 'electro', label: 'Módulos p/Electrodomésticos', items: [it('coc-alt-micro', 'alacena_micro')] },
+      ] },
+      { id: 'sup-altos', label: 'Superiores Altos', subgroups: [
+        { id: 'puertas', label: 'Puertas', items: [it('coc-sa-2p', 'alacena', 'Superior alto 2 puertas', { height: 900, shelves: 2 }, W_ALTO, { y: 1250 })] },
+      ] },
+      { id: 'tapas', label: 'Tapas/Estantes', subgroups: [
+        { id: 'tapas', label: 'Tapas', items: [
+          it('coc-tapa', 'tapa', null, null, W(600, 900, 1200, 1500, 1800, 2400)),
+          it('coc-tapa-bacha', 'tapa', 'Tapa p/ bacha', { bachas: 1 }, W(800, 1000, 1200, 1500)),
+          it('coc-tapa-2bachas', 'tapa', 'Tapa p/ 2 bachas', { width: 1800, bachas: 2 }, W(1500, 1800, 2100, 2400)),
+        ] },
+        { id: 'estantes', label: 'Estantes', items: [it('coc-estante', 'estante', null, null, W(400, 600, 800, 1000, 1200))] },
+      ] },
+      { id: 'componentes', label: 'Componentes', subgroups: [
+        { id: 'vistas', label: 'Vistas', items: [
+          it('coc-vista-bajo', 'vista', 'Vista bajo mesada'),
+          it('coc-vista-alacena', 'vista', 'Vista alacena', { height: 700, depth: 350 }, null, { y: 1450 }),
+          it('coc-vista-torre', 'vista', 'Vista torre', { height: 2150, depth: 580 }),
+        ] },
       ] },
     ],
   },
@@ -67,6 +107,14 @@ export const LIBRARY = [
     ],
   },
 ];
+
+// Módulo recién insertado desde un ítem: guarda el nombre del ítem (si no es el del tipo) y,
+// si se apoya (tapas), toma la altura de lo que tiene debajo (o queda a su altura si no hay nada).
+export function withItem(mod, item, modules) {
+  let m = item.label !== MODULE_TYPES[item.type].label ? { ...mod, name: item.label } : mod;
+  if (m.rest) { const y = restingHeight(m, modules); if (y > 0) m = { ...m, y }; }
+  return m;
+}
 
 // Todos los ítems con su ruta [biblioteca, familia, subfamilia] (ids y nombres).
 export function flatItems(lib = LIBRARY) {

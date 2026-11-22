@@ -1,4 +1,4 @@
-import { MODULE_TYPES, PARAM_DEFS, RULE_DEFS, DEFAULT_RULES, fieldsFor } from '../domain/modules.js';
+import { MODULE_TYPES, PARAM_DEFS, RULE_DEFS, DEFAULT_RULES, fieldsFor, moduleName } from '../domain/modules.js';
 import { NumField, SelField, TextField, num } from './fields.jsx';
 import RoomEditor from './RoomEditor.jsx';
 import WallPanel from './WallPanel.jsx';
@@ -69,7 +69,7 @@ export default function Inspector({ project, settings, selected, selectedWallId,
   const nParts = built?.parts.length || 0;
   return (
     <aside className="inspector">
-      <h3>{def.label}</h3>
+      <h3>{moduleName(selected)}</h3>
       <div className="row-btns">
         <button onClick={onRotate}>⟳ Rotar 90°</button>
         <button onClick={onDuplicate}>Duplicar</button>

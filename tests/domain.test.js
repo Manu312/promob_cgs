@@ -41,7 +41,7 @@ test('placard corredizo: hojas y barral', () => {
 test('todos los tipos generan piezas válidas (dimensiones > 0)', () => {
   for (const [type, def] of Object.entries(MODULE_TYPES)) {
     const b = buildModule({ type, params: def.defaults }, ctx);
-    assert.ok(b.parts.length > 0, type);
+    assert.ok(b.parts.length + b.decors.length > 0, type); // la tapa de piedra es solo decor (va por m²)
     for (const p of b.parts) assert.ok(p.sx > 0 && p.sy > 0 && p.sz > 0, `${type}:${p.name}`);
   }
 });

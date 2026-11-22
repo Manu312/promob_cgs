@@ -7,8 +7,8 @@ import { roomWalls } from './room.js';
 
 export const WALL_REACH = 600; // mm: a esta distancia de la pared, el plano de inserción es la pared
 
-export function insertPose(type, params, room, [px, pz]) {
-  const y = MODULE_TYPES[type]?.y || 0;
+export function insertPose(type, params, room, [px, pz], yItem = null) {
+  const y = yItem ?? MODULE_TYPES[type]?.y ?? 0;
   const D = params.depth;
   let best = null;
   for (const g of roomWalls(room)) {

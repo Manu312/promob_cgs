@@ -1,7 +1,7 @@
 // Texto de la barra de estado para el elemento seleccionado.
 
 import { roomWalls, OPENING_TYPES } from './room.js';
-import { MODULE_TYPES } from './modules.js';
+import { moduleName } from './modules.js';
 import { annotationValue } from './annotations.js';
 
 const area = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -34,7 +34,7 @@ export function describeSelection(project, sel) {
     const m = project.modules.find((x) => x.id === sel.id);
     if (!m) return '';
     const { width, height, depth } = m.params;
-    return `${MODULE_TYPES[m.type]?.label || m.type} · ${width} × ${height} × ${depth}${m.rot ? ` · Rotación: ${Math.round(m.rot * 10) / 10}°` : ''}`;
+    return `${moduleName(m)} · ${width} × ${height} × ${depth}${m.rot ? ` · Rotación: ${Math.round(m.rot * 10) / 10}°` : ''}`;
   }
   return '';
 }

@@ -3,7 +3,10 @@
 // z profundidad (pared = 0, frente = D). Medidas de referencia: docs/MEDIDAS-ELECTRODOMESTICOS.md.
 
 export const FINISHES = [['inox', 'Acero inoxidable'], ['blanco', 'Esmalte blanco'], ['negro', 'Negro'], ['vidrio', 'Vidrio templado negro']];
-export const TIPOS = [['simple', 'Simple / cíclica'], ['nofrost', 'No frost (freezer arriba)'], ['side', 'Side by side'], ['apoyo', 'De apoyo'], ['empotrable', 'Empotrable'], ['frontal', 'Carga frontal'], ['superior', 'Carga superior']];
+// Opciones propias de cada aparato (no se mezclan en un único "Tipo").
+export const TIPOS = [['simple', 'Simple / cíclica'], ['nofrost', 'No frost (freezer arriba)'], ['side', 'Side by side']];
+export const CARGAS = [['frontal', 'Carga frontal'], ['superior', 'Carga superior']];
+export const CANIOS = [['alto', 'Caño alto'], ['bajo', 'Caño bajo'], ['extraible', 'Extraíble']];
 
 // Pieza: caja o cilindro (eje vertical 'y' o hacia el frente 'z').
 export const box = (x, y, z, sx, sy, sz, finish) => ({ decor: 'aparato', x, y, z, sx, sy, sz, finish });
@@ -141,7 +144,8 @@ function lavavajillas(p) {
 
 // Lavarropas: 'frontal' (ojo de buey) o 'superior' (tapa arriba y panel atrás).
 function lavarropas(p) {
-  const { width: W, height: H, depth: D, tipo = 'frontal', finish = 'blanco' } = p;
+  const { width: W, height: H, depth: D, finish = 'blanco' } = p;
+  const tipo = p.carga || p.tipo || 'frontal';
   const out = [box(0, 0, 0, W, H, D, finish)];
   if (tipo === 'superior') {
     out.push(box(20, H, 20, W - 40, 10, D * 0.62, finish)); // tapa
@@ -188,7 +192,8 @@ function bacha(p) {
 
 // Grifería monocomando: 'alto' (caño alto curvo), 'bajo' o 'extraible' (cabezal grueso).
 function griferia(p) {
-  const { height: H = 334, reach: R = 210, tipo = 'alto', finish = 'cromo' } = p;
+  const { height: H = 334, reach: R = 210, finish = 'cromo' } = p;
+  const tipo = p.canio || p.tipo || 'alto';
   const out = [cyl(30, 0, 30, 28, 30, finish)]; // base
   const bodyH = tipo === 'bajo' ? H - 30 : 160;
   out.push(cyl(30, 30, 30, 22, bodyH, finish)); // cuerpo
@@ -203,7 +208,46 @@ function griferia(p) {
   return out;
 }
 
-export const APPLIANCE_BUILDERS = { cocina, anafe, horno, campana, heladera, microondas, lavavajillas, lavarropas, bacha, griferia };
+// Sanitarios de baño (Fase 6.3), en cerámica blanca.
+function inodoro(p) {
+  const { width: W, height: H, depth: D } = p;
+  const out = [];
+  out.push(box(W * 0.22, 0, D * 0.25, W * 0.56, 330, D * 0.5, 'ceramica')); // pie
+  out.push(cyl(W / 2, 330, D * 0.62, W / 2, 80, 'ceramica')); // taza
+  out.push(cyl(W / 2, 410, D * 0.62, W / 2 - 8, 18, 'blanco')); // asiento
+  out.push(box(W * 0.06, 410, D * 0.33, W * 0.88, 18, D * 0.12, 'blanco')); // bisagra del asiento
+  out.push(box(0, 400, 0, W, H - 400, 190, 'ceramica')); // mochila
+  out.push(box(W / 2 - 25, H, 60, 50, 8, 50, 'cromo')); // botón
+  return out;
+}
+function bidet(p) {
+  const { width: W, height: H, depth: D } = p;
+  return [
+    box(W * 0.2, 0, D * 0.2, W * 0.6, H - 90, D * 0.55, 'ceramica'),
+    cyl(W / 2, H - 90, D * 0.55, W / 2, 90, 'ceramica'),
+    box(W * 0.1, H - 90, 0, W * 0.8, 90, D * 0.3, 'ceramica'),
+    cyl(W / 2, H - 10, D * 0.55, W / 2 - 25, 12, 'blanco'), // interior
+    cyl(W / 2, H, 70, 18, 60, 'cromo'), // grifería
+  ];
+}
+// Lavatorio: 'pie' (con columna hasta el piso) o 'colgar'. y = borde de abajo de la pileta.
+function lavatorio(p) {
+  const { width: W, height: H, depth: D, montaje = 'pie', y = 680 } = p;
+  const out = [
+    box(0, 0, 0, W, 30, D, 'ceramica'), // fondo
+    box(0, 0, 0, 25, H, D, 'ceramica'), box(W - 25, 0, 0, 25, H, D, 'ceramica'),
+    box(0, 0, 0, W, H, 25, 'ceramica'), box(0, 0, D - 25, W, H, 25, 'ceramica'),
+    cyl(W / 2, 30, D * 0.55, 18, 2, 'cromo'), // desagüe
+  ];
+  if (montaje === 'pie') out.push(box(W * 0.33, -y, D * 0.3, W * 0.34, y, D * 0.35, 'ceramica'));
+  return out;
+}
+function griferiaBano(p) {
+  const { height: H = 160, reach: R = 120, finish = 'cromo' } = p;
+  return [cyl(25, 0, 25, 22, 20, finish), cyl(25, 20, 25, 18, H - 40, finish), box(18, H - 30, 25, 14, 14, R, finish), box(18, H - 20, 0, 14, 10, 40, finish)];
+}
+
+export const APPLIANCE_BUILDERS = { cocina, anafe, horno, campana, heladera, microondas, lavavajillas, lavarropas, bacha, griferia, inodoro, bidet, lavatorio, griferiaBano };
 
 // Rectángulo que cala la mesada, en coordenadas locales del aparato (null si no cala).
 export function cutoutOf(type, p, def) {

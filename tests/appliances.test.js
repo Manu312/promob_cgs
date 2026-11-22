@@ -63,7 +63,7 @@ test('heladeras: simple, no frost (dos puertas) y side by side (dos puertas vert
 
 test('lavarropas frontal con ojo de buey; superior con tapa arriba', () => {
   assert.ok(build('lavarropas').decors.some((d) => d.shape === 'cyl' && d.finish === 'vidrio'));
-  const sup = build('lavarropas', { tipo: 'superior' });
+  const sup = build('lavarropas', { carga: 'superior' });
   assert.ok(sup.decors.some((d) => d.y >= MODULE_TYPES.lavarropas.defaults.height));
   assert.ok(!sup.decors.some((d) => d.shape === 'cyl' && d.finish === 'vidrio'));
 });
@@ -72,4 +72,26 @@ test('microondas de apoyo se apoya; el empotrable va alto', () => {
   assert.equal(MODULE_TYPES.microondas.rest, true);
   assert.equal(findItem('ele-micro-emp').item.y, 1450);
   assert.deepEqual(['width', 'height', 'depth'].map((k) => MODULE_TYPES.lavavajillas.defaults[k]), [600, 850, 600]);
+});
+
+// Sanitarios de baño (#94)
+test('sanitarios: inodoro con mochila, bidet, lavatorio con pie hasta el piso o de colgar', () => {
+  const ino = build('inodoro');
+  assert.ok(ino.decors.some((d) => d.finish === 'ceramica' && d.y >= 400), 'mochila');
+  const pie = buildModule({ type: 'lavatorio', params: { ...MODULE_TYPES.lavatorio.defaults }, y: 680 }, {});
+  assert.ok(pie.decors.some((d) => d.y === -680), 'el pie llega al piso');
+  const col = buildModule({ type: 'lavatorio', params: { ...MODULE_TYPES.lavatorio.defaults, montaje: 'colgar' }, y: 700 }, {});
+  assert.ok(!col.decors.some((d) => d.y < 0));
+  assert.deepEqual(['width', 'height', 'depth'].map((k) => MODULE_TYPES.bidet.defaults[k]), [352, 400, 500]);
+  assert.equal(findItem('ban-lavatorio-colgar').path[1], 'sanitarios');
+});
+
+test('cada aparato tiene solo sus opciones: tipo (heladera), carga (lavarropas), caño (grifería)', () => {
+  assert.ok(fieldsFor('heladera').includes('tipo'));
+  assert.ok(fieldsFor('lavarropas').includes('carga') && !fieldsFor('lavarropas').includes('tipo'));
+  assert.ok(fieldsFor('griferia').includes('canio') && !fieldsFor('griferia').includes('tipo'));
+  const ext = build('griferia', { canio: 'extraible' }), alto = build('griferia');
+  const head = (b) => b.decors.some((d) => d.shape === 'cyl' && d.sy === 100); // cabezal grueso de 100 mm
+  assert.ok(head(ext), 'cabezal del extraíble');
+  assert.ok(!head(alto));
 });

@@ -1,0 +1,101 @@
+// Electrodomésticos y accesorios paramétricos propios (Fase 6). Se arman con piezas
+// decorativas: no van al despiece. Coordenadas locales como los módulos: x ancho, y alto,
+// z profundidad (pared = 0, frente = D). Medidas de referencia: docs/MEDIDAS-ELECTRODOMESTICOS.md.
+
+export const FINISHES = [['inox', 'Acero inoxidable'], ['blanco', 'Esmalte blanco'], ['negro', 'Negro'], ['vidrio', 'Vidrio templado negro']];
+
+// Pieza: caja o cilindro (eje vertical 'y' o hacia el frente 'z').
+export const box = (x, y, z, sx, sy, sz, finish) => ({ decor: 'aparato', x, y, z, sx, sy, sz, finish });
+export function cyl(cx, cy, cz, r, h, finish, axis = 'y') {
+  return axis === 'y'
+    ? { decor: 'aparato', shape: 'cyl', axis, x: cx - r, y: cy, z: cz - r, sx: 2 * r, sy: h, sz: 2 * r, finish }
+    : { decor: 'aparato', shape: 'cyl', axis, x: cx - r, y: cy - r, z: cz, sx: 2 * r, sy: 2 * r, sz: h, finish };
+}
+
+// Lugar de cada hornalla (fracciones del área y radio): 4 = 2×2, 5 = 4 en las esquinas + una
+// grande al centro, 6 = 3×2.
+const LAYOUTS = {
+  2: [[0.5, 0.28, 45], [0.5, 0.72, 55]],
+  4: [[0.27, 0.28, 42], [0.73, 0.28, 42], [0.27, 0.72, 52], [0.73, 0.72, 42]],
+  5: [[0.17, 0.27, 40], [0.83, 0.27, 40], [0.17, 0.73, 48], [0.83, 0.73, 40], [0.5, 0.5, 62]],
+  6: [[1 / 6, 0.28, 40], [0.5, 0.28, 42], [5 / 6, 0.28, 40], [1 / 6, 0.72, 50], [0.5, 0.72, 42], [5 / 6, 0.72, 40]],
+};
+export const burnerSpots = (n) => LAYOUTS[n] || LAYOUTS[4];
+
+// Hornallas sobre una superficie (x0..x1, z0..z1) a la altura y, con su rejilla.
+function burners(out, n, x0, x1, z0, z1, y, cap = 'negro') {
+  const W = x1 - x0, Dz = z1 - z0;
+  for (const [fx, fz, r] of burnerSpots(n)) {
+    const cx = x0 + W * fx, cz = z0 + Dz * fz;
+    out.push(cyl(cx, y, cz, r + 20, 4, 'negro'));
+    out.push(cyl(cx, y + 4, cz, r, 14, cap));
+    out.push(box(cx - r - 30, y + 18, cz - 4, 2 * r + 60, 8, 8, 'negro')); // rejilla
+    out.push(box(cx - 4, y + 18, cz - r - 30, 8, 8, 2 * r + 60, 'negro'));
+  }
+}
+
+// Cocina de pie: tablero con hornallas, panel de perillas, puerta del horno con vidrio y cajón.
+function cocina(p) {
+  const { width: W, height: H, depth: D, hornallas: n = 4, finish = 'inox' } = p;
+  const out = [];
+  out.push(box(0, 60, 0, W, H - 60, D - 20, finish)); // cuerpo
+  out.push(box(10, 0, 30, W - 20, 60, D - 70, 'negro')); // zócalo / patas
+  out.push(box(0, H - 12, 0, W, 12, D, 'inox')); // mesa
+  burners(out, n, 40, W - 40, 40, D - 140, H);
+  const pz = D - 20;
+  out.push(box(0, H - 130, pz, W, 118, 20, finish)); // panel de perillas
+  const k = n + 1;
+  for (let i = 0; i < k; i++) out.push(cyl(60 + ((W - 120) * (i + 0.5)) / k, H - 71, pz + 20, 18, 22, 'cromo', 'z'));
+  out.push(box(15, 170, pz, W - 30, H - 330, 22, finish)); // puerta del horno
+  out.push(box(55, 230, pz + 22, W - 110, H - 470, 2, 'vidrio'));
+  out.push(box(70, H - 194, pz + 30, W - 140, 18, 18, 'cromo')); // manija de la puerta
+  out.push(box(15, 70, pz, W - 30, 90, 20, finish)); // cajón
+  return out;
+}
+
+// Anafe: cubierta (vidrio o inox) apoyada en la mesada y el cuerpo que entra en el calado.
+function anafe(p) {
+  const { width: W, depth: D, hornallas: n = 4, finish = 'vidrio' } = p;
+  const out = [];
+  out.push(box(30, -45, 30, W - 60, 45, D - 60, 'negro')); // cuerpo (dentro del calado)
+  out.push(box(0, 0, 0, W, 8, D, finish === 'vidrio' ? 'vidrio' : 'inox'));
+  burners(out, n, 30, W - 30, 30, D - 110, 8);
+  for (let i = 0; i < n; i++) out.push(cyl(W - 60 - i * 55, 8, D - 50, 16, 20, 'cromo'));
+  return out;
+}
+
+// Horno empotrable: frente con vidrio, marco, manija y panel de perillas.
+function horno(p) {
+  const { width: W, height: H, depth: D, finish = 'inox' } = p;
+  const out = [];
+  out.push(box(10, 10, 0, W - 20, H - 20, D - 22, 'negro'));
+  out.push(box(0, 0, D - 22, W, H, 4, finish)); // marco frontal
+  out.push(box(25, 25, D - 18, W - 50, H - 150, 18, 'vidrio')); // puerta
+  out.push(box(60, H - 175, D, W - 120, 16, 22, 'cromo')); // manija
+  for (const x of [70, W - 70]) out.push(cyl(x, H - 62, D - 18, 18, 22, 'cromo', 'z'));
+  out.push(box(W / 2 - 60, H - 80, D - 17, 120, 36, 2, 'vidrio')); // reloj
+  return out;
+}
+
+// Campana de pared con chimenea hasta arriba (chimneyH).
+function campana(p) {
+  const { width: W, height: H, depth: D, chimneyH: C = 600, finish = 'inox' } = p;
+  const out = [];
+  out.push(box(0, 0, 0, W, 60, D, finish)); // cuerpo inferior
+  out.push(box((W - 300) / 2, 60, 0, 300, H - 60, 260, finish)); // pirámide/caja de motor
+  out.push(box((W - 260) / 2, H, 0, 260, C, 220, finish)); // chimenea
+  out.push(box(30, -2, 30, W - 60, 2, D - 60, 'negro')); // filtros
+  for (let i = 0; i < 3; i++) out.push(box(W / 2 - 75 + i * 55, 20, D, 40, 14, 4, 'negro')); // botonera
+  return out;
+}
+
+export const APPLIANCE_BUILDERS = { cocina, anafe, horno, campana };
+
+// Construye un aparato: solo piezas decorativas (no van al despiece) y, si tiene precio, la
+// línea para el presupuesto.
+export function buildAparato(type, p, label) {
+  const fn = APPLIANCE_BUILDERS[type];
+  const decors = fn ? fn(p) : [];
+  const extra = p.price > 0 ? { name: label, price: p.price } : null;
+  return { parts: [], decors, hardware: {}, extra };
+}

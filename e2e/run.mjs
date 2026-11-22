@@ -153,6 +153,34 @@ try {
   await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
   for (let i = 0; i < 2; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300); }
   check('Deshacer saca los módulos nuevos', (await project()).modules.length === nBefore);
+  // Electrodomésticos · Cocción (#91): cocina y anafe, precio opcional al presupuesto
+  {
+    await clickText('.cb-libs .cb-tab', 'Electrodomésticos'); await clickText('.cb-groups .cb-tab', 'Cocción'); await clickText('.cb-subs .cb-tab', 'Cocinas');
+    const cocinas = await page.$$eval('.mod-btn span', (els) => els.map((e) => e.textContent.trim()));
+    await dbl('Cocina 56 cm'); await sleep(500);
+    await clickText('.cb-subs .cb-tab', 'Anafes'); await dbl('Anafe 60 cm 4 hornallas'); await sleep(500);
+    p = await project();
+    const [coc, ana] = p.modules.slice(-2);
+    check('Electrodomésticos: cocinas 50/56/60/76/90 y anafe que se apoya', cocinas.length === 5 && coc.type === 'cocina' && coc.params.width === 560 && ana.type === 'anafe' && ana.rest === true, cocinas.join(', '));
+    await shot('01i-cocina-anafe');
+    await clickText('.tabs button', 'Plan de corte'); await sleep(400);
+    const anyCocina = await page.$$eval('.page table tbody tr', (rs) => rs.some((r) => r.textContent.includes('Cocina')));
+    check('Los electrodomésticos no entran al despiece', !anyCocina);
+    await clickText('.tabs button', 'Diseño 3D'); await sleep(400);
+    await page.keyboard.press('Escape'); await sleep(200);
+    const cp = await page.evaluate((id) => window.__muebles.screenOf(id, 100), coc.id);
+    await page.mouse.click(cp.x, cp.y); await sleep(400);
+    await page.keyboard.press('KeyE'); await sleep(200);
+    const priceIn = await fieldInput('Precio (opcional, al presupuesto)');
+    if (priceIn) { await priceIn.click({ clickCount: 3 }); await priceIn.type('450000'); await page.keyboard.press('Enter'); await sleep(400); }
+    await clickText('.tabs button', 'Presupuesto'); await sleep(400);
+    const el = await page.$$eval('.page table tbody tr', (rs) => rs.map((r) => r.textContent));
+    check('Con precio, la cocina va al presupuesto', el.some((t) => t.includes('Cocina 56 cm') && t.includes('450.000')), el.filter((t) => t.includes('Cocina')).join(' | '));
+    await clickText('.tabs button', 'Diseño 3D'); await sleep(400);
+    for (let i = 0; i < 3; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300); }
+    check('Deshacer saca los electrodomésticos', (await project()).modules.length === nBefore);
+    await page.keyboard.press('Escape'); await sleep(200);
+  }
   // Lista de Módulos (#60)
   await clickText('.side-tab', 'Lista de Módulos');
   const planes = await page.$$eval('.ml-plane-btn', (els) => els.map((e) => e.textContent.trim()));

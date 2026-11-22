@@ -8,7 +8,7 @@ import { bounds } from '../domain/walls.js';
 import { frontTransforms } from '../domain/fronts.js';
 import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
-import { mat3d, metal, stone } from './materials3d.js';
+import { mat3d, metal, stone, finishMat } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
 import { ModuleDistances, OpeningDims, HeightRuler, Annotations } from './Cotas.jsx';
 import { AnnotateTool } from './AnnotateTool.jsx';
@@ -34,6 +34,20 @@ function PartMesh({ p, material, onDoubleClick }) {
 
 function DecorMesh({ d, stoneMat }) {
   const pos = [(d.x + d.sx / 2) * S, (d.y + d.sy / 2) * S, (d.z + d.sz / 2) * S];
+  if (d.decor === 'aparato' && d.shape === 'cyl') { // cilindro: eje vertical o hacia el frente
+    return (
+      <mesh position={pos} rotation={d.axis === 'z' ? [Math.PI / 2, 0, 0] : [0, 0, 0]} material={finishMat(d.finish)} castShadow>
+        <cylinderGeometry args={[(d.sx / 2) * S, (d.sx / 2) * S, (d.axis === 'z' ? d.sz : d.sy) * S, 24]} />
+      </mesh>
+    );
+  }
+  if (d.decor === 'aparato') {
+    return (
+      <mesh position={pos} rotation={[0, d.ry || 0, 0]} material={finishMat(d.finish)} castShadow receiveShadow>
+        <boxGeometry args={[d.sx * S, d.sy * S, d.sz * S]} />
+      </mesh>
+    );
+  }
   if (d.decor === 'barral') {
     return (
       <mesh position={pos} rotation={[0, 0, Math.PI / 2]} material={metal} castShadow>

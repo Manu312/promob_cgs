@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AGG_TYPES, aggState, aggsApply } from '../domain/aggregates.js';
 import { moduleName } from '../domain/modules.js';
-import { NumField } from './fields.jsx';
+import { NumField, SelField } from './fields.jsx';
 
 // Herramientas · Agregados (como Promob): tildar el agregado; el (+) muestra sus opciones.
 export default function AggregatesPanel({ selected, rules, onAgg }) {
@@ -24,14 +24,15 @@ export default function AggregatesPanel({ selected, rules, onAgg }) {
           {AGG_TYPES.filter((a) => a.group === g).map((a) => (
             <div key={a.id} className="ag-row">
               <label className="radio">
-                <input type="checkbox" checked={st[a.id].on} onChange={(e) => onAgg(a.id, e.target.checked, a.qty ? st[a.id].qty : null)} /> {a.label}
+                <input type="checkbox" checked={st[a.id].on} onChange={(e) => onAgg(a.id, e.target.checked, a.qty ? st[a.id].qty : a.side ? st[a.id].side : null)} /> {a.label}
               </label>
-              {a.qty && (
+              {(a.qty || a.side) && (
                 <button className="ag-plus" aria-label={`Opciones de ${a.label}`} title="Opciones" onClick={() => setOpen((o) => ({ ...o, [a.id]: !o[a.id] }))}>{open[a.id] ? '−' : '+'}</button>
               )}
-              {a.qty && open[a.id] && (
+              {open[a.id] && (
                 <div className="ag-opts">
-                  <NumField label="Cantidad" value={st[a.id].qty} min={a.qty.min} max={a.qty.max} step={1} onChange={(v) => onAgg(a.id, true, v)} />
+                  {a.qty && <NumField label="Cantidad" value={st[a.id].qty} min={a.qty.min} max={a.qty.max} step={1} onChange={(v) => onAgg(a.id, true, v)} />}
+                  {a.side && <SelField label="Lado" value={st[a.id].side} options={a.side} onChange={(v) => onAgg(a.id, true, v)} />}
                 </div>
               )}
             </div>

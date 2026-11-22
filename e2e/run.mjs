@@ -388,6 +388,19 @@ try {
     for (let i = 0; i < 3; i++) await ctrl('KeyZ');
     am = (await project()).modules.find((m) => m.id === ag.id);
     check('Deshacer los agregados', !am.aggs?.ruedas && am.params.shelves === ag.params.shelves);
+    // Terminación (#82): marco superior y cornisa en una alacena → despiece
+    const al = (await project()).modules.filter((m) => m.type === 'alacena').at(-1); // la de la derecha (la primera queda detrás del placard)
+    await page.keyboard.press('Escape'); await sleep(200);
+    const alp = await page.evaluate((id) => window.__muebles.screenOf(id, -200), al.id);
+    await page.mouse.click(alp.x, alp.y); await sleep(400);
+    await tick('Marco superior'); await sleep(200); await tick('Cornisa'); await sleep(300);
+    const alm = (await project()).modules.find((m) => m.id === al.id);
+    await shot('02c-marco-cornisa');
+    await clickText('.tabs button', 'Plan de corte'); await sleep(500);
+    const cutNames = await page.$$eval('.page table tbody tr', (rs) => rs.map((r) => r.textContent));
+    check('Marco superior y cornisa en la alacena y en el despiece', !!alm.aggs?.marco && !!alm.aggs?.cornisa && cutNames.some((t) => t.includes('Cornisa')) && cutNames.some((t) => t.includes('Marco superior')));
+    await clickText('.tabs button', 'Diseño 3D'); await sleep(500);
+    await ctrl('KeyZ'); await ctrl('KeyZ');
     await page.keyboard.press('KeyE'); await page.keyboard.press('Escape'); await sleep(200);
   }
 

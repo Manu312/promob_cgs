@@ -49,3 +49,28 @@ test('fondo, estantes, divisiones y barral', () => {
   assert.equal(setAgg(m, DEFAULT_RULES, 'barral', true).params.interior, 'mixto');
   assert.equal(setAgg(mod('columna'), DEFAULT_RULES, 'barral', true).params.interior, 'barral');
 });
+
+// Agregados de terminación (#82)
+test('tapa, cierre, marco, cornisa y vistas suman piezas que van al despiece', () => {
+  let m = mod('alacena');
+  for (const id of ['tapa', 'marco', 'cornisa']) m = setAgg(m, DEFAULT_RULES, id, true);
+  m = setAgg(m, DEFAULT_RULES, 'vistas', true, 'izq');
+  const b = buildModule(m, { ...ctx, rules: DEFAULT_RULES });
+  const n = (x) => b.parts.filter((p) => p.name === x);
+  const H = MODULE_TYPES.alacena.defaults.height;
+  assert.equal(n('Tapa').length, 1);
+  assert.equal(n('Marco superior').length, 3);
+  assert.equal(n('Cornisa')[0].y, H + 18 + 60, 'cornisa arriba del marco y la tapa');
+  assert.deepEqual(n('Vista').map((v) => v.x), [-18]);
+  assert.equal(aggState(m).vistas.side, 'izq');
+  assert.equal(setAgg(m, DEFAULT_RULES, 'cornisa', false).aggs.cornisa, undefined);
+});
+
+test('cajones internos detrás de las puertas, con sus correderas', () => {
+  const m = setAgg(mod('bajo'), DEFAULT_RULES, 'cajones_int', true, 2);
+  const b = buildModule(m, { ...ctx, rules: DEFAULT_RULES });
+  assert.equal(b.parts.filter((p) => p.name === 'Frente cajón interno').length, 2);
+  assert.equal(b.hardware.corredera, 2);
+  const zDoor = b.parts.find((p) => p.name === 'Puerta').z;
+  assert.ok(b.parts.filter((p) => p.name === 'Frente cajón interno').every((p) => p.z + p.sz <= zDoor), 'quedan detrás de la puerta');
+});

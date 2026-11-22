@@ -2,7 +2,8 @@
 // más cercano (pared, columna u otro módulo que se cruce en altura). Todo en mm, en planta.
 
 import { roomWalls } from './room.js';
-import { footprint } from './modules.js';
+import { footprint, localAxes } from './modules.js';
+import { modulePoly, overlaps } from './collision.js';
 import { wallAngles, wallCorners } from './walls.js';
 
 const DIRS = [['-x', [-1, 0]], ['+x', [1, 0]], ['-z', [0, -1]], ['+z', [0, 1]]];
@@ -58,8 +59,35 @@ export function nearestDistances(mod, room, modules, maxDist = 20000) {
   return out;
 }
 
+// Cotas verticales del módulo: hacia abajo, al piso o a la cara de arriba del módulo que
+// tiene debajo (superpuesto en planta); hacia arriba, al techo o a la cara de abajo del
+// módulo de arriba. `at` es la esquina delantera izquierda (donde se dibuja la cota).
+export function verticalDistances(mod, room, modules) {
+  const y0 = mod.y || 0, y1 = y0 + mod.params.height;
+  const poly = modulePoly(mod);
+  let below = { y: 0, target: { kind: 'floor' } }, above = { y: room.h, target: { kind: 'ceiling' } };
+  for (const o of modules) {
+    if (o.id === mod.id || !overlaps(poly, modulePoly(o))) continue;
+    const oy0 = o.y || 0, oy1 = oy0 + o.params.height;
+    if (oy1 <= y0 + 0.5 && oy1 > below.y) below = { y: oy1, target: { kind: 'module', id: o.id } };
+    if (oy0 >= y1 - 0.5 && oy0 < above.y) above = { y: oy0, target: { kind: 'module', id: o.id } };
+  }
+  const { fw, fd } = footprint(mod);
+  const { ex, ez } = localAxes(mod.rot || 0);
+  const W = mod.params.width / 2, D = mod.params.depth / 2;
+  const at = [mod.x + fw / 2 - ex[0] * W + ez[0] * D, mod.z + fd / 2 - ex[1] * W + ez[1] * D];
+  const out = [];
+  if (y0 - below.y >= 1) out.push({ dir: 'down', dist: Math.round(y0 - below.y), at, y0: below.y, y1: y0, target: below.target });
+  if (above.y - y1 >= 1) out.push({ dir: 'up', dist: Math.round(above.y - y1), at, y0: y1, y1: above.y, target: above.target });
+  return out;
+}
+
 // Nueva posición del módulo para que la cota `dim` valga `value`.
 export function applyDimEdit(mod, dim, value) {
+  if (dim.dir === 'down' || dim.dir === 'up') {
+    const dy = (value - dim.dist) * (dim.dir === 'down' ? 1 : -1);
+    return { y: Math.max(0, Math.round((mod.y || 0) + dy)) };
+  }
   const d = DIRS.find(([k]) => k === dim.dir)[1];
   const delta = value - dim.dist;
   return { x: Math.round(mod.x - d[0] * delta), z: Math.round(mod.z - d[1] * delta) };

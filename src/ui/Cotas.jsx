@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Html, Line } from '@react-three/drei';
-import { nearestDistances, heightRuler } from '../domain/dimensions.js';
+import { nearestDistances, verticalDistances, heightRuler } from '../domain/dimensions.js';
 import { bounds } from '../domain/walls.js';
 import { roomWalls } from '../domain/room.js';
 import { openingDims } from '../domain/openings.js';
@@ -45,10 +45,24 @@ export function CotaLabel({ p, value, text, onCommit, onSelect, className = 'cot
 
 // Cotas de referencia del módulo seleccionado: distancia a pared, columna o módulo
 // más cercano en cada dirección. Editables: mueven el módulo.
-export function ModuleDistances({ room, modules, mod, onEdit }) {
+export function ModuleDistances({ room, modules, mod, onEdit, vertical = true }) {
   const dims = useMemo(() => nearestDistances(mod, room, modules), [mod, room, modules]);
+  const vdims = useMemo(() => (vertical ? verticalDistances(mod, room, modules) : []), [mod, room, modules, vertical]);
   const y = ((mod.y || 0) + Math.min(mod.params.height / 2, 450)) * S;
-  return dims.map((d) => {
+  const vert = vdims.map((d) => {
+    const [x, z] = [d.at[0] * S, d.at[1] * S];
+    const a = [x, d.y0 * S, z], b = [x, d.y1 * S, z];
+    const tick = (q) => [[q[0] - 0.05, q[1], q[2]], [q[0] + 0.05, q[1], q[2]]];
+    return (
+      <group key={d.dir}>
+        <Line points={[a, b]} color="#e4572e" lineWidth={1.6} depthTest={false} renderOrder={5} />
+        <Line points={tick(a)} color="#e4572e" lineWidth={1.6} depthTest={false} renderOrder={5} />
+        <Line points={tick(b)} color="#e4572e" lineWidth={1.6} depthTest={false} renderOrder={5} />
+        <CotaLabel p={[x, ((d.y0 + d.y1) / 2) * S, z]} value={d.dist} className={`cota cota-dist cota-vert cota-${d.dir}`} onCommit={onEdit ? (v) => onEdit(d, v) : undefined} />
+      </group>
+    );
+  });
+  return [...vert, ...dims.map((d) => {
     const a = [d.from[0] * S, y, d.from[1] * S], b = [d.to[0] * S, y, d.to[1] * S];
     const ux = Math.sign(d.to[0] - d.from[0]), uz = Math.sign(d.to[1] - d.from[1]);
     const px = -uz * 0.06, pz = ux * 0.06; // marca perpendicular de 60 mm
@@ -62,7 +76,7 @@ export function ModuleDistances({ room, modules, mod, onEdit }) {
         <CotaLabel p={mid} value={d.dist} className="cota cota-dist" onCommit={onEdit ? (v) => onEdit(d, v) : undefined} />
       </group>
     );
-  });
+  })];
 }
 
 // Cotas de la abertura seleccionada: distancia a cada extremo de su pared (editables).

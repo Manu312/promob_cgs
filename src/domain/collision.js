@@ -102,3 +102,16 @@ export function collideMove(mod, x, z, room, modules) {
   const best = [direct, xz, zx].reduce((a, b) => (dist(b) < dist(a) - 0.5 ? b : a));
   return { x: best.x, z: best.z };
 }
+
+// Subir o bajar el módulo hasta `y` sin meterse en el de arriba o el de abajo (ni bajo el piso).
+export function collideLift(mod, y, room, modules) {
+  const y0 = mod.y || 0, h = mod.params.height;
+  let ny = Math.max(0, Math.round(y));
+  const poly = modulePoly(mod);
+  const obs = obstaclesFor(mod, room, modules).filter((o) => o.kind === 'module' && !hits(mod, [o]) && overlaps(poly, o.poly));
+  for (const o of obs) {
+    if (ny > y0 && o.y0 >= y0 + h - TOL) ny = Math.min(ny, o.y0 - h);
+    if (ny < y0 && o.y1 <= y0 + TOL) ny = Math.max(ny, o.y1);
+  }
+  return Math.round(ny);
+}

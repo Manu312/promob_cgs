@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
 import { newModule, footprint, snapPosition, resizeModule, uid } from './domain/modules.js';
-import { collideMove } from './domain/collision.js';
+import { collideMove, collideLift } from './domain/collision.js';
+import { nudgeTarget, rotateAboutCenter, lockAxis } from './domain/movement.js';
+import { ToolsNav, MovementPanel } from './ui/MovementPanel.jsx';
 import StatusToggles from './ui/StatusToggles.jsx';
 import { moveWall, moveNode, setWallLength, setWallAngle, updateWall, splitWall, deleteWalls } from './domain/wallEdit.js';
 import { WallContextMenu, WallDeleteDialog } from './ui/WallMenus.jsx';
@@ -45,6 +47,10 @@ export default function App() {
   const [ui, setUi] = usePersistent('mueblesapp.ui', { collision: true, magnets: true, autoLower: true });
   const autoLower = ui.autoLower !== false;
   const toggleUi = (k) => setUi((u) => ({ ...u, [k]: u[k] === false }));
+  const tool = ui.tool === 'movimiento' ? 'movimiento' : 'propiedades'; // botonera Herramientas
+  const setTool = (t) => setUi((u) => ({ ...u, tool: t }));
+  // Traba de eje al arrastrar (teclas X / Y de Promob): 'x' o 'z'.
+  const [axisLock, setAxisLock] = useState(null);
   const [rawSettings, setSettings] = usePersistent('mueblesapp.settings', DEFAULT_SETTINGS);
   const settings = useMemo(() => mergeSettings(rawSettings), [rawSettings]);
   const [tab, setTab] = useState('diseno');
@@ -86,15 +92,28 @@ export default function App() {
   const grid = project.room.grid || { size: 50, magnetic: true };
   const gridStep = view.name === 'planta' && grid.magnetic ? grid.size : 10;
   // Mover un módulo: imán (Acoplamientos) y, con Colisión, sin atravesar paredes ni módulos.
-  const placeModule = useCallback((p, id, x, z, magnet) => {
+  const placeModule = useCallback((p, id, x0, z0, magnet, lock = null) => {
     const m = p.modules.find((o) => o.id === id);
     if (!m) return p;
+    const { x, z } = lockAxis(m, x0, z0, lock);
     let pos = magnet ? snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id), p.room, 40, gridStep) : { x: Math.round(x), z: Math.round(z) };
     if (ui.collision !== false) pos = collideMove(m, pos.x, pos.z, p.room, p.modules);
+    if (lock === 'x') pos = { ...pos, z: m.z };
+    if (lock === 'z') pos = { ...pos, x: m.x };
     if (pos.x === m.x && pos.z === m.z) return p;
     return { ...p, modules: p.modules.map((o) => (o.id === id ? { ...o, ...pos } : o)) };
   }, [gridStep, ui.collision]);
-  const onMove = useCallback((id, x, z) => setProject((p) => placeModule(p, id, x, z, ui.magnets !== false)), [setProject, placeModule, ui.magnets]);
+  const onMove = useCallback((id, x, z) => setProject((p) => placeModule(p, id, x, z, ui.magnets !== false, axisLock)), [setProject, placeModule, ui.magnets, axisLock]);
+  // Panel Movimiento: un paso por eje (con Colisión no atraviesa nada) y giro sobre el centro.
+  const nudgeSelected = (axis, sign, step = ui.moveStep ?? 10) => selectedId && setProject((p) => {
+    const m = p.modules.find((o) => o.id === selectedId);
+    if (!m) return p;
+    const t = nudgeTarget(m, axis, sign, step, ui.relative !== false);
+    if (axis !== 'h') return placeModule(p, m.id, t.x, t.z, false);
+    const y = ui.collision !== false ? collideLift(m, t.y, p.room, p.modules) : t.y;
+    return y === (m.y || 0) ? p : { ...p, modules: p.modules.map((o) => (o.id === m.id ? { ...o, y } : o)) };
+  });
+  const rotateBy = (deg) => selectedId && mapModule(selectedId, (m) => ({ ...m, ...rotateAboutCenter(m, deg) }));
   const setGrid = (patch) => setProject((p) => ({ ...p, room: { ...p.room, grid: { ...grid, ...patch } } }));
 
   // Arrastre de paredes y vértices: cada movimiento parte del ambiente que había al
@@ -250,7 +269,7 @@ export default function App() {
     setProject((p) => ({ ...p, modules: [...p.modules, copy] }));
     setSelectedId(copy.id);
   };
-  const rotateSelected = () => selectedId && mapModule(selectedId, (m) => ({ ...m, rot: ((m.rot || 0) + 90) % 360 }));
+  const rotateSelected = () => rotateBy(90);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -262,7 +281,16 @@ export default function App() {
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startDrawWalls(); return; }
       if (tab !== 'diseno' || inField) return;
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'b' || e.key === 'B')) { toggleUi('collision'); return; }
+      const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
+      const key = e.key.toLowerCase();
+      if (plain && key === 'b') { toggleUi('collision'); return; }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'm') { e.preventDefault(); setTool('movimiento'); return; }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'd') { e.preventDefault(); duplicateSelected(); return; }
+      if (plain && key === 'e') { setTool('propiedades'); return; }
+      if (plain && key === 'x') { setAxisLock((l) => (l === 'x' ? null : 'x')); return; }
+      if (plain && key === 'y') { setAxisLock((l) => (l === 'z' ? null : 'z')); return; }
+      if (plain && key === 'm') { stopDrawWalls(); stopAnnotate(); stopScale(); return; } // Seleccionar / Mover
+      if (plain && key === 'd' && !drawing && !annotating && !scaling) { startAnnotate(); return; } // calcular distancia
       if (annotating) { if (e.key === 'Escape') stopAnnotate(); return; }
       if (scaling) {
         if (e.key === 'Escape') stopScale();
@@ -288,6 +316,7 @@ export default function App() {
       if (!selectedId) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); }
       else if (e.key === 'r' || e.key === 'R') rotateSelected();
+      else if (e.key === 'PageUp' || e.key === 'PageDown') { e.preventDefault(); nudgeSelected('h', e.key === 'PageUp' ? 1 : -1, e.shiftKey ? 100 : 10); }
       else if (e.key.startsWith('Arrow')) {
         e.preventDefault();
         const st = e.shiftKey ? 100 : 10;
@@ -413,19 +442,25 @@ export default function App() {
             {deleteDlg && <WallDeleteDialog label={`Pared ${project.room.walls.findIndex((w) => w.id === deleteDlg.wallId) + 1}`} onConfirm={confirmDelete} onCancel={() => setDeleteDlg(null)} />}
             <div className="statusbar">
               <span className="sb-sel">{describeSelection(project, selection) || 'Sin selección'}</span>
+              {axisLock && <span className="sb-lock" title="X / Y cambian la traba">Movimiento trabado: solo {axisLock === 'x' ? 'ancho (X)' : 'profundidad (Y)'}</span>}
               <span className="sb-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</span>
               <StatusToggles ui={ui} onToggle={toggleUi} showDims={showDims} onShowDims={setShowDims}
                 planImage={project.planImage} onPlanImage={(visible) => setProject((p) => ({ ...p, planImage: { ...p.planImage, visible } }))} />
             </div>
           </section>
-          <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
+          <div className="tools-col">
+          <ToolsNav tool={tool} onTool={setTool} />
+          {tool === 'movimiento'
+            ? <MovementPanel label={selected ? describeSelection(project, selection) : null} ui={ui} setUi={setUi} onNudge={nudgeSelected} onRotate={(sign) => rotateBy(sign * (ui.rotStep ?? 90))} />
+            : <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
             selectedWallId={selectedWallId} onSelectWall={selectWall} onDrawWalls={startDrawWalls}
             onDeleteWall={(id) => setDeleteDlg({ wallId: id })} onSplitWall={doSplit}
             selectedOpeningId={selectedOpeningId} selectedColumnId={selectedColumnId} onSelectItem={setSelection} onScaleImage={startScale}
             onParams={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
             onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}
-            onProject={(fn) => setProject((p) => normalizeProject(fn(p)))} />
+            onProject={(fn) => setProject((p) => normalizeProject(fn(p)))} />}
+          </div>
         </main>
       )}
       {tab === 'corte' && <CutPlan cut={cut} nesting={nesting} settings={settings} project={project} />}

@@ -38,6 +38,12 @@ diseño 3D, renderizado, plan de corte y presupuesto. Se quieren todas las funci
    alto y espesor de paredes, ventanas, puertas y vanos por pared, columnas, piso con la forma real, paredes que se ocultan solas
    cuando tapan la vista ("Paredes auto"), cotas de paredes y módulos ("Cotas", se activan solas en Planta), imán a paredes no
    rectangulares y a columnas. Los proyectos viejos se migran solos (`normalizeProject`).
+3b. ✅ **Paridad con Promob — Fase 1, ambiente interactivo** (ver `docs/PRD.md` y `docs/PLAN-FASE-1.md`, issues #1–#14 y #29):
+   deshacer/rehacer, paredes como grafo (vértices + tramos, abiertas o cerradas), Planta ortográfica con grilla magnética,
+   selección y propiedades de pared, arrastrar paredes y vértices, construir paredes con clics y teclado, plantillas,
+   eliminar/dividir con menú de clic derecho, cotas automáticas (lineales, angulares, de módulos a paredes/vecinos) y editables,
+   flechas para estirar módulos, aberturas y columnas arrastrables, Auto Rebajar, regla de alturas, cotas manuales y plano de referencia.
+   Siguiente: Fase 2 (#15) en adelante.
 4. ⏳ **Esquineros y especiales**: bajo esquinero L, alacena esquinera, horno/anafe, heladera, rebatibles, cajonera interna, alacena sobre heladera.
 5. ⏳ **Corte para taller**: orden de cortes, etiquetas por pieza imprimibles, sobrantes reutilizables.
 6. ⏳ **Módulo libre** a medida (editor por piezas).

@@ -11,7 +11,11 @@ export function AnnotateTool({ room, modules, tool, origin, onPoint, onFinish })
   const [cur, setCur] = useState(null);
   const grid = room.grid?.size || 50;
   const top = (Math.max(room.h, ...room.walls.map((w) => Math.max(w.h0, w.h1))) + 60) * S;
-  const snap = (e) => snapPoint(room, modules, [e.point.x / S + origin.x, e.point.z / S + origin.z], { grid });
+  // tool.free: sin imán (para marcar puntos sobre el plano de referencia)
+  const snap = (e) => {
+    const raw = [e.point.x / S + origin.x, e.point.z / S + origin.z];
+    return tool.free ? { point: raw.map((v) => Math.round(v)), kind: 'free' } : snapPoint(room, modules, raw, { grid });
+  };
   const onMove = (e) => setCur(snap(e));
   const onDown = (e) => {
     e.stopPropagation();

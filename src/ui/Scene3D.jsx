@@ -11,6 +11,7 @@ import { mat3d, metal, stone } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
 import { ModuleDistances, OpeningDims, HeightRuler, Annotations } from './Cotas.jsx';
 import { AnnotateTool } from './AnnotateTool.jsx';
+import { PlanImage } from './PlanImage.jsx';
 import { DrawTool } from './DrawTool.jsx';
 import { PlanGrid } from './PlanGrid.jsx';
 
@@ -169,11 +170,14 @@ function Capturer({ captureRef, photoreal }) {
   useEffect(() => {
     captureRef.current = (scale = 2) => {
       if (photoreal) return gl.domElement.toDataURL('image/png'); // la imagen ya está acumulada en el canvas
+      const plan = scene.getObjectByName('planImage'); // el plano de referencia no va a la imagen exportada
+      if (plan) plan.visible = false;
       const old = gl.getPixelRatio();
       gl.setPixelRatio(old * scale);
       gl.render(scene, camera);
       const url = gl.domElement.toDataURL('image/png');
       gl.setPixelRatio(old);
+      if (plan) plan.visible = true;
       gl.render(scene, camera);
       return url;
     };
@@ -183,7 +187,7 @@ function Capturer({ captureRef, photoreal }) {
 
 // Solo en desarrollo: permite a los tests e2e ubicar módulos, paredes y vértices en pantalla.
 function DevProbe({ project, origin }) {
-  const { camera, gl } = useThree();
+  const { camera, gl, scene } = useThree();
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     const toScreen = (x, y, z) => {
@@ -193,6 +197,7 @@ function DevProbe({ project, origin }) {
     };
     window.__muebles = {
       cameraType: camera.type,
+      planImageShown: !!scene.getObjectByName('planImage'),
       screenOf(id, dy = 0) {
         const m = project.modules.find((o) => o.id === id);
         if (!m) return null;
@@ -451,6 +456,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
         {view.name === 'frente' && !renderMode && <HeightRuler room={room} modules={project.modules} />}
         {selectedOpeningId && !renderMode && <OpeningDims room={room} id={selectedOpeningId} onEdit={onOpeningDim} />}
         {planta && !renderMode && <PlanGrid room={room} />}
+        {planta && !renderMode && project.planImage?.visible && <PlanImage img={project.planImage} />}
         {planta && !renderMode && !drawing && !annotating && <NodeHandles room={room} onNodeDown={onNodeDown} />}
         {planta && !renderMode && annotating && <AnnotateTool room={room} modules={project.modules} tool={annotating} origin={origin} onPoint={onAnnotatePoint} onFinish={onAnnotateFinish} />}
         {!renderMode && <Annotations annotations={project.annotations || []} selectedId={selectedDimId} onSelect={onSelectDim} />}

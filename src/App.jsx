@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
-import { newModule, footprint, snapPosition, uid } from './domain/modules.js';
+import { newModule, footprint, snapPosition, resizeModule, uid } from './domain/modules.js';
 import { moveWall, moveNode, setWallLength } from './domain/wallEdit.js';
 import { applyDimEdit } from './domain/dimensions.js';
 import { buildAll, computeCutList } from './domain/cutlist.js';
@@ -85,6 +85,10 @@ export default function App() {
   const onMoveWall = useCallback((id, dx, dz) => setProject((p) => ({ ...p, room: moveWall(baseRoomRef.current || p.room, id, dx, dz) })), [setProject]);
   const onMoveNode = useCallback((id, x, z) => setProject((p) => ({ ...p, room: moveNode(p.room, id, x, z) })), [setProject]);
   const recenter = () => setView((v) => ({ ...v, tick: v.tick + 1 }));
+  // Flechas de redimensionar: siempre desde el módulo como estaba al empezar el arrastre.
+  const onResize = useCallback((start, handle, delta) => setProject((p) => ({
+    ...p, modules: p.modules.map((m) => (m.id === start.id ? resizeModule(start, handle, delta) : m)),
+  })), [setProject]);
 
   // Cotas editables: la distancia del módulo mueve el módulo; el largo de pared cambia la pared.
   const onDimEdit = (dim, value) => selectedId && mapModule(selectedId, (m) => ({ ...m, ...applyDimEdit(m, dim, value) }));
@@ -173,7 +177,7 @@ export default function App() {
             <ErrorBoundary onReset={() => { setPhotoreal(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
                 selectedWallId={selectedWallId} onSelectWall={selectWall}
-                onMoveWall={onMoveWall} onMoveNode={onMoveNode} step={gridStep}
+                onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
                 onDimEdit={onDimEdit} onWallLength={onWallLength}
                 onDragStart={onDragStart} onDragEnd={history.commit}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}

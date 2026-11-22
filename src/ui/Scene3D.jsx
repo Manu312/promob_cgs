@@ -3,7 +3,7 @@ import { OrbitControls, OrthographicCamera, Environment, Lightformer, ContactSha
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { WebGLPathTracer, GradientEquirectTexture } from 'three-gpu-pathtracer';
-import { footprint } from '../domain/modules.js';
+import { footprint, localAxes, RESIZE_HANDLES } from '../domain/modules.js';
 import { bounds } from '../domain/walls.js';
 import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
@@ -44,13 +44,33 @@ function DecorMesh({ d }) {
 function SelBox({ w, h, d }) {
   const geo = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(w * S + 0.012, h * S + 0.012, d * S + 0.04)), [w, h, d]);
   return (
-    <lineSegments geometry={geo} position={[0, (h * S) / 2, 0.014]}>
+    <lineSegments geometry={geo} position={[0, (h * S) / 2, 0.014]} raycast={() => null}>
       <lineBasicMaterial color="#2f7df6" />
     </lineSegments>
   );
 }
 
-function ModuleObject({ mod, b, selected, showSel, onDown }) {
+// Flechas de redimensionar: posición (mm, sistema del módulo con origen en el centro de
+// la huella y el piso del módulo) y giro del cono (apunta hacia +y por defecto).
+const GAP = 90;
+const handlePos = (W, H, D) => ({ right: [W / 2 + GAP, H / 2, 0], left: [-W / 2 - GAP, H / 2, 0], front: [0, H / 2, D / 2 + GAP], top: [0, H + GAP, 0] });
+const HANDLE_ROT = { right: [0, 0, -Math.PI / 2], left: [0, 0, Math.PI / 2], front: [Math.PI / 2, 0, 0], top: [0, 0, 0] };
+const handleMat = new THREE.MeshBasicMaterial({ color: '#ef4444', depthTest: false, transparent: true });
+
+function ResizeHandles({ W, H, D, planta, onDown }) {
+  return Object.entries(handlePos(W, H, D))
+    .filter(([k]) => !(planta && k === 'top')) // en Planta no se puede arrastrar en vertical
+    .map(([k, p]) => (
+      <mesh key={k} position={p.map((v) => v * S)} rotation={HANDLE_ROT[k]} material={handleMat} renderOrder={3} userData={{ resizeHandle: k }}
+        onPointerDown={(e) => onDown(e, k)}
+        onPointerOver={() => { document.body.style.cursor = 'grab'; }}
+        onPointerOut={() => { document.body.style.cursor = ''; }}>
+        <coneGeometry args={[0.045, 0.11, 20]} />
+      </mesh>
+    ));
+}
+
+function ModuleObject({ mod, b, selected, showSel, onDown, onResizeDown, planta }) {
   const { fw, fd } = footprint(mod);
   const W = mod.params.width, D = mod.params.depth, H = mod.params.height;
   return (
@@ -60,6 +80,7 @@ function ModuleObject({ mod, b, selected, showSel, onDown }) {
         {b.decors.map((d, i) => <DecorMesh key={'d' + i} d={d} />)}
       </group>
       {selected && showSel && <SelBox w={W} h={H} d={D} />}
+      {selected && showSel && onResizeDown && <ResizeHandles W={W} H={H} D={D} planta={planta} onDown={(e, k) => onResizeDown(e, mod, k)} />}
     </group>
   );
 }
@@ -184,6 +205,14 @@ function DevProbe({ project, origin }) {
         const n = project.room.nodes.find((o) => o.id === id);
         return n ? toScreen(n.x, project.room.h + 20, n.z) : null;
       },
+      screenOfHandle(id, handle) {
+        const m = project.modules.find((o) => o.id === id);
+        if (!m) return null;
+        const { fw, fd } = footprint(m);
+        const [lx, ly, lz] = handlePos(m.params.width, m.params.height, m.params.depth)[handle];
+        const { ex, ez } = localAxes(m.rot || 0);
+        return toScreen(m.x + fw / 2 + ex[0] * lx + ez[0] * lz, (m.y || 0) + ly, m.z + fd / 2 + ex[1] * lx + ez[1] * lz);
+      },
     };
   });
   return null;
@@ -205,11 +234,18 @@ function NodeHandles({ room, onNodeDown }) {
 
 // Arrastre en el plano horizontal: módulos (posición), paredes (desplazamiento sobre
 // su normal, redondeado al paso) y vértices (posición redondeada al paso).
-function DragController({ drag, setDrag, onMove, onMoveWall, onMoveNode, onDragEnd, controlsRef, origin }) {
+function DragController({ drag, setDrag, onMove, onMoveWall, onMoveNode, onResize, onDragEnd, controlsRef, origin }) {
   const { camera, gl } = useThree();
   useEffect(() => {
     if (!drag) return;
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -drag.planeY);
+    if (drag.vertical) { // flecha de alto: plano vertical de frente a la cámara
+      const n = new THREE.Vector3();
+      camera.getWorldDirection(n);
+      n.y = 0;
+      if (n.lengthSq() < 1e-6) n.set(0, 0, 1);
+      plane.setFromNormalAndCoplanarPoint(n.normalize(), drag.p0);
+    }
     const ray = new THREE.Raycaster();
     const v = new THREE.Vector2();
     const pt = new THREE.Vector3();
@@ -220,7 +256,10 @@ function DragController({ drag, setDrag, onMove, onMoveWall, onMoveNode, onDragE
       ray.setFromCamera(v, camera);
       if (!ray.ray.intersectPlane(plane, pt)) return;
       const rx = pt.x / S + origin.x, rz = pt.z / S + origin.z;
-      if (drag.kind === 'wall') {
+      if (drag.kind === 'resize') {
+        const delta = drag.vertical ? (pt.y - drag.p0.y) / S : (rx - drag.sx) * drag.dir[0] + (rz - drag.sz) * drag.dir[1];
+        onResize(drag.start, drag.handle, snap(delta));
+      } else if (drag.kind === 'wall') {
         const q = snap((rx - drag.sx) * drag.n[0] + (rz - drag.sz) * drag.n[1]);
         onMoveWall(drag.id, drag.n[0] * q, drag.n[1] * q);
       } else if (drag.kind === 'node') {
@@ -233,7 +272,7 @@ function DragController({ drag, setDrag, onMove, onMoveWall, onMoveNode, onDragE
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-  }, [drag, camera, gl, onMove, onMoveWall, onMoveNode, onDragEnd, setDrag, controlsRef, origin]);
+  }, [drag, camera, gl, onMove, onMoveWall, onMoveNode, onResize, onDragEnd, setDrag, controlsRef, origin]);
   return null;
 }
 
@@ -243,7 +282,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onDimEdit, onWallLength, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const { room } = project;
@@ -261,9 +300,19 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
     setDrag(d);
     if (controlsRef.current) controlsRef.current.enabled = false;
   };
+  // Las flechas se dibujan siempre encima: si el rayo pasó por una (aunque haya algo
+  // más cerca, como el propio módulo), el clic es de la flecha.
+  const handleHit = (e) => {
+    if (!onResize || !selectedMod) return false;
+    const hit = e.intersections?.find((i) => i.object.userData?.resizeHandle);
+    if (!hit) return false;
+    onResizeDown(e, selectedMod, hit.object.userData.resizeHandle, hit.point);
+    return true;
+  };
   const onDown = (e, mod) => {
     if (renderMode) return;
     e.stopPropagation();
+    if (handleHit(e)) return;
     onSelect(mod.id);
     const [rx, rz] = toRoom(e.point);
     startDrag({ kind: 'module', id: mod.id, planeY: e.point.y, offX: rx - mod.x, offZ: rz - mod.z });
@@ -271,6 +320,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
   // Pared: se selecciona siempre; se arrastra en Planta, o en 3D si es movible.
   const onWallDown = (e, g) => {
     if (renderMode) return;
+    if (handleHit(e)) return;
     onSelectWall(g.id);
     if (!(planta || g.wall.movable)) return;
     const [rx, rz] = toRoom(e.point);
@@ -282,6 +332,18 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
     const [rx, rz] = toRoom(e.point);
     startDrag({ kind: 'node', id: n.id, planeY: e.point.y, offX: n.x - rx, offZ: n.z - rz, step });
   };
+  // Flecha de redimensionar: el arrastre se mide sobre el eje de la flecha (en el mundo),
+  // siempre desde el módulo como estaba al empezar.
+  function onResizeDown(e, mod, handle, point = e.point) {
+    if (renderMode) return;
+    e.stopPropagation();
+    const h = RESIZE_HANDLES[handle];
+    if (h.axis === 'y') return startDrag({ kind: 'resize', id: mod.id, handle, start: mod, vertical: true, p0: point.clone(), planeY: 0, step });
+    const { ex, ez } = localAxes(mod.rot || 0);
+    const ax = h.axis === 'x' ? ex : ez;
+    const [rx, rz] = toRoom(point);
+    startDrag({ kind: 'resize', id: mod.id, handle, start: mod, planeY: point.y, sx: rx, sz: rz, dir: [ax[0] * h.sign, ax[1] * h.sign], step });
+  }
 
   return (
     <Canvas
@@ -325,7 +387,8 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
         {project.modules.map((m) => {
           const b = builtById.get(m.id);
           if (!b) return null;
-          return <ModuleObject key={m.id} mod={m} b={b} selected={m.id === selectedId} showSel={!renderMode} onDown={onDown} />;
+          return <ModuleObject key={m.id} mod={m} b={b} selected={m.id === selectedId} showSel={!renderMode} onDown={onDown}
+            onResizeDown={onResize ? onResizeDown : null} planta={planta} />;
         })}
       </group>
       {renderMode && !photoreal && <ContactShadows position={[0, 0.002, 0]} scale={12} blur={2.2} opacity={0.45} far={2.5} />}
@@ -336,7 +399,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
       <Capturer captureRef={captureRef} photoreal={photoreal} />
       <DevProbe project={project} origin={origin} />
-      <DragController drag={drag} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
+      <DragController drag={drag} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
     </Canvas>
   );
 }

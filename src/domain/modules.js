@@ -50,6 +50,8 @@ export const PARAM_DEFS = {
   nicheH: { label: 'Hueco p/ electrodoméstico (alto)', type: 'num', min: 0, max: 2200, step: 10, unit: 'mm' },
   nicheY: { label: 'Hueco: altura desde abajo', type: 'num', min: 0, max: 2200, step: 10, unit: 'mm' },
   bachas: { label: 'Bachas', type: 'num', min: 0, max: 2, step: 1 },
+  armD: { label: 'Profundidad del cuerpo', type: 'num', min: 250, max: 700, step: 10, unit: 'mm' },
+  side: { label: 'Lado de la esquina', type: 'sel', options: [['izq', 'Izquierda'], ['der', 'Derecha']] },
 };
 
 const CAJA_FIELDS = ['width', 'height', 'depth', 'plinth', 'top', 'dividers', 'shelves', 'interior', 'doorType', 'doors', 'drawers', 'drawerH', 'handlePos', 'mesada', 'mesadaT', 'mesadaOver', 'nicheH', 'nicheY'];
@@ -88,10 +90,14 @@ export const MODULE_TYPES = {
   tapa: { label: 'Tapa / mesada', cat: 'Cocina', kind: 'tapa', y: 870, rest: true, defaults: { width: 1200, height: 20, depth: 600, mesadaT: 20, bachas: 0 } },
   vista: { label: 'Vista (panel lateral)', cat: 'Cocina', kind: 'vista', y: 0, defaults: { width: 18, height: 870, depth: 580 } },
   estante: { label: 'Estante', cat: 'Cocina', kind: 'estante', y: 1500, defaults: { width: 800, height: 18, depth: 250 } },
+  // Esquineros: ocupan la esquina (dos brazos contra las dos paredes). "Izquierda" = la esquina
+  // queda a la izquierda (atrás-izquierda); "Derecha" = atrás-derecha.
+  esq_l: { label: 'Esquinero L', cat: 'Cocina', kind: 'esquinero', y: 0, defaults: { width: 950, depth: 950, height: 870, armD: 560, plinth: 150, doors: 2, side: 'izq', shape: 'l', handlePos: 'top', mesada: 'si', mesadaT: 20, mesadaOver: 20 } },
+  esq_oblicuo: { label: 'Esquinero oblicuo', cat: 'Cocina', kind: 'esquinero', y: 0, defaults: { width: 900, depth: 900, height: 870, armD: 560, plinth: 150, doors: 1, side: 'izq', shape: 'oblicuo', handlePos: 'top', mesada: 'si', mesadaT: 20, mesadaOver: 20 } },
   mostrador: { label: 'Mostrador', cat: 'Oficina', kind: 'caja', y: 0, defaults: caja({ width: 1500, height: 1050, depth: 500, plinth: 100, dividers: 2, doorType: 'ninguna', doors: 0, shelves: 1, handlePos: 'none' }) },
 };
 
-const KIND_FIELDS = { escritorio: ['width', 'height', 'depth'], tapa: ['width', 'depth', 'mesadaT', 'bachas'], vista: ['height', 'depth'], estante: ['width', 'depth'] };
+const KIND_FIELDS = { esquinero: ['width', 'depth', 'armD', 'height', 'plinth', 'doors', 'side', 'handlePos', 'mesada', 'mesadaT', 'mesadaOver'], escritorio: ['width', 'height', 'depth'], tapa: ['width', 'depth', 'mesadaT', 'bachas'], vista: ['height', 'depth'], estante: ['width', 'depth'] };
 
 export function fieldsFor(type) {
   return KIND_FIELDS[MODULE_TYPES[type]?.kind] || CAJA_FIELDS;
@@ -340,7 +346,100 @@ function buildEstante(raw, { t }) {
   return { parts: [part('Estante', 'cuerpo', 0, 0, 0, p.width, t, p.depth, { x: 1 })], decors: [], hardware: { soporte_estante: 2 } };
 }
 
-const BUILDERS = { escritorio: buildEscritorio, tapa: buildTapa, vista: buildVista, estante: buildEstante };
+// Esquinero bajo (L u oblicuo). Se arma con la esquina atrás-izquierda (fondos contra las
+// paredes z = 0 y x = 0) y se espeja para "Derecha". L: dos frentes en el ángulo interior
+// (2P: dos puertas; 1P: una puerta y un frente fijo). Oblicuo: frente a 45° (1 o 2 puertas).
+// El piso y el techo del oblicuo se cortan como dos rectángulos (el triángulo queda adentro).
+function buildEsquinero(raw, { t, tf, tb = 3, rules = {} }) {
+  const p = sanitize(raw);
+  const R = { ...DEFAULT_RULES, ...rules };
+  const G = R.gap;
+  const W = p.width, D = p.depth, H = p.height, A = Math.min(p.armD, W - 100, D - 100);
+  const P = R.base === 'ninguna' ? 0 : Math.min(p.plinth || 0, H - 4 * t);
+  const parts = [], decors = [], hw = {};
+  const add = (c, n) => { if (n > 0) hw[c] = (hw[c] || 0) + n; };
+  const bodyH = H - P;
+  // Fondos contra las dos paredes
+  parts.push(part('Fondo', 'fondo', 0, P, 0, W, bodyH, tb));
+  parts.push(part('Fondo', 'fondo', 0, P, tb, tb, bodyH, D - tb));
+  // Laterales en las puntas de los brazos
+  parts.push(part('Lateral', 'cuerpo', W - t, P, tb, t, bodyH, A - tb, { y: 1 }));
+  parts.push(part('Lateral', 'cuerpo', tb, P, D - t, A - tb, bodyH, t, { y: 1 }));
+  // Piso y techo en L (dos rectángulos cada uno)
+  for (const [name, y] of [['Piso', P], ['Techo', H - t]]) {
+    parts.push(part(name, 'cuerpo', tb, y, tb, W - t - tb, t, A - tb, { x: 1 }));
+    parts.push(part(name, 'cuerpo', tb, y, A, A - tb, t, D - t - A, { z: 1 }));
+  }
+  // Zócalo en las caras interiores
+  if (P > 0) {
+    const s = R.plinthSetback;
+    parts.push(part('Zócalo', 'cuerpo', A - s - t, 0, A - s - t, W - A + s, P, t, { x: 1 }));
+    parts.push(part('Zócalo', 'cuerpo', A - s - t, 0, A - s, t, P, D - A + s, { z: 1 }));
+    if (R.base === 'patas_zocalo') add('pata', 6);
+  }
+  const fy = P + G / 2, fh = H - G / 2 - fy;
+  const hp = p.handlePos;
+  const handleY = (h) => (hp === 'top' ? fy + h - 168 : hp === 'bottom' ? fy + 40 : fy + h / 2 - 64);
+  const nDoors = Math.max(1, Math.min(2, Math.round(p.doors || 1)));
+  if (p.shape === 'oblicuo') {
+    // Frente a 45° entre (W, A) y (A, D)
+    const ax = W, az = A, bx = A, bz = D;
+    const L = Math.hypot(bx - ax, bz - az);
+    const ux = (bx - ax) / L, uz = (bz - az) / L, nx = uz, nz = -ux; // n: hacia afuera
+    const ry = Math.atan2(-uz, ux);
+    const dw = (L - G * (nDoors + 1)) / nDoors;
+    for (let i = 0; i < nDoors; i++) {
+      const s = G + dw / 2 + i * (dw + G);
+      const cx = ax + ux * s + (nx * tf) / 2, cz = az + uz * s + (nz * tf) / 2;
+      parts.push({ ...part('Puerta', 'frente', cx - dw / 2, fy, cz - tf / 2, dw, fh, tf, { x: 2, y: 2 }), ry });
+      add('bisagra', hingesFor(fh));
+      if (hp !== 'none') {
+        const hs = nDoors === 1 ? s + dw / 2 - 40 : i === 0 ? s + dw / 2 - 40 : s - dw / 2 + 40;
+        decors.push({ ...decor('manija', ax + ux * hs + nx * (tf + 12) - 6, handleY(fh), az + uz * hs + nz * (tf + 12) - 12, 12, 128, 25), ry });
+        add('manija', 1);
+      }
+    }
+  } else {
+    // L: frente sobre el brazo x (plano z = A) y sobre el brazo z (plano x = A)
+    const wA = W - A - G, wB = D - A - tf - G;
+    parts.push(part('Puerta', 'frente', A + G / 2, fy, A, wA, fh, tf, { x: 2, y: 2 }));
+    add('bisagra', hingesFor(fh));
+    parts.push(part(nDoors === 2 ? 'Puerta' : 'Frente fijo', 'frente', A, fy, A + tf + G / 2, tf, fh, wB, { z: 2, y: 2 }));
+    if (nDoors === 2) add('bisagra', hingesFor(fh));
+    if (hp !== 'none') {
+      decors.push(decor('manija', W - G / 2 - 46, handleY(fh), A + tf, 12, 128, 25));
+      add('manija', 1);
+      if (nDoors === 2) { decors.push(decor('manija', A + tf, handleY(fh), D - G / 2 - 46, 25, 128, 12)); add('manija', 1); }
+    }
+  }
+  // Mesada en L (y la franja a 45° del oblicuo)
+  if (p.mesada === 'si') {
+    const o = tf + p.mesadaOver, T = p.mesadaT;
+    decors.push(decor('mesada', 0, H, 0, W, T, A + o));
+    decors.push(decor('mesada', 0, H, A + o, A + o, T, D - A - o));
+    let area = W * (A + o) + (A + o) * (D - A - o);
+    if (p.shape === 'oblicuo') {
+      const leg = Math.min(W, D) - A;
+      const L = Math.hypot(leg, leg), ry = Math.atan2(-Math.SQRT1_2, -Math.SQRT1_2);
+      const cx = (W + A) / 2 + (o / 2) * Math.SQRT1_2, cz = (A + D) / 2 + (o / 2) * Math.SQRT1_2;
+      decors.push({ ...decor('mesada', cx - L / 2, H, cz - o / 2, L, T, o), ry });
+      // cuadrado a 45° que tapa el triángulo interior (diagonal desde la esquina interior
+      // hasta el medio del frente): lado = leg / 2, centro en (A + leg/4, A + leg/4)
+      const s2 = leg / 2, c2 = A + leg / 4;
+      decors.push({ ...decor('mesada', c2 - s2 / 2, H, c2 - s2 / 2, s2, T, s2), ry: Math.PI / 4 });
+      area += (leg * leg) / 2;
+    }
+    add('mesada', Math.round(area / 1e4) / 100);
+  }
+  add('kit_armado', 1);
+  if (p.side === 'der') {
+    const flip = (o) => ({ ...o, x: W - o.x - o.sx, ...(o.ry ? { ry: -o.ry } : {}) });
+    return { parts: parts.map(flip), decors: decors.map(flip), hardware: hw };
+  }
+  return { parts, decors, hardware: hw };
+}
+
+const BUILDERS = { esquinero: buildEsquinero, escritorio: buildEscritorio, tapa: buildTapa, vista: buildVista, estante: buildEstante };
 
 export function buildModule(mod, ctx) {
   const def = MODULE_TYPES[mod.type];

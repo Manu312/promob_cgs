@@ -142,6 +142,15 @@ try {
   check('Catálogo con módulos nuevos (torre p/ horno, tapas con bachas)', okTorre && okTapa && torre.type === 'torre_horno' && tapa.type === 'tapa' && tapa.params.bachas === 2 && tapas.length === 3, tapas.join(', '));
   await shot('01f-modulos-nuevos');
   check('El módulo toma el nombre del ítem', (await page.$eval('.inspector h3', (e) => e.textContent)) === 'Tapa p/ 2 bachas');
+  // Esquineros L y oblicuos (#62)
+  await clickText('.cb-groups .cb-tab', 'Inferiores'); await clickText('.cb-subs .cb-tab', 'Esquineros');
+  const esq = await page.$$eval('.mod-btn span', (els) => els.map((e) => e.textContent.trim()));
+  await clickText('.cb-subs .cb-tab', 'Módulos Diagonales');
+  const okObl = await dbl('Esquinero oblicuo 2P 900mm'); await sleep(500);
+  p = await project();
+  check('Esquineros L (4) y oblicuos en el catálogo', esq.length === 4 && okObl && p.modules.at(-1).type === 'esq_oblicuo' && p.modules.at(-1).params.doors === 2, esq.join(', '));
+  await shot('01g-esquinero');
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
   for (let i = 0; i < 2; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300); }
   check('Deshacer saca los módulos nuevos', (await project()).modules.length === nBefore);
   // Lista de Módulos (#60)

@@ -31,6 +31,16 @@ export const LIBRARY = [
           it('coc-inf-2c1p', 'bajo_mixto', 'Bajo 2 cajones + 1 puerta', { width: 500, doors: 1, drawers: 2, drawerH: 150 }, W(400, 450, 500, 600)),
         ] },
         { id: 'electro', label: 'Módulos p/Electrodomésticos', items: [it('coc-inf-horno', 'bajo_horno')] },
+        { id: 'esquineros', label: 'Esquineros', items: [
+          it('coc-esq-l-izq', 'esq_l', 'Esquinero L Izq 950mm', { doors: 1, side: 'izq' }),
+          it('coc-esq-l2p-izq', 'esq_l', 'Esquinero L 2P Izq', { doors: 2, side: 'izq' }),
+          it('coc-esq-l-der', 'esq_l', 'Esquinero L Der 950mm', { doors: 1, side: 'der' }),
+          it('coc-esq-l2p-der', 'esq_l', 'Esquinero L 2P Der', { doors: 2, side: 'der' }),
+        ] },
+        { id: 'diagonales', label: 'Módulos Diagonales', items: [
+          it('coc-esq-obl1p', 'esq_oblicuo', 'Esquinero oblicuo 1P 900mm', { doors: 1 }),
+          it('coc-esq-obl2p', 'esq_oblicuo', 'Esquinero oblicuo 2P 900mm', { doors: 2 }),
+        ] },
         { id: 'lavaplatos', label: 'Lavaplatos', items: [it('coc-inf-bacha', 'bajo_bacha', null, null, W(600, 800, 900, 1000, 1200))] },
       ] },
       { id: 'altos', label: 'Altos', subgroups: [

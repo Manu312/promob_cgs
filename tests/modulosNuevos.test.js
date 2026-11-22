@@ -79,3 +79,39 @@ test('insertar desde un ítem: guarda su nombre y la tapa se apoya sobre el bajo
   assert.equal(sinNombre.name, undefined);
   assert.equal(moduleName(sinNombre), MODULE_TYPES.bajo.label);
 });
+
+// Esquineros (#62)
+test('esquinero L 2P izq: dos puertas en el ángulo interior, fondos contra las dos paredes', () => {
+  const b = build('esq_l');
+  assert.equal(b.parts.filter((x) => x.name === 'Puerta').length, 2);
+  assert.equal(b.parts.filter((x) => x.name === 'Fondo').length, 2);
+  for (const x of b.parts) assert.ok(x.sx > 0 && x.sy > 0 && x.sz > 0 && x.x >= -0.01 && x.x + x.sx <= 950.01 && x.z + x.sz <= 950.01, x.name);
+  assert.ok(b.hardware.mesada > 0);
+});
+
+test('esquinero L 1P: una puerta y un frente fijo; Der es el espejo de Izq', () => {
+  const izq = build('esq_l', { doors: 1 });
+  assert.deepEqual([izq.parts.filter((x) => x.name === 'Puerta').length, izq.parts.filter((x) => x.name === 'Frente fijo').length], [1, 1]);
+  const der = build('esq_l', { doors: 1, side: 'der' });
+  const fi = izq.parts.find((x) => x.name === 'Frente fijo'), fd = der.parts.find((x) => x.name === 'Frente fijo');
+  assert.equal(Math.round(fd.x + fd.sx), Math.round(950 - fi.x));
+  assert.equal(fd.z, fi.z);
+});
+
+test('esquinero oblicuo: puertas a 45° sobre el frente diagonal', () => {
+  const b1 = build('esq_oblicuo');
+  const b2 = build('esq_oblicuo', { doors: 2 });
+  const d1 = b1.parts.filter((x) => x.name === 'Puerta'), d2 = b2.parts.filter((x) => x.name === 'Puerta');
+  assert.equal(d1.length, 1);
+  assert.equal(d2.length, 2);
+  assert.ok(d1.every((d) => Math.abs(Math.abs(d.ry) - (3 * Math.PI) / 4) < 1e-6));
+  const L = Math.hypot(340, 340);
+  assert.ok(d1[0].sx > L - 10 && d1[0].sx < L);
+  const c = [d1[0].x + d1[0].sx / 2, d1[0].z + d1[0].sz / 2];
+  assert.ok(Math.abs(c[0] + c[1] - (900 + 560)) < 30, 'centro sobre la diagonal');
+});
+
+test('esquineros en el catálogo', () => {
+  assert.equal(findItem('coc-esq-l2p-der').item.params.side, 'der');
+  assert.equal(findItem('coc-esq-obl2p').path[2], 'diagonales');
+});

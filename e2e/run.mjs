@@ -84,6 +84,17 @@ try {
   check('Arrastrar módulo lo mueve', after.x !== before.x || after.z !== before.z, `(${before.x},${before.z}) → (${after.x},${after.z})`);
   await shot('02-arrastre');
 
+  // Deshacer/rehacer: el arrastre completo es un solo paso
+  const ctrl = async (key) => { await page.keyboard.down('Control'); await page.keyboard.press(key); await page.keyboard.up('Control'); await sleep(400); };
+  await ctrl('KeyZ');
+  p = await project();
+  const undone = p.modules.find((m) => m.id === target.id);
+  check('Ctrl+Z deshace el arrastre entero', undone.x === before.x && undone.z === before.z, `(${undone.x},${undone.z})`);
+  await ctrl('KeyY');
+  p = await project();
+  const redone = p.modules.find((m) => m.id === target.id);
+  check('Ctrl+Y rehace el arrastre', redone.x === after.x && redone.z === after.z, `(${redone.x},${redone.z})`);
+
   // Teclado
   await page.keyboard.press('KeyR'); await sleep(300);
   p = await project();

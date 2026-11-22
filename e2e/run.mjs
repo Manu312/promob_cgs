@@ -449,6 +449,17 @@ try {
   await dragFrom(hT, 0, -40);
   p = await project();
   check('Flecha de arriba cambia el alto', p.modules.find((m) => m.id === cz.id).params.height > cz.params.height, `alto=${p.modules.find((m) => m.id === cz.id).params.height}`);
+  // Flechas a ambos lados, por eje (#43): la de atrás estira hacia atrás y deja fijo el frente
+  p = await project();
+  const c3 = p.modules.find((m) => m.id === cz.id);
+  const hF = await page.evaluate((id) => window.__muebles.screenOfHandle(id, 'front'), cz.id);
+  const hB = await page.evaluate((id) => window.__muebles.screenOfHandle(id, 'back'), cz.id);
+  const lb = Math.hypot(hB.x - hF.x, hB.y - hF.y);
+  await dragFrom(hB, ((hB.x - hF.x) / lb) * 40, ((hB.y - hF.y) / lb) * 40);
+  p = await project();
+  const c4 = p.modules.find((m) => m.id === cz.id);
+  check('Flecha de atrás estira la profundidad y deja fijo el frente', c4.params.depth > c3.params.depth && c4.z + c4.params.depth === c3.z + c3.params.depth, `prof ${c3.params.depth} → ${c4.params.depth}, z=${c4.z}`);
+  await shot('18b-flechas-eje');
   check('Sin errores de consola tras redimensionar', errors.length === 0, errors.slice(-3).join(' | '));
 
   // Construir paredes (#6): proyecto nuevo con 2 paredes y un rectángulo dibujado solo con teclado

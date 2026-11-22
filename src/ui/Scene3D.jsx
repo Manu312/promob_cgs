@@ -3,7 +3,7 @@ import { OrbitControls, OrthographicCamera, Environment, Lightformer, ContactSha
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { WebGLPathTracer, GradientEquirectTexture } from 'three-gpu-pathtracer';
-import { footprint, localAxes, RESIZE_HANDLES } from '../domain/modules.js';
+import { footprint, localAxes, RESIZE_HANDLES, AXIS_COLORS } from '../domain/modules.js';
 import { bounds } from '../domain/walls.js';
 import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
@@ -58,20 +58,32 @@ function SelBox({ w, h, d }) {
 
 // Flechas de redimensionar: posición (mm, sistema del módulo con origen en el centro de
 // la huella y el piso del módulo) y giro del cono (apunta hacia +y por defecto).
-const GAP = 90;
-const handlePos = (W, H, D) => ({ right: [W / 2 + GAP, H / 2, 0], left: [-W / 2 - GAP, H / 2, 0], front: [0, H / 2, D / 2 + GAP], top: [0, H + GAP, 0] });
-const HANDLE_ROT = { right: [0, 0, -Math.PI / 2], left: [0, 0, Math.PI / 2], front: [Math.PI / 2, 0, 0], top: [0, 0, 0] };
-const handleMat = new THREE.MeshBasicMaterial({ color: '#ef4444', depthTest: false, transparent: true });
+const GAP = 150; // la cola de la flecha (125 mm) no se mete en el módulo
+const handlePos = (W, H, D) => ({
+  right: [W / 2 + GAP, H / 2, 0], left: [-W / 2 - GAP, H / 2, 0],
+  front: [0, H / 2, D / 2 + GAP], back: [0, H / 2, -D / 2 - GAP],
+  top: [0, H + GAP, 0], bottom: [0, -GAP, 0],
+});
+const HANDLE_ROT = {
+  right: [0, 0, -Math.PI / 2], left: [0, 0, Math.PI / 2],
+  front: [Math.PI / 2, 0, 0], back: [-Math.PI / 2, 0, 0],
+  top: [0, 0, 0], bottom: [Math.PI, 0, 0],
+};
+const handleMats = Object.fromEntries(Object.entries(AXIS_COLORS).map(([k, c]) => [k, new THREE.MeshBasicMaterial({ color: c, depthTest: false, transparent: true })]));
 
 function ResizeHandles({ W, H, D, planta, onDown }) {
   return Object.entries(handlePos(W, H, D))
-    .filter(([k]) => !(planta && k === 'top')) // en Planta no se puede arrastrar en vertical
+    .filter(([k]) => !(planta && RESIZE_HANDLES[k].axis === 'y')) // en Planta no se puede arrastrar en vertical
     .map(([k, p]) => (
-      <mesh key={k} position={p.map((v) => v * S)} rotation={HANDLE_ROT[k]} material={handleMat} renderOrder={3} userData={{ resizeHandle: k }}
+      <mesh key={k} position={p.map((v) => v * S)} rotation={HANDLE_ROT[k]} material={handleMats[RESIZE_HANDLES[k].axis]} renderOrder={3} userData={{ resizeHandle: k }}
         onPointerDown={(e) => onDown(e, k)}
         onPointerOver={() => { document.body.style.cursor = 'grab'; }}
         onPointerOut={() => { document.body.style.cursor = ''; }}>
-        <coneGeometry args={[0.045, 0.11, 20]} />
+        <coneGeometry args={[0.04, 0.09, 20]} />
+        {/* cola de la flecha (como las de Promob) */}
+        <mesh position={[0, -0.085, 0]} material={handleMats[RESIZE_HANDLES[k].axis]} renderOrder={3} userData={{ resizeHandle: k }}>
+          <cylinderGeometry args={[0.012, 0.012, 0.08, 10]} />
+        </mesh>
       </mesh>
     ));
 }
@@ -289,7 +301,7 @@ function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onRe
       const snap = (val) => Math.round(val / drag.step) * drag.step;
       const rx = pt.x / S + o.x, rz = pt.z / S + o.z;
       if (drag.kind === 'resize') {
-        const delta = drag.vertical ? (pt.y - drag.p0.y) / S : (rx - drag.sx) * drag.dir[0] + (rz - drag.sz) * drag.dir[1];
+        const delta = drag.vertical ? ((pt.y - drag.p0.y) / S) * drag.sign : (rx - drag.sx) * drag.dir[0] + (rz - drag.sz) * drag.dir[1];
         cb.onResize(drag.start, drag.handle, snap(delta));
       } else if (drag.kind === 'opening') {
         cb.onMoveOpening(drag.id, drag.offset0 + snap((rx - drag.sx) * drag.u[0] + (rz - drag.sz) * drag.u[1]));
@@ -411,7 +423,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
     if (renderMode || !leftButton(e)) return;
     e.stopPropagation();
     const h = RESIZE_HANDLES[handle];
-    if (h.axis === 'y') return startDrag({ kind: 'resize', id: mod.id, handle, start: mod, vertical: true, p0: point.clone(), planeY: 0, step });
+    if (h.axis === 'y') return startDrag({ kind: 'resize', id: mod.id, handle, start: mod, vertical: true, sign: h.sign, p0: point.clone(), planeY: 0, step });
     const { ex, ez } = localAxes(mod.rot || 0);
     const ax = h.axis === 'x' ? ex : ez;
     const [rx, rz] = toRoom(point);

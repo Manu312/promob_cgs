@@ -1,5 +1,6 @@
 import { MODULE_TYPES, DEFAULT_RULES, uid } from './modules.js';
 import { normalizeRoom, rid } from './room.js';
+import { roomTemplate } from './drawWalls.js';
 
 export function normalizeProject(p) {
   return { ...p, room: normalizeRoom(p.room), rules: { ...DEFAULT_RULES, ...(p.rules || {}) } };
@@ -10,7 +11,7 @@ const mk = (type, x, extra = {}) => ({ id: uid(), type, params: { ...MODULE_TYPE
 export function emptyProject() {
   return {
     name: 'Proyecto nuevo',
-    room: normalizeRoom({ w: 3600, d: 3000, h: 2600 }),
+    room: roomTemplate('dos', { w: 3600, d: 3000 }), // como Promob: arranca con 2 paredes y el piso
     defaults: { cuerpo: 'mel18_blanco', frente: 'mel18_roble', fondo: 'fibro3_blanco', cajon: 'mel18_blanco' },
     rules: { ...DEFAULT_RULES },
     modules: [],
@@ -20,6 +21,7 @@ export function emptyProject() {
 export function sampleProject() {
   const p = emptyProject();
   p.name = 'Cocina de ejemplo';
+  p.room = roomTemplate('rect', { w: 3600, d: 3000 });
   p.modules = [
     mk('columna', 0),
     mk('bajo_cajones', 600),

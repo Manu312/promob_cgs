@@ -3,6 +3,9 @@ import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
 import { newModule, footprint, snapPosition, resizeModule, uid } from './domain/modules.js';
 import { moveWall, moveNode, setWallLength } from './domain/wallEdit.js';
 import { applyDimEdit } from './domain/dimensions.js';
+import { addWall, segmentEnd } from './domain/drawWalls.js';
+import { absAngle } from './domain/walls.js';
+import DrawHud from './ui/DrawHud.jsx';
 import { buildAll, computeCutList } from './domain/cutlist.js';
 import { nestAll } from './domain/nesting.js';
 import { computeBudget } from './domain/budget.js';
@@ -94,6 +97,63 @@ export default function App() {
   const onDimEdit = (dim, value) => selectedId && mapModule(selectedId, (m) => ({ ...m, ...applyDimEdit(m, dim, value) }));
   const onWallLength = (id, value) => setProject((p) => normalizeProject({ ...p, room: setWallLength(p.room, id, value) }));
 
+  // Construir paredes: estado del trazo (punto inicial o esquina desde la que sigue,
+  // esquina donde empezó la cadena y ángulo del último tramo). Cada tramo es un paso de deshacer.
+  const [drawing, setDrawing] = useState(null);
+  const [drawLen, setDrawLen] = useState('');
+  const [drawAng, setDrawAng] = useState('');
+  const drawCursorRef = useRef(null);
+  const lenRef = useRef(null), angRef = useRef(null);
+  const freshDraw = { start: null, fromNodeId: null, chainStartId: null, prevAbs: null, segs: 0, confirmClose: false };
+  const startDrawWalls = () => {
+    setDrawing(freshDraw); setDrawLen(''); setDrawAng(''); setSelection(null);
+    if (view.name !== 'planta') { setView((v) => ({ name: 'planta', tick: v.tick + 1 })); setShowDims(true); }
+    setTimeout(() => lenRef.current?.focus(), 50);
+  };
+  const stopDrawWalls = () => { setDrawing(null); drawCursorRef.current = null; };
+  // Si se deshace un tramo mientras se dibuja, la esquina de partida puede desaparecer.
+  useEffect(() => {
+    if (drawing?.fromNodeId && !project.room.nodes.some((n) => n.id === drawing.fromNodeId)) setDrawing(freshDraw);
+  }, [project.room]); // eslint-disable-line react-hooks/exhaustive-deps
+  const drawFrom = () => {
+    if (drawing.fromNodeId) { const n = projectRef.current.room.nodes.find((o) => o.id === drawing.fromNodeId); return n && [n.x, n.z]; }
+    return drawing.start;
+  };
+  const commitWall = (to) => {
+    const from = drawing.fromNodeId ? { nodeId: drawing.fromNodeId } : { point: drawing.start };
+    const res = addWall(projectRef.current.room, from, to);
+    if (res.startNodeId === res.endNodeId) return;
+    setProject((p) => normalizeProject({ ...p, room: res.room }));
+    const a = res.room.nodes.find((n) => n.id === res.startNodeId), b = res.room.nodes.find((n) => n.id === res.endNodeId);
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    setDrawLen(''); setDrawAng('');
+    if (res.closed) { stopDrawWalls(); return; }
+    setDrawing({ ...freshDraw, fromNodeId: res.endNodeId, chainStartId: drawing.chainStartId ?? res.startNodeId, prevAbs: absAngle([(b.x - a.x) / len, (b.z - a.z) / len]), segs: drawing.segs + 1 });
+    setTimeout(() => lenRef.current?.focus(), 0);
+  };
+  const onDrawPoint = (c) => {
+    if (!drawing) return;
+    if (!drawing.start && !drawing.fromNodeId) {
+      setDrawing({ ...drawing, ...(c.nodeId ? { fromNodeId: c.nodeId, chainStartId: c.nodeId } : { start: c.end }) });
+      setTimeout(() => lenRef.current?.focus(), 0);
+      return;
+    }
+    if (c.nodeId && c.nodeId === drawing.chainStartId && drawing.segs >= 2) { setDrawing({ ...drawing, confirmClose: true }); return; }
+    commitWall(c.nodeId ? { nodeId: c.nodeId } : { point: c.end });
+  };
+  // Tramo por teclado: largo y ángulo escritos (o los que marca el mouse si quedan vacíos).
+  const commitTyped = () => {
+    const from = drawFrom();
+    if (!from) return;
+    const cur = drawCursorRef.current;
+    const num = (s) => { const v = Number(String(s).replace(',', '.')); return s !== '' && Number.isFinite(v) ? v : null; };
+    const len = num(drawLen) ?? cur?.len;
+    if (!(len > 0)) return;
+    const a = num(drawAng);
+    const abs = a != null ? (drawing.prevAbs == null ? a : drawing.prevAbs + (a - 180)) : (cur?.abs ?? (drawing.prevAbs == null ? 0 : drawing.prevAbs - 90));
+    commitWall({ point: segmentEnd(from, len, abs) });
+  };
+
   const addModule = (type) => {
     const m = newModule(type, project);
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));
@@ -121,7 +181,14 @@ export default function App() {
         if (k === 'z' && !e.shiftKey) { e.preventDefault(); history.undo(); return; }
         if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); history.redo(); return; }
       }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startDrawWalls(); return; }
       if (tab !== 'diseno' || inField) return;
+      if (drawing) { // los números van directo al largo, como en Promob
+        if (e.key === 'Escape') stopDrawWalls();
+        else if (/^[0-9.,]$/.test(e.key)) { e.preventDefault(); setDrawLen((s) => s + e.key); lenRef.current?.focus(); }
+        else if (e.key === 'Enter') commitTyped();
+        return;
+      }
       if (e.key === 'Escape') setSelectedId(null);
       if (!selectedId) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); }
@@ -180,15 +247,17 @@ export default function App() {
                 onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
                 onDimEdit={onDimEdit} onWallLength={onWallLength}
                 onDragStart={onDragStart} onDragEnd={history.commit}
+                drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
                 renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoHideWalls} />
             </ErrorBoundary>
             <div className="vp-toolbar">
               {[['perspectiva', 'Perspectiva'], ['frente', 'Frente'], ['planta', 'Planta']].map(([k, l]) => (
-                <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => { setView((v) => ({ name: k, tick: v.tick + 1 })); if (k === 'planta') setShowDims(true); }}>{l}</button>
+                <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => { setView((v) => ({ name: k, tick: v.tick + 1 })); if (k === 'planta') setShowDims(true); else stopDrawWalls(); }}>{l}</button>
               ))}
               <button className={showDims ? 'active-soft' : ''} onClick={() => setShowDims((s) => !s)} title="Mostrar medidas de paredes y módulos">Cotas</button>
               <button className={autoHideWalls ? 'active-soft' : ''} onClick={() => setAutoHideWalls((s) => !s)} title="Ocultar las paredes que tapan la vista">Paredes auto</button>
+              <button className={drawing ? 'active' : ''} onClick={() => (drawing ? stopDrawWalls() : startDrawWalls())} title="Construir paredes (Ctrl+Shift+P)">✏ Paredes</button>
               {view.name === 'planta' && (
                 <span className="grid-ctl">
                   <button className={grid.magnetic ? 'active-soft' : ''} onClick={() => setGrid({ magnetic: !grid.magnetic })}
@@ -214,15 +283,20 @@ export default function App() {
                   </select>
                 </span>
               )}
-              <button onClick={exportImage}>Exportar imagen</button>
+              <button onClick={exportImage} title="Exportar imagen (PNG)">⤓ Imagen</button>
             </div>
+            {drawing && (
+              <DrawHud draw={drawing} len={drawLen} setLen={setDrawLen} ang={drawAng} setAng={setDrawAng} lenRef={lenRef} angRef={angRef}
+                onCommit={commitTyped} onCancel={stopDrawWalls}
+                onClose={(yes) => (yes ? commitWall({ nodeId: drawing.chainStartId }) : setDrawing({ ...drawing, confirmClose: false }))} />
+            )}
             <div className="statusbar">
               <span className="sb-sel">{describeSelection(project, selection) || 'Sin selección'}</span>
               <span className="sb-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</span>
             </div>
           </section>
           <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
-            selectedWallId={selectedWallId} onSelectWall={selectWall}
+            selectedWallId={selectedWallId} onSelectWall={selectWall} onDrawWalls={startDrawWalls}
             onParams={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
             onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}

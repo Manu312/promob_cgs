@@ -31,7 +31,7 @@ h2 { margin: 0; font-size: 20px; } h3 { margin: 16px 0 8px; font-size: 15px; } h
 .mod-btn { display: flex; flex-direction: column; align-items: flex-start; width: 100%; margin-bottom: 5px; text-align: left; }
 .mod-btn small { color: var(--muted); font-size: 11px; }
 .viewport { position: relative; min-width: 0; min-height: 300px; }
-.vp-toolbar { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none; }
+.vp-toolbar { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 4px; flex-wrap: wrap; pointer-events: none; }
 .vp-toolbar > * { pointer-events: auto; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .vp-error { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 24px; text-align: center; background: var(--bg); }
 .pt-progress { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
@@ -40,10 +40,15 @@ h2 { margin: 0; font-size: 20px; } h3 { margin: 16px 0 8px; font-size: 15px; } h
 .grid-ctl select { width: auto; padding: 4px 6px; }
 button:disabled { opacity: .5; cursor: default; }
 .vp-toolbar .sep { width: 8px; box-shadow: none; }
-.vp-toolbar button, .vp-toolbar select { padding: 4px 9px; font-size: 12.5px; }
+.vp-toolbar button, .vp-toolbar select { padding: 4px 7px; font-size: 12px; }
 .statusbar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; gap: 12px; padding: 4px 10px; background: rgba(255,255,255,.93); border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .statusbar .sb-sel { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .statusbar .sb-stats { white-space: nowrap; }
+.draw-hud { position: absolute; left: 10px; right: 10px; bottom: 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 7px 10px; background: rgba(255,255,255,.96); border: 1px solid #b7e0c4; border-left: 4px solid #16a34a; border-radius: 6px; font-size: 12.5px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.draw-hud label { display: inline-flex; align-items: center; gap: 5px; }
+.draw-hud input { width: 72px; padding: 3px 6px; text-align: right; }
+.draw-hud .hint-inline { color: var(--muted); font-size: 11.5px; }
+.cota.cota-draw { background: #16a34a; }
 .wall-list { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 .wall-list button.muted { color: var(--muted); border-style: dashed; }
 

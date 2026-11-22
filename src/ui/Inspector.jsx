@@ -27,7 +27,7 @@ function MatSelect({ label, value, settings, onChange, allowInherit }) {
   return <SelField label={label} value={value || ''} onChange={(v) => onChange(v || undefined)} options={opts} />;
 }
 
-export default function Inspector({ project, settings, selected, selectedWallId, onSelectWall, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onProject }) {
+export default function Inspector({ project, settings, selected, selectedWallId, onSelectWall, onDrawWalls, built, onParams, onUpdate, onDelete, onDuplicate, onRotate, onProject }) {
   if (selectedWallId && project.room.walls.some((w) => w.id === selectedWallId)) {
     return <WallPanel room={project.room} wallId={selectedWallId} onBack={() => onSelectWall(null)}
       onRoom={(fn) => onProject((p) => ({ ...p, room: fn(p.room) }))} />;
@@ -40,7 +40,7 @@ export default function Inspector({ project, settings, selected, selectedWallId,
         <h3>Proyecto</h3>
         <TextField label="Nombre" value={project.name} onChange={(v) => onProject((p) => ({ ...p, name: v }))} />
         <h4>Ambiente</h4>
-        <RoomEditor room={room} onChange={(r) => onProject((p) => ({ ...p, room: r }))} onSelectWall={onSelectWall} />
+        <RoomEditor room={room} onChange={(r) => onProject((p) => ({ ...p, room: r }))} onSelectWall={onSelectWall} onDrawWalls={onDrawWalls} />
         <h4>Materiales por defecto</h4>
         <MatSelect label="Cuerpo" value={defaults.cuerpo} settings={settings} onChange={(v) => setDef('cuerpo', v)} />
         <MatSelect label="Frentes" value={defaults.frente} settings={settings} onChange={(v) => setDef('frente', v)} />

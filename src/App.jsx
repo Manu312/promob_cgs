@@ -85,6 +85,9 @@ export default function App() {
   const budget = useMemo(() => computeBudget(cut, nesting, settings), [cut, nesting, settings]);
 
   const selected = project.modules.find((m) => m.id === selectedId) || null;
+  // Miniaturas del catálogo: se regeneran si cambian materiales o reglas del proyecto.
+  const thumbKey = JSON.stringify([project.defaults, project.rules, settings.materials.map((m) => [m.id, m.color, m.t, m.wood])]);
+  const thumbCtx = useMemo(() => ({ key: thumbKey, project: { defaults: project.defaults, rules: project.rules }, settings }), [thumbKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mapModule = useCallback((id, fn) => setProject((p) => ({
     ...p, modules: p.modules.map((m) => (m.id === id ? fn(m) : m)),
@@ -388,7 +391,7 @@ export default function App() {
       {tab === 'diseno' && (
         <main className="design">
           <section className="viewport">
-            <CatalogBar nav={ui.catalogPath} setNav={(p) => setUi((u) => ({ ...u, catalogPath: p }))} counts={ui.catalogUse} onInsert={insertItem} />
+            <CatalogBar nav={ui.catalogPath} setNav={(p) => setUi((u) => ({ ...u, catalogPath: p }))} counts={ui.catalogUse} onInsert={insertItem} thumbCtx={thumbCtx} />
             <div className="vp-area">
             <ErrorBoundary onReset={() => { setPhotoreal(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}

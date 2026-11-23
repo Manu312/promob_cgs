@@ -4,7 +4,11 @@
 // alineada a ejes; la misma geometría alimenta el 3D y el despiece.
 
 import { snapCandidates } from './room.js';
-import { buildAparato, FINISHES, TIPOS, CARGAS, CANIOS, splitAround } from './appliances.js';
+import { buildAparato, FINISHES, TIPOS, CARGAS, CANIOS, splitAround, APPLIANCE_BUILDERS } from './appliances.js';
+import { DECORE_BUILDERS, DECORE_MATERIALS } from './decore.js';
+
+// Los objetos de Decore se construyen como los aparatos (piezas de decoración, sin despiece).
+Object.assign(APPLIANCE_BUILDERS, DECORE_BUILDERS);
 import { bounds } from './walls.js';
 
 const SLIDES = [250, 300, 350, 400, 450, 500, 550, 600];
@@ -68,6 +72,8 @@ export const PARAM_DEFS = {
   bowlDepth: { label: 'Profundidad de cubeta', type: 'num', min: 100, max: 300, step: 10, unit: 'mm' },
   reach: { label: 'Alcance del caño', type: 'num', min: 100, max: 350, step: 5, unit: 'mm' },
   finish: { label: 'Terminación', type: 'sel', options: FINISHES },
+  material: { label: 'Material', type: 'sel', options: DECORE_MATERIALS },
+  forma: { label: 'Forma', type: 'sel', options: [['rect', 'Rectangular'], ['redonda', 'Redonda']] },
   chimneyH: { label: 'Chimenea (alto)', type: 'num', min: 0, max: 1500, step: 10, unit: 'mm' },
   price: { label: 'Precio (opcional, al presupuesto)', type: 'num', min: 0, max: 1e9, step: 1000, unit: '$' },
   armD: { label: 'Profundidad del cuerpo', type: 'num', min: 250, max: 700, step: 10, unit: 'mm' },
@@ -134,6 +140,16 @@ export const MODULE_TYPES = {
   // Accesorios de cocina (Fase 6.2): la bacha cala la mesada sobre la que se apoya.
   bacha: { label: 'Bacha', cat: 'Accesorios', kind: 'aparato', ap: 'bacha', y: 870, rest: true, fields: ['width', 'depth', 'bowls', 'montaje', 'bowlDepth', 'price'], defaults: { width: 710, height: 10, depth: 482, bowls: 1, montaje: 'apoyo', bowlDepth: 180, price: 0 } },
   griferia: { label: 'Grifería', cat: 'Accesorios', kind: 'aparato', ap: 'griferia', y: 870, rest: true, fields: ['height', 'reach', 'canio', 'finish', 'price'], defaults: { width: 60, height: 334, depth: 240, reach: 210, canio: 'alto', finish: 'cromo', price: 0 } },
+  // Decore (Fase 7b S16): decoración paramétrica propia
+  mesa: { label: 'Mesa de comedor', cat: 'Decore', kind: 'aparato', ap: 'mesa', y: 0, fields: ['width', 'height', 'depth', 'forma', 'material', 'price'], defaults: { width: 1600, height: 760, depth: 900, forma: 'rect', material: 'madera', price: 0 } },
+  silla: { label: 'Silla', cat: 'Decore', kind: 'aparato', ap: 'silla', y: 0, fields: ['width', 'height', 'depth', 'material', 'price'], defaults: { width: 450, height: 900, depth: 480, material: 'madera', price: 0 } },
+  banqueta: { label: 'Banqueta alta', cat: 'Decore', kind: 'aparato', ap: 'banqueta', y: 0, fields: ['width', 'height', 'material', 'price'], defaults: { width: 380, height: 650, depth: 380, material: 'madera', price: 0 } },
+  sofa: { label: 'Sofá', cat: 'Decore', kind: 'aparato', ap: 'sofa', y: 0, fields: ['width', 'height', 'depth', 'material', 'price'], defaults: { width: 2100, height: 850, depth: 900, material: 'tela_gris', price: 0 } },
+  planta: { label: 'Planta', cat: 'Decore', kind: 'aparato', ap: 'planta', y: 0, fields: ['width', 'height', 'material', 'price'], defaults: { width: 450, height: 1200, depth: 450, material: 'terracota', price: 0 } },
+  cuadro: { label: 'Cuadro', cat: 'Decore', kind: 'aparato', ap: 'cuadro', y: 1300, fields: ['width', 'height', 'material', 'price'], defaults: { width: 800, height: 600, depth: 28, material: 'negro', price: 0 } },
+  frutero: { label: 'Frutero', cat: 'Decore', kind: 'aparato', ap: 'frutero', y: 890, rest: true, fields: ['width', 'material', 'price'], defaults: { width: 280, height: 150, depth: 280, material: 'ceramica', price: 0 } },
+  ollas: { label: 'Juego de ollas', cat: 'Decore', kind: 'aparato', ap: 'ollas', y: 890, rest: true, fields: ['material', 'price'], defaults: { width: 450, height: 150, depth: 260, material: 'inox', price: 0 } },
+  alfombra: { label: 'Alfombra', cat: 'Decore', kind: 'aparato', ap: 'alfombra', y: 0, fields: ['width', 'depth', 'material', 'price'], defaults: { width: 2000, height: 8, depth: 1400, material: 'tela_beige', price: 0 } },
   // Sanitarios de baño (Fase 6.3)
   inodoro: { label: 'Inodoro con mochila', cat: 'Baño', kind: 'aparato', ap: 'inodoro', y: 0, fields: ['width', 'height', 'depth', 'price'], defaults: { width: 380, height: 780, depth: 690, price: 0 } },
   bidet: { label: 'Bidet', cat: 'Baño', kind: 'aparato', ap: 'bidet', y: 0, fields: ['width', 'height', 'depth', 'price'], defaults: { width: 352, height: 400, depth: 500, price: 0 } },

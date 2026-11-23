@@ -255,6 +255,30 @@ export const LIBRARY = [
     ],
   },
   {
+    // Decore: decoración propia para ambientar y renderizar
+    id: 'decore', label: 'Decore', groups: [
+      { id: 'mesas', label: 'Mesas | Sillas', subgroups: [
+        { id: 'mesas', label: 'Mesas', items: [it('dec-mesa', 'mesa', null, null, W(1200, 1400, 1600, 1800, 2000)), it('dec-mesa-red', 'mesa', 'Mesa redonda', { width: 1100, depth: 1100, forma: 'redonda' })] },
+        { id: 'sillas', label: 'Sillas y banquetas', items: [it('dec-silla', 'silla'), it('dec-banqueta', 'banqueta')] },
+      ] },
+      { id: 'estofados', label: 'Estofados', subgroups: [
+        { id: 'sofas', label: 'Sofás y sillones', items: [it('dec-sofa', 'sofa', null, null, W(1600, 1800, 2100, 2400)), it('dec-sillon', 'sofa', 'Sillón', { width: 950 })] },
+      ] },
+      { id: 'plantas', label: 'Plantas', subgroups: [
+        { id: 'plantas', label: 'Plantas', items: [it('dec-planta', 'planta'), it('dec-planta-chica', 'planta', 'Planta chica', { width: 250, height: 450 }, null, { y: 890, rest: true })] },
+      ] },
+      { id: 'cuadros', label: 'Cuadros', subgroups: [
+        { id: 'cuadros', label: 'Cuadros', items: [it('dec-cuadro', 'cuadro', null, null, W(400, 600, 800, 1000, 1200))] },
+      ] },
+      { id: 'utensilios', label: 'Utensilios', subgroups: [
+        { id: 'utensilios', label: 'Cocina', items: [it('dec-frutero', 'frutero'), it('dec-ollas', 'ollas')] },
+      ] },
+      { id: 'alfombras', label: 'Alfombras', subgroups: [
+        { id: 'alfombras', label: 'Alfombras', items: [it('dec-alfombra', 'alfombra', null, null, W(1400, 1600, 2000, 2400, 3000))] },
+      ] },
+    ],
+  },
+  {
     id: 'oficinas', label: 'Oficinas', groups: [
       { id: 'escritorios', label: 'Escritorios', subgroups: [
         { id: 'escritorios', label: 'Escritorios', items: [it('ofi-esc', 'escritorio', null, null, W(900, 1000, 1200, 1400, 1600)), it('ofi-esc-caj', 'cajonera')] },

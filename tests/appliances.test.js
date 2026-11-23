@@ -17,7 +17,7 @@ test('los aparatos se dibujan con piezas decorativas y no van al despiece', () =
   for (const t of APARATOS) {
     const b = build(t);
     assert.equal(b.parts.length, 0, t);
-    assert.ok(b.decors.length > 3, t);
+    assert.ok(b.decors.length > (MODULE_TYPES[t].cat === 'Decore' ? 0 : 3), t); // un cuadro o una alfombra tienen pocas piezas
     for (const d of b.decors) assert.ok(d.sx > 0 && d.sy > 0 && d.sz > 0 && d.finish, `${t}: ${JSON.stringify(d)}`);
   }
 });

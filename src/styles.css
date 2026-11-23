@@ -311,3 +311,7 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .rw-holder[hidden] { display: none; }
 .reposicionar .rp-sub { font-size: 12px; margin-top: 4px; }
 .vp-toolbar select { width: auto; }
+.nav-overlay { position: absolute; inset: 0; z-index: 8; }
+.nav-overlay.zoomWin { cursor: crosshair; }
+.nav-overlay.walk { cursor: move; }
+.zoom-box { position: absolute; border: 1.5px solid #dc2626; background: rgba(220,38,38,.08); pointer-events: none; }

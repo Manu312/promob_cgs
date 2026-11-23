@@ -221,6 +221,40 @@ export default function App() {
   const viewBack = () => { const r = backView(viewHist, view); if (r) { setViewHist(r.hist); setView((v) => ({ ...r.view, tick: v.tick + 1 })); } };
   const viewFwd = () => { const r = fwdView(viewHist, view); if (r) { setViewHist(r.hist); setView((v) => ({ ...r.view, tick: v.tick + 1 })); } };
   const toggleOrtho = () => view.name !== 'planta' && goView({ ...view, ortho: !view.ortho });
+  // Herramientas de navegación (Promob): Pan (P), Zoom (Z), Zoom Ventana (W), Caminar (C); M vuelve a Seleccionar.
+  const [navTool, setNavTool] = useState('select');
+  const navRef = useRef(null);
+  const [zoomBox, setZoomBox] = useState(null); // recuadro del Zoom Ventana (px dentro de la vista)
+  const walkRef = useRef(null);
+  const navToggle = (t) => setNavTool((cur) => (cur === t ? 'select' : t));
+  const navOverlay = (navTool === 'zoomWin' || navTool === 'walk') ? {
+    onPointerDown: (e) => {
+      if (e.button !== 0) return;
+      const r = e.currentTarget.getBoundingClientRect();
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      if (navTool === 'zoomWin') setZoomBox({ x0: e.clientX - r.left, y0: e.clientY - r.top, x1: e.clientX - r.left, y1: e.clientY - r.top, w: r.width, h: r.height });
+      else walkRef.current = { x: e.clientX, y: e.clientY };
+    },
+    onPointerMove: (e) => {
+      if (navTool === 'zoomWin' && zoomBox) { const r = e.currentTarget.getBoundingClientRect(); setZoomBox((z) => ({ ...z, x1: e.clientX - r.left, y1: e.clientY - r.top })); }
+      if (navTool === 'walk' && walkRef.current) {
+        const dx = e.clientX - walkRef.current.x, dy = e.clientY - walkRef.current.y;
+        walkRef.current = { x: e.clientX, y: e.clientY };
+        navRef.current?.walk(-dy * 0.01, dx * 0.15); // arrastrar hacia arriba avanza; a los costados gira
+      }
+    },
+    onPointerUp: () => {
+      if (navTool === 'zoomWin' && zoomBox) {
+        const z = zoomBox;
+        setZoomBox(null);
+        if (Math.abs(z.x1 - z.x0) > 6 && Math.abs(z.y1 - z.y0) > 6) {
+          navRef.current?.zoomWindow({ x0: Math.min(z.x0, z.x1) / z.w, x1: Math.max(z.x0, z.x1) / z.w, y0: Math.min(z.y0, z.y1) / z.h, y1: Math.max(z.y0, z.y1) / z.h });
+          setNavTool('select');
+        }
+      }
+      walkRef.current = null;
+    },
+  } : null;
   // Aberturas (a lo largo de su pared) y columnas (imán a paredes y grilla).
   const onMoveOpening = useCallback((id, offset) => setProject((p) => ({ ...p, room: updateOpening(p.room, id, { offset }) })), [setProject]);
   const onMoveColumn = useCallback((id, x, z) => setProject((p) => ({ ...p, room: moveColumn(p.room, id, x, z, gridStep) })), [setProject, gridStep]);
@@ -490,6 +524,8 @@ export default function App() {
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startDrawWalls(); return; }
       if (e.key === 'F8' && tab === 'diseno') { e.preventDefault(); toggleOrtho(); return; } // Ortogonal / Perspectiva
+      if (e.key === 'F6' && tab === 'diseno') { e.preventDefault(); navRef.current?.fitAll(); return; } // Zoom total
+      if ((e.key === 'F5' || e.key === 'F7') && tab === 'diseno') { e.preventDefault(); if (selectedIds.length) navRef.current?.fitModules(selectedIds); return; } // Zoom total entidad
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l' && tab === 'diseno' && !inField) { e.preventDefault(); locateSelected(); return; }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'k' && tab === 'diseno' && !inField) { e.preventDefault(); replaceSelected(); return; }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'l' && tab === 'diseno') { e.preventDefault(); setQuickFind(true); return; }
@@ -511,7 +547,11 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'u') { e.preventDefault(); ungroupSelected(); return; } // Desagrupar
       if (plain && key === 'x') { setAxisLock((l) => (l === 'x' ? null : 'x')); return; }
       if (plain && key === 'y') { setAxisLock((l) => (l === 'z' ? null : 'z')); return; }
-      if (plain && key === 'm') { stopDrawWalls(); stopAnnotate(); stopScale(); return; } // Seleccionar / Mover
+      if (plain && key === 'm') { stopDrawWalls(); stopAnnotate(); stopScale(); setNavTool('select'); return; } // Seleccionar / Mover
+      if (plain && key === 'p') { navToggle('pan'); return; } // Pan
+      if (plain && key === 'z') { navToggle('zoom'); return; } // Zoom
+      if (plain && key === 'w') { navToggle('zoomWin'); return; } // Zoom Ventana
+      if (plain && key === 'c' && view.name !== 'planta' && !view.ortho) { navToggle('walk'); return; } // Caminar (solo perspectiva)
       if (plain && key === 'd' && !drawing && !annotating && !scaling) { startAnnotate(); return; } // calcular distancia
       if (annotating) { if (e.key === 'Escape') stopAnnotate(); return; }
       if (scaling) {
@@ -527,7 +567,7 @@ export default function App() {
         else if (e.key === 'Enter') commitTyped();
         return;
       }
-      if (e.key === 'Escape') setSelectedId(null);
+      if (e.key === 'Escape') { setSelectedId(null); setNavTool('select'); }
       if (selectedWallId && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); setDeleteDlg({ wallId: selectedWallId }); return; }
       if ((selectedOpeningId || selectedColumnId) && (e.key === 'Delete' || e.key === 'Backspace')) {
         e.preventDefault();
@@ -681,6 +721,7 @@ export default function App() {
                 selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
                 onWallDouble={(id) => goView({ name: 'pared', wallId: id })} onFloorDouble={() => goView({ name: 'planta' })}
+                navTool={navTool} navRef={navRef}
                 renderMode={renderMode || renderDlg || !!renderJob} renderRef={renderRef}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower && !renderJob?.panorama} pickRef={pickRef} ghost={ghost}
                 openFronts={openFronts} onToggleFront={toggleFront} />
@@ -697,6 +738,13 @@ export default function App() {
               <button onClick={viewBack} disabled={!viewHist.back.length} title="Volver vista" aria-label="Volver vista">◁</button>
               <button onClick={viewFwd} disabled={!viewHist.fwd.length} title="Avanzar vista" aria-label="Avanzar vista">▷</button>
               <button className={view.ortho ? 'active-soft' : ''} disabled={view.name === 'planta'} onClick={toggleOrtho} title="Ortogonal / Perspectiva (F8)">Ortogonal</button>
+              <span className="sep" />
+              <button className={`nav-tool${navTool === 'pan' ? ' active' : ''}`} onClick={() => navToggle('pan')} title="Pan (P): arrastrar mueve la vista">Pan</button>
+              <button className={`nav-tool${navTool === 'zoom' ? ' active' : ''}`} onClick={() => navToggle('zoom')} title="Zoom (Z): arrastrar arriba acerca, abajo aleja">Zoom</button>
+              <button className={`nav-tool${navTool === 'zoomWin' ? ' active' : ''}`} onClick={() => navToggle('zoomWin')} title="Zoom Ventana (W): marcá un recuadro">Zoom ventana</button>
+              <button onClick={() => navRef.current?.fitAll()} title="Zoom Total (F6)">Zoom total</button>
+              <button disabled={!selectedIds.length} onClick={() => navRef.current?.fitModules(selectedIds)} title="Zoom Total Entidad (F7): encuadra lo seleccionado">Zoom selección</button>
+              <button className={`nav-tool${navTool === 'walk' ? ' active' : ''}`} disabled={view.name === 'planta' || view.ortho} onClick={() => navToggle('walk')} title="Caminar (C): arrastrar arriba/abajo avanza o retrocede; a los costados gira. Solo en perspectiva.">Caminar</button>
               <button className={drawing ? 'active' : ''} onClick={() => (drawing ? stopDrawWalls() : startDrawWalls())} title="Construir paredes (Ctrl+Shift+P)">✏ Paredes</button>
               <button className={annotating ? 'active' : ''} onClick={() => (annotating ? stopAnnotate() : startAnnotate())} title="Cota manual: lineal o angular">↔ Cota</button>
               {view.name === 'planta' && (
@@ -752,6 +800,9 @@ export default function App() {
               fileName={`${project.name || 'render'}${renderJob.panorama ? '-360' : ''}.png`} onClose={() => setRenderJob(null)} />}
             {reposDlg && <ReposicionarDialog initial={reposDlg.initial} onCancel={() => setReposDlg(null)}
               onOk={(o) => { setReposDlg(null); setDupOffset(o); duplicateWith(o); }} />}
+            {navOverlay && <div className={`nav-overlay ${navTool}`} {...navOverlay}>
+              {zoomBox && <div className="zoom-box" style={{ left: Math.min(zoomBox.x0, zoomBox.x1), top: Math.min(zoomBox.y0, zoomBox.y1), width: Math.abs(zoomBox.x1 - zoomBox.x0), height: Math.abs(zoomBox.y1 - zoomBox.y0) }} />}
+            </div>}
             {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)}
               canGroup={multiSel && !selectionGroup(project, selectedIds)} canUngroup={project.modules.some((m) => selectedIds.includes(m.id) && m.groupId)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}

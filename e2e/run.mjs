@@ -995,6 +995,46 @@ try {
     check('Sin errores con las vistas', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S7: Zoom total (F6), Zoom entidad (F7), Zoom ventana (W), Pan (P), Caminar (C)
+  {
+    const camPos = () => page.evaluate(() => window.__muebles.camPos());
+    const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    const pm = await project();
+    const ma = pm.modules.find((m) => m.type === 'bajo_mixto');
+    const q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), ma.id);
+    await page.mouse.click(q.x, q.y); await sleep(300);
+    const cx = pm.room.nodes.reduce((a, n) => a + n.x, 0) / pm.room.nodes.length;
+    const xs = pm.room.nodes.map((n) => n.x), zs = pm.room.nodes.map((n) => n.z);
+    const center = [(ma.x + 300 - (Math.min(...xs) + Math.max(...xs)) / 2) / 1000, 0.4, (ma.z + 300 - (Math.min(...zs) + Math.max(...zs)) / 2) / 1000];
+    const c0 = await camPos();
+    await page.keyboard.press('F7'); await sleep(500);
+    const c1 = await camPos();
+    check('F7 encuadra lo seleccionado (se acerca)', dist(c1, center) < dist(c0, center), `${dist(c0, center).toFixed(2)} → ${dist(c1, center).toFixed(2)} m (cx ${cx | 0})`);
+    await page.keyboard.press('F6'); await sleep(500);
+    const c2 = await camPos();
+    check('F6 Zoom total aleja para ver todo', Math.hypot(...c2) > Math.hypot(...c1));
+    await page.keyboard.press('KeyW'); await sleep(200);
+    check('W activa Zoom ventana', !!(await page.$('.nav-overlay.zoomWin')));
+    const vp = await page.$eval('.vp-area', (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+    await page.mouse.move(vp.x + vp.w * 0.4, vp.y + vp.h * 0.4); await page.mouse.down();
+    await page.mouse.move(vp.x + vp.w * 0.6, vp.y + vp.h * 0.6, { steps: 6 }); await page.mouse.up(); await sleep(500);
+    const c3 = await camPos();
+    check('Zoom ventana acerca al recuadro y vuelve a Seleccionar', dist(c3, [0, 0, 0]) < dist(c2, [0, 0, 0]) && !(await page.$('.nav-overlay')));
+    await page.keyboard.press('KeyP'); await sleep(200);
+    check('P activa la herramienta Pan', (await page.$eval('.vp-toolbar .nav-tool.active', (e) => e.textContent).catch(() => '')) === 'Pan');
+    await page.keyboard.press('KeyM'); await sleep(200);
+    check('M vuelve a Seleccionar/Mover', !(await page.$('.vp-toolbar .nav-tool.active')));
+    await page.keyboard.press('KeyC'); await sleep(200);
+    const c4 = await camPos();
+    await page.mouse.move(vp.x + vp.w / 2, vp.y + vp.h / 2); await page.mouse.down();
+    await page.mouse.move(vp.x + vp.w / 2, vp.y + vp.h / 2 - 80, { steps: 8 }); await page.mouse.up(); await sleep(300);
+    const c5 = await camPos();
+    check('Caminar: arrastrar hacia arriba avanza', dist(c4, c5) > 0.3 && Math.abs(c4[1] - c5[1]) < 1e-6, dist(c4, c5).toFixed(2) + ' m');
+    await page.keyboard.press('Escape'); await sleep(200);
+    await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(800);
+    check('Sin errores con la navegación', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

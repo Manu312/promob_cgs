@@ -6,6 +6,41 @@ import { roomWalls, wallPieces } from '../domain/room.js';
 import { wallCorners, floorPolygon, wallFacesCamera } from '../domain/walls.js';
 import { finishesOf } from '../domain/roomMaterials.js';
 import { finishMaterial } from './roomTextures.js';
+import { stripsOf, stripCells, rectMinusRects, regionsOn } from '../domain/strips.js';
+
+const OV = { side: THREE.DoubleSide };
+// Franjas con material y regiones sobre la cara interior de una pared (1 mm hacia adentro del ambiente),
+// descontando los vanos de puertas y ventanas. Coordenadas locales de la pared (u, v - separación del piso).
+function WallOverlays({ room, w, H, gap, zc, ops }) {
+  const strips = stripsOf(room, w.id, w.len, H);
+  const sf = room.stripFinishes?.[w.id] || {};
+  const holes = ops.map((o) => ({ u0: o.offset, u1: o.offset + o.width, v0: o.sill, v1: o.sill + o.height }));
+  const z = (zc > 0 ? -1 : 1) * 0.001;
+  const rects = [];
+  for (const c of stripCells(strips, w.len, H)) {
+    if (!sf[c.id]) continue;
+    for (const r of rectMinusRects(c, holes)) rects.push({ ...r, f: sf[c.id], key: `${c.id}|${r.u0}|${r.v0}` });
+  }
+  const regs = regionsOn(room, { kind: 'wall', wallId: w.id }).filter((r) => r.finish);
+  return (
+    <>
+      {rects.map((r) => (
+        <mesh key={r.key} position={[((r.u0 + r.u1) / 2) * S, ((r.v0 + r.v1) / 2 - gap) * S, z]} material={finishMaterial(r.f, r.u1 - r.u0, r.v1 - r.v0, OV)} receiveShadow>
+          <planeGeometry args={[(r.u1 - r.u0) * S, (r.v1 - r.v0) * S]} />
+        </mesh>
+      ))}
+      {regs.map((r) => <RegionMesh key={r.id} r={r} gap={gap} position={[0, 0, z * 1.6]} />)}
+    </>
+  );
+}
+
+// Región: en pared (u, v) o en piso (x, z); la geometría se libera al cambiar.
+function RegionMesh({ r, gap = 0, floor = false, position, rotation }) {
+  const geo = useMemo(() => new THREE.ShapeGeometry(new THREE.Shape(r.pts.map(([a, b]) => (floor ? new THREE.Vector2(a * S, -b * S) : new THREE.Vector2(a * S, (b - gap) * S))))), [r.pts, gap, floor]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return <mesh geometry={geo} position={position} rotation={rotation} material={finishMaterial(r.finish, 1000, 1000, OV)} userData={{ regionId: r.id }} receiveShadow />;
+}
+
 import { footprint } from '../domain/modules.js';
 import { CotaLabel } from './Cotas.jsx';
 import { wallDims } from '../domain/dimensions.js';
@@ -80,7 +115,7 @@ function SlopedWall({ len, h0, h1, T, zc, openings, material }) {
 }
 
 
-function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onDown: onWallDown, onMenu, onDouble, selectedOpeningId, onOpeningDown, finish }) {
+function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onDown: onWallDown, onMenu, onDouble, selectedOpeningId, onOpeningDown, finish, room }) {
   const ref = useRef();
   const W = w.wall;
   const T = w.t;
@@ -112,7 +147,7 @@ function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onD
     onWallDown(e, w);
   };
   return (
-    <group ref={ref} position={[w.a[0] * S, gap * S, w.a[1] * S]} rotation={[0, theta, 0]} onPointerDown={onDown} userData={{ wallId: w.id }}
+    <group ref={ref} position={[w.a[0] * S, gap * S, w.a[1] * S]} rotation={[0, theta, 0]} onPointerDown={onDown} userData={{ wallId: w.id, gap }}
       onDoubleClick={onDouble ? (e) => { if (!ref.current?.visible || !firstHitIn(e)) return; e.stopPropagation(); onDouble(w.id); } : undefined}
       onContextMenu={(e) => { if (!onMenu || !ref.current?.visible) return; e.stopPropagation(); onMenu(e, w); }}>
       {sloped
@@ -123,6 +158,7 @@ function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onD
           const m = fm ? [mat, mat, mat, mat, zc > 0 ? mat : fm, zc > 0 ? fm : mat] : mat;
           return <Box key={i} c={[((p.u0 + p.u1) / 2) * S, ((p.v0 + p.v1) / 2) * S, zc * S]} s={[(p.u1 - p.u0) * S, (p.v1 - p.v0) * S, T * S]} m={m} />;
         })}
+      {!lowered && room && <WallOverlays room={room} w={w} H={H} gap={gap} zc={zc} ops={ops} />}
       {ops.map((o) => (
         <Opening key={o.id} o={o} T={T} zc={zc} selected={o.id === selectedOpeningId}
           onDown={onOpeningDown ? (e) => { if (!ref.current?.visible) return; e.stopPropagation(); onOpeningDown(e, o, w); } : null} />
@@ -165,8 +201,11 @@ export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDo
       {walls.map((w) => (
         <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} origin={origin}
           openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide} lowerH={room.lowerH}
-          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu} onDouble={onWallDouble} finish={fin.walls[w.id]}
+          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu} onDouble={onWallDouble} finish={fin.walls[w.id]} room={room}
           selectedOpeningId={selectedOpeningId} onOpeningDown={onOpeningDown} />
+      ))}
+      {regionsOn(room, { kind: 'floor' }).filter((r) => r.finish).map((r) => (
+        <RegionMesh key={r.id} r={r} floor position={[0, 0.0012, 0]} rotation={[-Math.PI / 2, 0, 0]} />
       ))}
       {room.columns.map((c) => (
         <mesh key={c.id} position={[(c.x + c.w / 2) * S, (H / 2) * S, (c.z + c.d / 2) * S]} material={c.id === selectedColumnId ? colSelMat : wallMat}

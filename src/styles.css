@@ -335,3 +335,18 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .tint-row { display: flex; gap: 4px; align-items: center; }
 .tint-row input[type=color] { width: 44px; }
 .mat-scope { min-width: 120px; }
+.surface-editor { max-width: 620px; }
+.se-tools, .se-ops, .se-presets { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12px; }
+.se-tools button, .se-ops button { font-size: 12px; padding: 3px 7px; }
+.se-ops input[type=number] { width: 70px; }
+.se-presets input, .se-presets select, .se-ops select { width: auto; }
+.se-svg { background: #fafaf9; border: 1px solid var(--line); border-radius: 4px; touch-action: none; user-select: none; }
+.se-svg.tool-h, .se-svg.tool-v, .se-svg.tool-rect, .se-svg.tool-circle, .se-svg.tool-pts, .se-svg.tool-cutv, .se-svg.tool-cuth { cursor: crosshair; }
+.se-face { fill: #eeebe5; stroke: #9ca3af; }
+.se-opening { fill: #cfe6f3; stroke: #93c5fd; }
+.se-strip { stroke: #dc2626; stroke-width: 3; cursor: move; }
+.se-region { stroke: #2563eb; stroke-width: 1.5; opacity: .85; cursor: move; }
+.se-region.on { stroke: #dc2626; stroke-width: 2.5; }
+.se-vertex { fill: #fff; stroke: #2563eb; cursor: pointer; }
+.se-draft { fill: rgba(220,38,38,.12); stroke: #dc2626; stroke-dasharray: 4 3; }
+.se-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }

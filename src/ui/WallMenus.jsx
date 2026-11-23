@@ -15,6 +15,10 @@ export function WallContextMenu({ menu, wall, onAction, onClose }) {
         {item('lowered', wall.lowered ? 'Restaurar (subir)' : 'Rebajar')}
         {item('transparent', wall.transparent ? 'Opaca' : 'Transparente')}
         {item('split', 'Dividir aquí')}
+        <hr />
+        {item('strips', 'Editar franjas…')}
+        {item('regions', 'Editar regiones…')}
+        <hr />
         {item('delete', 'Eliminar…')}
       </div>
     </div>

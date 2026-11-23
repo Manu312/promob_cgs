@@ -6,7 +6,7 @@ import { IconSearch } from './fields.jsx';
 // Pestaña Materiales (Promob: barra de materiales): arrastrar un material al piso o a una pared
 // (en pared se elige Cara o Todo). Con una pared o el piso seleccionados, un clic lo aplica.
 // Herramientas: Copiar material y Cambiar tonalidad. Favoritos con la estrella.
-export default function MaterialsPanel({ favs = [], onFav, target, onApply, tool, onTool, tint, onTint }) {
+export default function MaterialsPanel({ favs = [], onFav, target, onApply, tool, onTool, tint, onTint, onStrips, onRegions }) {
   const [q, setQ] = useState('');
   const [tab, setTab] = useState(favs.length ? 'favoritos' : 'pinturas');
   const list = q ? searchRoomMaterials(q) : tab === 'favoritos' ? favs.map(roomMatById).filter(Boolean) : searchRoomMaterials('').filter((m) => m.group === tab);
@@ -43,6 +43,12 @@ export default function MaterialsPanel({ favs = [], onFav, target, onApply, tool
           title="Cambiar tonalidad: elegí el color y hacé clic en las superficies. M o Esc termina.">Cambiar tonalidad</button>
         <input type="color" value={tint} onChange={(e) => onTint(e.target.value)} title="Tonalidad" />
       </div>
+      {(onStrips || onRegions) && (
+        <div className="rm-tools">
+          {onStrips && <button onClick={onStrips} title="Franjas horizontales y verticales en la pared seleccionada">Editar franjas…</button>}
+          {onRegions && <button onClick={onRegions} title="Regiones en la superficie seleccionada (pared o piso)">Editar regiones…</button>}
+        </div>
+      )}
       {tool?.kind === 'copy' && <p className="hint rm-tool-hint">{tool.source ? 'Ahora hacé clic en las superficies o módulos destino.' : 'Hacé clic en la superficie o el módulo de origen.'}</p>}
       {tool?.kind === 'tint' && <p className="hint rm-tool-hint">Hacé clic en una pared o en el piso para teñirla.</p>}
     </aside>

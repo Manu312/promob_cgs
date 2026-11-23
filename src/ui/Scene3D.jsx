@@ -250,7 +250,18 @@ function SurfacePicker({ surfaceRef }) {
       for (const hit of ray.intersectObjects(scene.children, true)) {
         if (!hit.object.isMesh || !hit.object.visible) continue;
         let o = hit.object, vis = true;
-        while (o) { if (!o.visible) vis = false; if (o.userData?.wallId) return vis ? { kind: 'wall', wallId: o.userData.wallId } : null; if (o.userData?.floor) return { kind: 'floor' }; if (o.userData?.moduleId) return { kind: 'module', id: o.userData.moduleId }; o = o.parent; }
+        while (o) {
+          if (!o.visible) vis = false;
+          if (o.userData?.regionId) return vis ? { kind: 'region', id: o.userData.regionId } : null;
+          if (o.userData?.wallId) { // con la posición (u, v) en la cara, para las franjas
+            if (!vis) return null;
+            const l = o.worldToLocal(hit.point.clone());
+            return { kind: 'wall', wallId: o.userData.wallId, u: l.x / S, v: l.y / S + (o.userData.gap || 0) };
+          }
+          if (o.userData?.floor) return { kind: 'floor' };
+          if (o.userData?.moduleId) return { kind: 'module', id: o.userData.moduleId };
+          o = o.parent;
+        }
         if (vis) return null;
       }
       return null;

@@ -53,6 +53,7 @@ import { toggleId, selectAllIds, moveGroup, rotateGroup, describeMulti } from '.
 import { expandToGroups, groupModules, ungroupModules, selectionGroup, pruneGroups } from './domain/groups.js';
 import { pasteModules, sideOffset } from './domain/clipboard.js';
 import { replaceModule, findItemForModule } from './domain/replace.js';
+import { toExtreme, centerX, invertModule, shiftRotation } from './domain/moveExtras.js';
 import ReposicionarDialog from './ui/ReposicionarDialog.jsx';
 
 function usePersistent(key, init, migrate = (x) => x) {
@@ -522,6 +523,24 @@ export default function App() {
         return;
       }
       if (!selectedId) return;
+      // Ctrl+flechas: hasta el obstáculo más cercano; Ctrl+Inicio: centrar a lo ancho (Promob).
+      const EXT = { ArrowRight: '+x', ArrowLeft: '-x', ArrowUp: '-z', ArrowDown: '+z' };
+      if ((e.ctrlKey || e.metaKey) && (EXT[e.key] || e.key === 'Home')) {
+        e.preventDefault();
+        setProject((p) => ({
+          ...p,
+          modules: p.modules.map((m) => {
+            if (m.id !== selectedId) return m;
+            const pos = e.key === 'Home' ? centerX(m, p.room, p.modules) : toExtreme(m, p.room, p.modules, EXT[e.key]);
+            return { ...m, ...pos };
+          }),
+        }));
+        return;
+      }
+      if (plain && key === 'i') { // Invertir: espeja el módulo (lado del esquinero, bisagras)
+        setProject((p) => ({ ...p, modules: p.modules.map((m) => (selectedIds.includes(m.id) ? invertModule(m, builtById.get(m.id) ? frontsOf(builtById.get(m.id)) : []) : m)) }));
+        return;
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); }
       else if (e.key === 'r' || e.key === 'R') rotateSelected();
       else if (e.key === 'PageUp' || e.key === 'PageDown') { e.preventDefault(); nudgeSelected('h', e.key === 'PageUp' ? 1 : -1, e.shiftKey ? 100 : 10); }
@@ -536,6 +555,30 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // Shift + mover el mouse sobre la vista: gira el módulo seleccionado (Promob). Todo el giro
+  // es un paso de deshacer.
+  const shiftRot = useRef(null);
+  useEffect(() => {
+    const onMoveMouse = (e) => {
+      const s = shiftRot.current;
+      if (!e.shiftKey || !selectedId || multiSel || drawing || annotating || e.buttons) { if (s) { shiftRot.current = null; history.commit(); } return; }
+      if (!vpRef.current?.contains(e.target)) return;
+      if (!s) {
+        const m0 = project.modules.find((m) => m.id === selectedId);
+        if (!m0) return;
+        shiftRot.current = { x0: e.clientX, m0 };
+        history.begin();
+        return;
+      }
+      const rot = shiftRotation(s.m0.rot || 0, e.clientX - s.x0);
+      setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === s.m0.id ? { ...m, ...rotateAboutCenter(s.m0, rot - (s.m0.rot || 0)) } : m)) }));
+    };
+    const onUp = (e) => { if (e.key === 'Shift' && shiftRot.current) { shiftRot.current = null; history.commit(); } };
+    window.addEventListener('mousemove', onMoveMouse);
+    window.addEventListener('keyup', onUp);
+    return () => { window.removeEventListener('mousemove', onMoveMouse); window.removeEventListener('keyup', onUp); };
   });
 
   // Tamaño de la vista 3D (Ambiente 3D y área del render).

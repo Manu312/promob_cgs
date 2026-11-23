@@ -923,6 +923,39 @@ try {
     check('Sin errores con la sustitución', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S5: Ctrl+flechas hasta el extremo, Ctrl+Inicio centrar, Shift+mouse girar, I invertir
+  {
+    let pm = await project();
+    const ma = pm.modules.find((m) => m.type === 'bajo_mixto');
+    const q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), ma.id);
+    await page.mouse.click(q.x, q.y); await sleep(300);
+    const ck = async (k) => { await page.keyboard.down('Control'); await page.keyboard.press(k); await page.keyboard.up('Control'); await sleep(300); };
+    await ck('ArrowDown');
+    pm = await project();
+    const fwd = pm.modules.find((m) => m.id === ma.id);
+    check('Ctrl+↓ lleva el módulo hasta el frente (obstáculo más cercano)', fwd.z !== ma.z || fwd.x !== ma.x, `(${ma.x},${ma.z}) → (${fwd.x},${fwd.z})`);
+    await ck('KeyZ');
+    await ck('Home');
+    pm = await project();
+    check('Ctrl+Inicio no rompe nada (centra a lo ancho si tiene a los dos costados)', !!pm.modules.find((m) => m.id === ma.id));
+    await ck('KeyZ');
+    const h0 = JSON.stringify(pm.modules.find((m) => m.id === ma.id).params.hinges || {});
+    await page.keyboard.press('KeyI'); await sleep(300);
+    pm = await project();
+    check('I invierte las bisagras del módulo', JSON.stringify(pm.modules.find((m) => m.id === ma.id).params.hinges || {}) !== h0);
+    await ck('KeyZ');
+    const rot0 = (await project()).modules.find((m) => m.id === ma.id).rot || 0;
+    await page.mouse.move(q.x, q.y); await page.keyboard.down('Shift');
+    for (let i = 1; i <= 10; i++) { await page.mouse.move(q.x + 6 * i, q.y); await sleep(30); }
+    await page.keyboard.up('Shift'); await sleep(300);
+    const rot1 = (await project()).modules.find((m) => m.id === ma.id).rot || 0;
+    check('Shift + mover el mouse gira el módulo', rot1 !== rot0, `${rot0}° → ${rot1}°`);
+    await ck('KeyZ');
+    check('Deshacer vuelve el giro de una vez', ((await project()).modules.find((m) => m.id === ma.id).rot || 0) === rot0);
+    await page.keyboard.press('Escape'); await sleep(200);
+    check('Sin errores con los atajos de movimiento', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

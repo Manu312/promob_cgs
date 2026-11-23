@@ -528,7 +528,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, onFloorMenu, rulersOf, onChangePlane, surfaceRef, onMoveHotpoint, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, onFloorMenu, rulersOf, onChangePlane, bg = '#f3f4f6', lightK = 1, show = {}, surfaceRef, onMoveHotpoint, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -655,9 +655,9 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
       onContextMenu={(e) => e.preventDefault()}
     >
       <FillContext.Provider value={fillMode(fill)}>
-      <color attach="background" args={[fillMode(fill).bg || (renderMode ? '#e7e3dc' : '#f3f4f6')]} />
-      <ambientLight intensity={renderMode ? 0.25 * rig.ambient : 0.6} />
-      <hemisphereLight args={renderMode ? [rig.sky.top, rig.sky.bottom, 0.35 * rig.sky.intensity] : ['#ffffff', '#cbbfae', 0.4]} />
+      <color attach="background" args={[fillMode(fill).bg || (renderMode ? '#e7e3dc' : bg)]} />
+      <ambientLight intensity={renderMode ? 0.25 * rig.ambient : 0.6 * lightK} />
+      <hemisphereLight args={renderMode ? [rig.sky.top, rig.sky.bottom, 0.35 * rig.sky.intensity] : ['#ffffff', '#cbbfae', 0.4 * lightK]} />
       <directionalLight
         name="sol"
         castShadow
@@ -695,9 +695,9 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
         {view.name === 'frente' && !renderMode && <HeightRuler room={room} modules={project.modules} />}
         {selectedOpeningId && !renderMode && <OpeningDims room={room} id={selectedOpeningId} onEdit={onOpeningDim} />}
         {planta && !renderMode && <PlanGrid room={room} />}
-        {planta && !renderMode && project.planImage?.visible && <PlanImage img={project.planImage} />}
+        {planta && !renderMode && show.planos !== false && project.planImage?.visible && <PlanImage img={project.planImage} />}
         {planta && !renderMode && !drawing && !annotating && navTool !== 'hotpoint' && <NodeHandles room={room} onNodeDown={onNodeDown} />}
-        {navTool === 'hotpoint' && !renderMode && <HotpointHandles room={room} onDown={(e, g) => {
+        {(navTool === 'hotpoint' || show.hotpoints) && !renderMode && <HotpointHandles room={room} onDown={(e, g) => {
           e.stopPropagation();
           if (!leftButton(e)) return;
           startDrag({ kind: 'hotpoint', id: g.id, planeY: e.point.y });
@@ -707,7 +707,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
         {planta && !renderMode && drawing && <DrawTool room={room} draw={drawing} origin={origin} cursorRef={drawCursorRef} onPoint={onDrawPoint} onFinish={onDrawFinish} />}
         {showDims && !renderMode && <Dimensions room={room} modules={project.modules.filter((m) => !m.hidden)} onWallLength={onWallLength} onWallAngle={onWallAngle} />}
         {selectedMod && !renderMode && <ModuleDistances room={room} modules={project.modules} mod={selectedMod} onEdit={onDimEdit} vertical={!planta} />}
-        {ghost && <GhostBox mod={ghost} />}
+        {ghost && show.insercion !== false && <GhostBox mod={ghost} />}
         {renderMode && <Lights3D project={project} />}
         <FillGroup>
           {(project.geometries || []).map((g) => (
@@ -716,13 +716,14 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
           ))}
         </FillGroup>
         {geoDraft && <GeometryMesh g={geoDraft} room={room} modules={project.modules} draft />}
+        {show.invisibles && !renderMode && project.modules.filter((m) => m.hidden).map((m) => <GhostBox key={'inv' + m.id} mod={m} />)}
         {project.modules.map((m) => {
           const b = builtById.get(m.id);
           if (!b || m.hidden) return null; // oculto desde la Lista de módulos
           return <ModuleObject key={m.id} mod={m} b={b} selected={selectedIds.includes(m.id) || m.id === selectedId} showSel={!renderMode} onDown={onDown}
             onMenu={renderMode || drawing || annotating ? null : onModuleMenu}
             openState={openFronts[m.id]} onToggleFront={renderMode ? null : onToggleFront}
-            onResizeDown={onResize && selectedIds.length < 2 ? onResizeDown : null} planta={planta} />;
+            onResizeDown={onResize && selectedIds.length < 2 && show.flechas !== false ? onResizeDown : null} planta={planta} />;
         })}
       </group>
       {/* sombra de contacto solo del visor: su textura vive en este renderer, no va a la ventana de render */}

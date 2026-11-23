@@ -62,6 +62,9 @@ import { FloorShapeEditor, FloorGridEditor } from './ui/FloorEditors.jsx';
 import { rulerGroups, wallRulers, snapToRulers } from './domain/rulers.js';
 import { makeFavorite, placeFavorite, removeFavorite, exportFavorites, importFavorites, favoriteGroups } from './domain/favorites.js';
 import FavoriteDialog from './ui/FavoriteDialog.jsx';
+import { prefsOf, applyPrefsToNewProject } from './domain/prefs.js';
+import { remapEvent } from './domain/shortcuts.js';
+import PrefsDialog from './ui/PrefsDialog.jsx';
 import { INSERT_DIRECTIONS, INSERT_ORIENTATIONS, placeRelative, orientItem, changePlane, detachModule } from './domain/insertion.js';
 import RulersDialog from './ui/RulersDialog.jsx';
 import { modulesOnWall } from './domain/wallEdit.js';
@@ -491,6 +494,9 @@ export default function App() {
   const [rulersDlg, setRulersDlg] = useState(null);
   // Módulos favoritos (guardados para todos los proyectos)
   const [favDlg, setFavDlg] = useState(null);
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const prefs = prefsOf(ui);
+  const show = { planos: true, flechas: true, hotpoints: false, insercion: true, invisibles: false, ...(ui.show || {}) }; // menú Mostrar
   const favorites = ui.favorites || [];
   const [favMsg, setFavMsg] = useState(null);
   // Cambiar de plano (clic derecho durante el arrastre): piso, arriba de un módulo o una pared.
@@ -856,8 +862,12 @@ export default function App() {
   const rotateSelected = () => rotateBy(90);
 
   useEffect(() => {
-    const onKey = (e) => {
-      const inField = ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName);
+    const onKey = (e0) => {
+      const inField = ['INPUT', 'SELECT', 'TEXTAREA'].includes(e0.target.tagName);
+      // Configurar atajos: una combinación propia actúa como la de por defecto de su acción
+      const rm = inField ? { kind: 'pass' } : remapEvent(e0, ui.shortcuts);
+      if (rm.kind === 'block') return;
+      const e = rm.kind === 'as' ? { ...rm.init, target: e0.target, preventDefault: () => e0.preventDefault(), stopPropagation: () => e0.stopPropagation() } : e0;
       if ((e.ctrlKey || e.metaKey) && !inField) {
         const k = e.key.toLowerCase();
         if (k === 'z' && !e.shiftKey) { e.preventDefault(); history.undo(); return; }
@@ -1018,7 +1028,7 @@ export default function App() {
       setProject(normalizeProject(p)); setSelectedId(null); recenter();
     } catch { window.alert('El archivo no es un proyecto válido.'); }
   };
-  const newProject = () => { if (window.confirm('¿Empezar un proyecto vacío? (exportá el actual si lo querés guardar)')) { setProject(emptyProject()); setSelectedId(null); recenter(); } };
+  const newProject = () => { if (window.confirm('¿Empezar un proyecto vacío? (exportá el actual si lo querés guardar)')) { setProject(applyPrefsToNewProject(emptyProject(), prefs)); setSelectedId(null); recenter(); } };
 
   return (
     <div className="app">
@@ -1031,6 +1041,7 @@ export default function App() {
           <span className="total-pill" title="Total del presupuesto">{money(budget.total)}</span>
           <button onClick={history.undo} disabled={!history.canUndo} title="Deshacer (Ctrl+Z)">↶ Deshacer</button>
           <button onClick={history.redo} disabled={!history.canRedo} title="Rehacer (Ctrl+Y)">↷ Rehacer</button>
+          <button onClick={() => setPrefsOpen(true)} title="Preferencias y atajos">Preferencias</button>
           <button onClick={newProject}>Nuevo</button>
           <button onClick={() => fileRef.current?.click()}>Abrir</button>
           <button onClick={exportProject}>Guardar archivo</button>
@@ -1151,6 +1162,7 @@ export default function App() {
                 onFloorMenu={(ev) => setFloorMenu({ x: ev.clientX, y: ev.clientY })}
                 rulersOf={ui.showRulers ? (w) => wallRulers(w, groupsR) : null}
                 onChangePlane={onChangePlane}
+                bg={prefs.bg} lightK={prefs.light} show={show}
                 onMoveHotpoint={(id, x, z) => setProject((p) => {
                   const g = roomWalls(p.room).find((w) => w.id === id);
                   if (!g) return p;
@@ -1233,6 +1245,8 @@ export default function App() {
                 </div>
               </div>
             )}
+            {prefsOpen && <PrefsDialog ui={ui} onClose={() => setPrefsOpen(false)} onShortcuts={(sc) => setUi((u) => ({ ...u, shortcuts: sc }))}
+              onPrefs={(patch) => setUi((u) => ({ ...u, prefs: { ...prefsOf(u), ...patch }, ...(patch.fill ? { fill: patch.fill } : {}), ...(patch.arrowStep ? { moveStep: patch.arrowStep } : {}) }))} />}
             {favDlg && <FavoriteDialog count={favDlg.ids.length} groups={favoriteGroups(favorites)} capture={() => captureRef.current?.(1)}
               onSave={(info) => { const f = makeFavorite(project.modules.filter((m) => favDlg.ids.includes(m.id)), info); if (f) setUi((u) => ({ ...u, favorites: [...(u.favorites || []), f], catalogPath: ['__fav', f.group || 'General'] })); }}
               onClose={() => setFavDlg(null)} />}
@@ -1298,7 +1312,7 @@ export default function App() {
               <span className="sb-sel">{(multiSel ? describeMulti(project, selectedIds, !!selectionGroup(project, selectedIds)) : describeSelection(project, selection)) || 'Sin selección'}</span>
               {axisLock && <span className="sb-lock" title="X / Y cambian la traba">Movimiento trabado: solo {axisLock === 'x' ? 'ancho (X)' : 'profundidad (Y)'}</span>}
               <span className="sb-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</span>
-              <StatusToggles ui={ui} onToggle={toggleUi} showDims={showDims} onShowDims={setShowDims} onShowRulers={(v) => setUi((u) => ({ ...u, showRulers: v }))}
+              <StatusToggles ui={ui} onToggle={toggleUi} showDims={showDims} onShowDims={setShowDims} onShowRulers={(v) => setUi((u) => ({ ...u, showRulers: v }))} show={show} onShow={(k, v) => setUi((u) => ({ ...u, show: { ...(u.show || {}), [k]: v } }))}
                 planImage={project.planImage} onPlanImage={(visible) => setProject((p) => ({ ...p, planImage: { ...p.planImage, visible } }))} />
             </div>
             </div>

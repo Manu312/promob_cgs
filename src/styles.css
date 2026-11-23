@@ -411,3 +411,19 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .auth-card .link { border: none; background: none; color: var(--accent); cursor: pointer; padding: 0; text-align: left; }
 .auth-msg { color: #b91c1c !important; }
 .auth-card .field { display: flex; flex-direction: column; align-items: stretch; gap: 4px; } .auth-card .field input { width: 100%; box-sizing: border-box; }
+/* Proyectos (Inicio) */
+.projects-home .ph-bar { display: flex; gap: 12px; align-items: center; margin: 8px 0 12px; flex-wrap: wrap; }
+.ph-search { flex: 1; min-width: 220px; }
+.ph-table td { vertical-align: top; }
+.ph-table tr.current td:first-child { border-left: 3px solid var(--accent); }
+.ph-table .link { border: none; background: none; color: var(--accent); cursor: pointer; padding: 0; font-weight: 600; text-align: left; }
+.ph-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; } .ph-tags span { font-size: 11px; background: #eef2ff; color: #3730a3; border-radius: 8px; padding: 0 6px; }
+.ph-actions { white-space: nowrap; } .ph-actions button { margin-left: 2px; padding: 2px 6px; font-size: 12px; }
+.ph-pages { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 10px; }
+.proj-name { border: none; background: none; color: #374151; font-size: 13px; cursor: pointer; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj-name:hover { text-decoration: underline; }
+.ph-table .ph-open { display: block; width: 100%; text-align: left; }
+.topbar .proj-name { flex: 0 1 auto; min-width: 0; max-width: 200px; padding: 0; }
+.topbar { flex-wrap: nowrap; } .topbar .top-actions { flex-wrap: nowrap; }
+.top-actions button, .tabs button { white-space: nowrap; }
+.tabs { flex-wrap: nowrap; }

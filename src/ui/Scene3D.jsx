@@ -13,6 +13,7 @@ import { fitBoxPose, zoomWindowPose, walkPose } from '../domain/navigation.js';
 import { fillMode } from '../domain/fillModes.js';
 import { FillContext, FillGroup, useFill, NONE_MATERIAL } from './fill3d.jsx';
 import { GeometryMesh } from './Geometry3D.jsx';
+import Lights3D from './Lights3D.jsx';
 import { outlineOf, boundsOf, holesOn, holesInGeometry } from '../domain/geometry.js';
 import { mat3d, metal, stone, finishMat } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
@@ -673,6 +674,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
         {showDims && !renderMode && <Dimensions room={room} modules={project.modules.filter((m) => !m.hidden)} onWallLength={onWallLength} onWallAngle={onWallAngle} />}
         {selectedMod && !renderMode && <ModuleDistances room={room} modules={project.modules} mod={selectedMod} onEdit={onDimEdit} vertical={!planta} />}
         {ghost && <GhostBox mod={ghost} />}
+        {renderMode && <Lights3D project={project} />}
         <FillGroup>
           {(project.geometries || []).map((g) => (
             <GeometryMesh key={g.id} g={g} room={room} modules={project.modules} selected={!renderMode && g.id === selectedGeoId} holes={g.hole?.on ? [] : holesInGeometry(project, g)}

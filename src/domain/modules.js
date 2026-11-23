@@ -74,6 +74,14 @@ export const PARAM_DEFS = {
   finish: { label: 'Terminación', type: 'sel', options: FINISHES },
   material: { label: 'Material', type: 'sel', options: DECORE_MATERIALS },
   forma: { label: 'Forma', type: 'sel', options: [['rect', 'Rectangular'], ['redonda', 'Redonda']] },
+  // Luz de las luminarias (Lumen / Editor de luces)
+  lightColor: { label: 'Color de la luz', type: 'color' },
+  lightI: { label: 'Intensidad', type: 'num', min: 0, max: 2, step: 0.1 },
+  shadow: { label: 'Sombra', type: 'sel', options: [['si', 'Sí'], ['no', 'No']] },
+  transparency: { label: 'Ilumina transparentes', type: 'sel', options: [['si', 'Sí'], ['no', 'No']] },
+  beam: { label: 'Apertura', type: 'num', min: 5, max: 160, step: 5, unit: '°' },
+  falloff: { label: 'Falloff', type: 'num', min: 5, max: 170, step: 5, unit: '°' },
+  tilt: { label: 'Inclinación', type: 'num', min: -90, max: 90, step: 5, unit: '°' },
   chimneyH: { label: 'Chimenea (alto)', type: 'num', min: 0, max: 1500, step: 10, unit: 'mm' },
   price: { label: 'Precio (opcional, al presupuesto)', type: 'num', min: 0, max: 1e9, step: 1000, unit: '$' },
   armD: { label: 'Profundidad del cuerpo', type: 'num', min: 250, max: 700, step: 10, unit: 'mm' },
@@ -150,6 +158,12 @@ export const MODULE_TYPES = {
   frutero: { label: 'Frutero', cat: 'Decore', kind: 'aparato', ap: 'frutero', y: 890, rest: true, fields: ['width', 'material', 'price'], defaults: { width: 280, height: 150, depth: 280, material: 'ceramica', price: 0 } },
   ollas: { label: 'Juego de ollas', cat: 'Decore', kind: 'aparato', ap: 'ollas', y: 890, rest: true, fields: ['material', 'price'], defaults: { width: 450, height: 150, depth: 260, material: 'inox', price: 0 } },
   alfombra: { label: 'Alfombra', cat: 'Decore', kind: 'aparato', ap: 'alfombra', y: 0, fields: ['width', 'depth', 'material', 'price'], defaults: { width: 2000, height: 8, depth: 1400, material: 'tela_beige', price: 0 } },
+  // Lumen (Fase 7b S17): luminarias con su luz
+  lampara_colgante: { label: 'Lámpara colgante', cat: 'Lumen', kind: 'aparato', ap: 'colgante', y: 1700, light: { kind: 'ambiente', at: () => [0, 40, 0] }, fields: ['width', 'height', 'material', 'lightColor', 'lightI', 'shadow', 'transparency', 'price'], defaults: { width: 350, height: 900, depth: 350, material: 'negro', lightColor: '#fff1d6', lightI: 1, shadow: 'si', transparency: 'si', price: 0 } },
+  spot_embutido: { label: 'Spot embutido', cat: 'Lumen', kind: 'aparato', ap: 'spot', y: 2580, light: { kind: 'spot', at: () => [0, -2, 0] }, fields: ['width', 'material', 'lightColor', 'lightI', 'beam', 'falloff', 'tilt', 'shadow', 'transparency', 'price'], defaults: { width: 90, height: 20, depth: 90, material: 'blanco', lightColor: '#fff1d6', lightI: 1, beam: 40, falloff: 70, tilt: 0, shadow: 'si', transparency: 'si', price: 0 } },
+  tira_led: { label: 'Tira LED', cat: 'Lumen', kind: 'aparato', ap: 'tiraLed', y: 1440, light: { kind: 'lineal', at: () => [0, -2, 0] }, fields: ['width', 'lightColor', 'lightI', 'transparency', 'price'], defaults: { width: 1000, height: 10, depth: 15, lightColor: '#fff6e5', lightI: 1, shadow: 'no', transparency: 'si', price: 0 } },
+  aplique: { label: 'Aplique de pared', cat: 'Lumen', kind: 'aparato', ap: 'aplique', y: 1700, light: { kind: 'ambiente', at: (p) => [0, p.height * 0.55, p.depth * 0.1] }, fields: ['width', 'height', 'material', 'lightColor', 'lightI', 'shadow', 'transparency', 'price'], defaults: { width: 200, height: 250, depth: 150, material: 'dorado', lightColor: '#ffe7c2', lightI: 0.8, shadow: 'si', transparency: 'si', price: 0 } },
+  lampara_pie: { label: 'Lámpara de pie', cat: 'Lumen', kind: 'aparato', ap: 'lamparaPie', y: 0, light: { kind: 'ambiente', at: (p) => [0, p.height - 150, 0] }, fields: ['width', 'height', 'material', 'lightColor', 'lightI', 'shadow', 'transparency', 'price'], defaults: { width: 400, height: 1600, depth: 400, material: 'negro', lightColor: '#fff1d6', lightI: 1, shadow: 'si', transparency: 'si', price: 0 } },
   // Sanitarios de baño (Fase 6.3)
   inodoro: { label: 'Inodoro con mochila', cat: 'Baño', kind: 'aparato', ap: 'inodoro', y: 0, fields: ['width', 'height', 'depth', 'price'], defaults: { width: 380, height: 780, depth: 690, price: 0 } },
   bidet: { label: 'Bidet', cat: 'Baño', kind: 'aparato', ap: 'bidet', y: 0, fields: ['width', 'height', 'depth', 'price'], defaults: { width: 352, height: 400, depth: 500, price: 0 } },

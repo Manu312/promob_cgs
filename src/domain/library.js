@@ -279,6 +279,24 @@ export const LIBRARY = [
     ],
   },
   {
+    // Lumen: luminarias (cada una ilumina el render; se ajustan en el Editor de luces)
+    id: 'lumen', label: 'Lumen', groups: [
+      { id: 'techo', label: 'Techo', subgroups: [
+        { id: 'colgantes', label: 'Colgantes', items: [it('lum-colgante', 'lampara_colgante'), it('lum-colgante-grande', 'lampara_colgante', 'Colgante grande', { width: 500 })] },
+        { id: 'spots', label: 'Spots', items: [it('lum-spot', 'spot_embutido')] },
+      ] },
+      { id: 'pared', label: 'Pared', subgroups: [
+        { id: 'apliques', label: 'Apliques', items: [it('lum-aplique', 'aplique')] },
+      ] },
+      { id: 'muebles', label: 'Muebles', subgroups: [
+        { id: 'led', label: 'Tiras LED', items: [it('lum-led', 'tira_led', null, null, W(600, 800, 1000, 1200, 1500, 1800, 2400))] },
+      ] },
+      { id: 'pie', label: 'De pie', subgroups: [
+        { id: 'pie', label: 'Lámparas de pie', items: [it('lum-pie', 'lampara_pie')] },
+      ] },
+    ],
+  },
+  {
     id: 'oficinas', label: 'Oficinas', groups: [
       { id: 'escritorios', label: 'Escritorios', subgroups: [
         { id: 'escritorios', label: 'Escritorios', items: [it('ofi-esc', 'escritorio', null, null, W(900, 1000, 1200, 1400, 1600)), it('ofi-esc-caj', 'cajonera')] },

@@ -20,6 +20,8 @@ export const DEFAULT_RULES = {
   gap: 3,
   slideGap: 13,
   plinthSetback: 40,
+  golaH: 40,
+  golaD: 25,
 };
 
 export const RULE_DEFS = {
@@ -29,6 +31,8 @@ export const RULE_DEFS = {
   gap: { label: 'Luz entre frentes', type: 'num', min: 0, max: 10, step: 0.5, unit: 'mm' },
   slideGap: { label: 'Holgura corredera / lado', type: 'num', min: 5, max: 25, step: 0.5, unit: 'mm' },
   plinthSetback: { label: 'Retiro del zócalo', type: 'num', min: 0, max: 120, step: 5, unit: 'mm' },
+  golaH: { label: 'Alto del perfil gola', type: 'num', min: 20, max: 80, step: 1, unit: 'mm' },
+  golaD: { label: 'Profundidad del rebaje gola', type: 'num', min: 10, max: 60, step: 1, unit: 'mm' },
 };
 
 export const PARAM_DEFS = {
@@ -44,6 +48,8 @@ export const PARAM_DEFS = {
   doors: { label: 'Cantidad de puertas', type: 'num', min: 0, max: 8, step: 1 },
   drawers: { label: 'Cajones (solo 1 cuerpo)', type: 'num', min: 0, max: 8, step: 1 },
   drawerH: { label: 'Alto frente cajón (si hay puertas)', type: 'num', min: 100, max: 400, step: 10, unit: 'mm' },
+  // Línea Gola (sin tiradores): perfil de aluminio encastrado en un rebaje de los laterales
+  gola: { label: 'Gola (sin tirador)', type: 'sel', options: [['no', 'Sin gola'], ['superior', 'Gola arriba'], ['superior_medio', 'Gola arriba y entre cajones'], ['inferior', 'Gola abajo (alacena)']] },
   handlePos: { label: 'Manijas', type: 'sel', options: [['top', 'Arriba'], ['middle', 'Medio'], ['bottom', 'Abajo'], ['custom', 'Personalizada (mm)'], ['none', 'Sin manijas']] },
   handleOffset: { label: 'Tirador: desde el borde de arriba', type: 'num', min: 0, max: 2000, step: 5, unit: 'mm' },
   handleOrient: { label: 'Tirador: orientación', type: 'sel', options: [['auto', 'Automática'], ['vertical', 'Vertical'], ['horizontal', 'Horizontal']] },
@@ -68,8 +74,8 @@ export const PARAM_DEFS = {
   side: { label: 'Lado de la esquina', type: 'sel', options: [['izq', 'Izquierda'], ['der', 'Derecha']] },
 };
 
-const CAJA_FIELDS = ['width', 'height', 'depth', 'plinth', 'top', 'dividers', 'shelves', 'interior', 'doorType', 'doors', 'drawers', 'drawerH', 'handlePos', 'handleOffset', 'handleOrient', 'mesada', 'mesadaT', 'mesadaOver', 'nicheH', 'nicheY'];
-const caja = (d) => ({ top: 'techo', dividers: 1, shelves: 1, interior: 'estantes', doorType: 'batientes', doors: 2, drawers: 0, drawerH: 180, handlePos: 'top', handleOffset: 40, handleOrient: 'auto', plinth: 0, mesada: 'no', mesadaT: 20, mesadaOver: 20, nicheH: 0, nicheY: 0, ...d });
+const CAJA_FIELDS = ['width', 'height', 'depth', 'plinth', 'top', 'dividers', 'shelves', 'interior', 'doorType', 'doors', 'drawers', 'drawerH', 'gola', 'handlePos', 'handleOffset', 'handleOrient', 'mesada', 'mesadaT', 'mesadaOver', 'nicheH', 'nicheY'];
+const caja = (d) => ({ gola: 'no', top: 'techo', dividers: 1, shelves: 1, interior: 'estantes', doorType: 'batientes', doors: 2, drawers: 0, drawerH: 180, handlePos: 'top', handleOffset: 40, handleOrient: 'auto', plinth: 0, mesada: 'no', mesadaT: 20, mesadaOver: 20, nicheH: 0, nicheY: 0, ...d });
 const conMesada = (d) => caja({ mesada: 'si', ...d });
 
 export const MODULE_TYPES = {
@@ -231,6 +237,11 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null, holes 
     : { x0: G / 2, x1: W - G / 2, y0: y0 + G / 2, y1: yTop - G / 2 };
   const fronts = [];
   let shelfTop = yIn1;
+  // Gola: los frentes dejan libre el canal del perfil (arriba, o abajo en las alacenas)
+  const gola = p.gola && p.gola !== 'no' ? p.gola : null;
+  const gH = R.golaH, gD = R.golaD;
+  if (gola === 'superior' || gola === 'superior_medio') zone.y1 -= gH;
+  if (gola === 'inferior') zone.y0 += gH;
   // Hueco libre para un electrodoméstico (horno, microondas, heladera): sin frentes, con
   // divisores fijos arriba y abajo. Debajo van cajones (o puertas si no hay cajones); arriba, puertas.
   const nicheH = n === 1 && !sliding ? Math.min(p.nicheH || 0, yIn1 - yIn0) : 0;
@@ -265,8 +276,9 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null, holes 
     let top = zone.y1;
     const bottom = zone.y0, fw = zone.x1 - zone.x0;
     if (nDrawers > 0 && nDoors === 0) {
-      const fh = (top - bottom - (nDrawers - 1) * G) / nDrawers;
-      for (let j = 0; j < nDrawers; j++) { fronts.push({ kind: 'drawer', x: zone.x0, y: top - fh, w: fw, h: fh }); top -= fh + G; }
+      const DG = gola === 'superior_medio' ? gH : G; // gola entre cajones: el perfil va en la separación
+      const fh = (top - bottom - (nDrawers - 1) * DG) / nDrawers;
+      for (let j = 0; j < nDrawers; j++) { fronts.push({ kind: 'drawer', x: zone.x0, y: top - fh, w: fw, h: fh }); top -= fh + DG; }
       shelfTop = null;
     } else {
       for (let j = 0; j < nDrawers; j++) { const fh = p.drawerH; fronts.push({ kind: 'drawer', x: zone.x0, y: top - fh, w: fw, h: fh }); top -= fh + G; }
@@ -313,7 +325,7 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null, holes 
   };
   // Puertas y cajones. Cada pieza de un frente lleva `front` (índice) para las aperturas;
   // las puertas, además, `hinge` (lado de la bisagra; `params.hinges` lo invierte por puerta).
-  const hp = p.handlePos;
+  const hp = gola ? 'none' : p.handlePos; // con gola no hay tiradores
   fronts.forEach((f, k) => {
     const n0 = parts.length, d0 = decors.length;
     if (f.kind === 'drawer') {
@@ -355,6 +367,23 @@ function buildCaja(raw, { t, tf, tb = 3, tc = t, rules = {}, aggs = null, holes 
     for (let i = n0; i < parts.length; i++) parts[i].front = k;
     for (let i = d0; i < decors.length; i++) decors[i].front = k;
   });
+
+  // Perfiles gola (aluminio): canal arriba / abajo y, si corresponde, entre cajones. Los laterales
+  // llevan el rebaje donde encastra el perfil.
+  if (gola) {
+    const prof = (yb) => {
+      decors.push({ ...decor('aparato', 0, yb, D - gD, W, gH, 2), finish: 'inox' }); // fondo del canal
+      decors.push({ ...decor('aparato', 0, yb, D - gD, W, 2, gD), finish: 'inox' }); // ala
+      add('perfil_gola', Math.round(W / 10) / 100);
+    };
+    if (gola === 'inferior') prof(zone.y0 - gH);
+    else prof(zone.y1 + G / 2);
+    if (gola === 'superior_medio') {
+      const ds = fronts.filter((f) => f.kind === 'drawer').sort((a, b) => b.y - a.y);
+      for (let j = 0; j < ds.length - 1; j++) prof(ds[j + 1].y + ds[j + 1].h);
+    }
+    for (const pt of parts) if (pt.name === 'Lateral') pt.name = 'Lateral (rebaje gola)';
+  }
 
   // Mesada (se compra aparte: va al presupuesto por m², no al plan de corte)
   if (p.mesada === 'si') {

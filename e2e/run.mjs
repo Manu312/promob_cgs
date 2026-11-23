@@ -1286,6 +1286,25 @@ try {
     check('Sin errores al perforar', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S14: Línea Gola (biblioteca Cocina Gola, sin tiradores)
+  {
+    const n0 = (await project()).modules.length;
+    await clickText('.cb-libs .cb-tab', 'Cocina Gola'); await sleep(300);
+    check('Biblioteca Cocina Gola', (await page.$$eval('.cb-groups .cb-tab', (b) => b.map((x) => x.textContent))).join('|') === 'Inferiores|Altos');
+    await clickText('.cb-subs .cb-tab', 'Cajoneros'); await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('.mod-btn')].find((b) => b.textContent.includes('Cajonero gola 3'))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))); await sleep(500);
+    const pm = await project();
+    const g = pm.modules.at(-1);
+    check('Cajonero gola insertado con gola arriba y entre cajones', pm.modules.length === n0 + 1 && g.params.gola === 'superior_medio' && g.params.handlePos === 'none');
+    const golaF = await page.$$eval('.inspector .field', (fs) => fs.find((f) => f.textContent.startsWith('Gola'))?.querySelector('select')?.value);
+    check('Propiedades muestra la Gola del módulo', golaF === 'superior_medio', golaF);
+    await shot('07n-gola');
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+    await page.keyboard.press('Escape');
+    await clickText('.cb-libs .cb-tab', 'Cocinas'); await sleep(200);
+    check('Sin errores con la Línea Gola', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

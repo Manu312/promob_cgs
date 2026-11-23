@@ -627,6 +627,39 @@ try {
   check('Sin errores en render final', errors.length === 0, errors.slice(-3).join(' | '));
   await clickText('.render-window button', 'Cerrar'); await sleep(300);
 
+  // Clima: sol y cielo (Fase 7 S2)
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.rd-tabs button', 'Clima'); await sleep(300);
+  await clickText('.rd-climas button', 'Atardecer'); await sleep(500);
+  let clima = (await project()).render.clima;
+  let sun = await page.evaluate(() => window.__muebles.sun());
+  check('Clima Atardecer: sol bajo (altitud 10°) y anaranjado', clima.preset === 'atardecer' && clima.altitude === 10 && sun.color === '#ffa865' && sun.dir[1] < 0.2, JSON.stringify(sun));
+  await shot('04d-clima');
+  const comp = await page.$eval('.sun-compass', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * (106 / 120), y: r.top + r.height / 2 }; });
+  await page.mouse.click(comp.x, comp.y); await sleep(400);
+  clima = (await project()).render.clima;
+  sun = await page.evaluate(() => window.__muebles.sun());
+  check('Brújula: clic a la derecha → azimut 90° y el sol viene de la derecha', clima.azimuth === 90 && sun.dir[0] > 0.9, `${clima.azimuth}° ${JSON.stringify(sun.dir)}`);
+  const arc = await page.$eval('.sun-altitude', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * (10 / 120) + 40, y: r.top + r.height * (110 / 120) - 40 }; });
+  await page.mouse.click(arc.x, arc.y); await sleep(400);
+  check('Arco de altitud: clic a 45° → altitud 45°', (await project()).render.clima.altitude === 45, String((await project()).render.clima.altitude));
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+  check('Deshacer vuelve la altitud de a un paso', (await project()).render.clima.altitude === 10, String((await project()).render.clima.altitude));
+  await clickText('.rd-climas button', 'No aplicar'); await sleep(400);
+  sun = await page.evaluate(() => window.__muebles.sun());
+  check('No aplicar apaga el sol', sun.visible === false);
+  await clickText('.rd-tabs button', 'Calidad'); await sleep(200);
+  await clickText('.render-dialog .radio', 'Render rápido'); await sleep(200);
+  await clickText('.render-dialog footer button', 'Renderizar'); await sleep(1500);
+  const rn = await rwImage();
+  check('Render sin luz natural sale igual (solo luz ambiente)', rn.w > 0 && rn.diff > 50, JSON.stringify(rn));
+  await clickText('.render-window button', 'Cerrar'); await sleep(300);
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.rd-tabs button', 'Clima'); await sleep(200);
+  await clickText('.rd-climas button', 'Luz blanca'); await sleep(200);
+  await page.keyboard.press('Escape'); await sleep(300);
+  check('Sin errores con el clima', errors.length === 0, errors.slice(-3).join(' | '));
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

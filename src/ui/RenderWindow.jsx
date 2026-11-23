@@ -4,7 +4,7 @@ import { download } from './fields.jsx';
 
 // Ventana de render: calcula la imagen al tamaño pedido y la muestra mientras se refina.
 // Detener deja la imagen como está; Guardar imagen la baja en PNG.
-export default function RenderWindow({ bridge, size, quality, fileName, onClose }) {
+export default function RenderWindow({ bridge, size, quality, rig, fileName, onClose }) {
   const holder = useRef(null);
   const jobRef = useRef(null);
   const [samples, setSamples] = useState(0);
@@ -17,7 +17,7 @@ export default function RenderWindow({ bridge, size, quality, fileName, onClose 
     let job;
     try {
       job = createRenderJob({
-        ...bridge(), size, quality,
+        ...bridge(), size, quality, rig,
         onProgress: (s) => { setSamples(s); setElapsed(performance.now() - t0); },
         onDone: () => { setRunning(false); setElapsed(performance.now() - t0); },
       });

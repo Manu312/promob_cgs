@@ -25,17 +25,18 @@ export function makeRenderCamera(camera, view, size) {
   return cam;
 }
 
-function skyTexture() {
+// Cielo del clima (degradé cenit → horizonte) como entorno: ilumina la escena, no es el fondo.
+function skyTexture(sky) {
   const env = new GradientEquirectTexture(256);
-  env.topColor.set('#fffaf2');
-  env.bottomColor.set('#b9b2a6');
+  env.topColor.set(sky?.top || '#fffaf2');
+  env.bottomColor.set(sky?.bottom || '#b9b2a6');
   env.exponent = 2;
   env.update();
   return env;
 }
 
 // Crea un trabajo de render. `quality` = qualityOf(config); `onProgress(muestras)` se llama al avanzar.
-export function createRenderJob({ gl, scene, camera, view, size, quality, background = '#e7e3dc', onProgress, onDone }) {
+export function createRenderJob({ gl, scene, camera, view, size, quality, rig, background = '#e7e3dc', onProgress, onDone }) {
   const { width: W, height: H } = size;
   const glCanvas = document.createElement('canvas');
   const off = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -53,12 +54,14 @@ export function createRenderJob({ gl, scene, camera, view, size, quality, backgr
   output.height = H;
   const ctx = output.getContext('2d');
   const cam = makeRenderCamera(camera, view, size);
-  const env = skyTexture();
+  const env = skyTexture(rig?.sky);
 
   // La escena es la del visor: durante cada llamada se cambia el entorno por el del render, se saca
   // el fondo (lo pone la composición) y se ocultan las cosas que solo existen en el renderer del visor.
   // El rasterizado ya suma las luces del visor (ambiente, hemisférica, sol): el cielo ilumina menos.
-  const envIntensity = quality.pathTrace ? 1 : 0.4;
+  // El trazado de rayos no usa la luz ambiente de three: la "luz ambiente" es un mínimo de cielo.
+  const skyI = rig ? rig.sky.intensity : 1;
+  const envIntensity = quality.pathTrace ? Math.max(skyI, rig?.ambient ? 0.25 : 0) : skyI * 0.4;
   const withScene = (fn) => {
     const bg = scene.background;
     const en = scene.environment;

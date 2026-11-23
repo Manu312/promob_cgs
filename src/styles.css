@@ -274,3 +274,22 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .rw-error { color: #b91c1c; }
 .vp-toolbar, .statusbar { z-index: 10; }
 .rd-body input[type=radio], .rd-body input[type=checkbox] { width: auto; margin: 0; }
+.rd-body fieldset:disabled { opacity: .5; }
+.rd-climas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+.rd-climas button { display: flex; align-items: center; gap: 6px; padding: 4px 6px; font-size: 12px; text-align: left; }
+.rd-climas button i { width: 18px; height: 18px; border-radius: 3px; border: 1px solid var(--line); background: linear-gradient(var(--sky-top), var(--sky-bottom)); flex: none; }
+.rd-climas button.on { border-color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+.rd-slider { display: grid; grid-template-columns: 120px 1fr 44px; align-items: center; gap: 6px; font-size: 12px; }
+.rd-slider input { padding: 0; }
+.rd-slider b { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+.rd-sun { display: flex; gap: 10px; justify-content: space-around; }
+.rd-sun > div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.rd-sun.off .sun-compass .sc-sun, .rd-sun.off .sun-altitude .sc-sun { fill: #d1d5db; }
+.sun-compass, .sun-altitude { cursor: crosshair; touch-action: none; user-select: none; }
+.sun-compass text, .sun-altitude text { font-size: 9px; fill: #6b7280; }
+.sc-ring { fill: #f8fafc; stroke: #94a3b8; stroke-width: 1.5; }
+.sun-altitude .sc-ring { fill: none; }
+.sc-tick { stroke: #94a3b8; stroke-width: 1.5; }
+.sc-room { fill: #e5e7eb; stroke: #9ca3af; }
+.sc-ray { stroke: #f59e0b; stroke-width: 2; stroke-dasharray: 3 2; }
+.sc-sun { fill: #fbbf24; stroke: #d97706; stroke-width: 1.5; }

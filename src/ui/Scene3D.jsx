@@ -2,6 +2,7 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, OrthographicCamera, Environment, Lightformer, ContactShadows } from '@react-three/drei';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { lightRig } from '../domain/render.js';
 import { footprint, localAxes, RESIZE_HANDLES, AXIS_COLORS } from '../domain/modules.js';
 import { bounds } from '../domain/walls.js';
 import { frontTransforms } from '../domain/fronts.js';
@@ -237,6 +238,10 @@ function DevProbe({ project, origin, openFronts }) {
       cameraType: camera.type,
       planImageShown: !!scene.getObjectByName('planImage'),
       ghostShown: !!scene.getObjectByName('insertGhost'),
+      sun() {
+        const l = scene.getObjectByName('sol');
+        return l && { visible: l.visible, intensity: l.intensity, color: '#' + l.color.getHexString(), dir: l.position.clone().normalize().toArray() };
+      },
       openFronts,
       screenOf(id, dy = 0) {
         const m = project.modules.find((o) => o.id === id);
@@ -366,6 +371,9 @@ const roomCenter = (room) => {
 export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
+  // Luz del modo render según el clima del render (sol, cielo, ambiente).
+  const climaKey = JSON.stringify(project.render?.clima || null);
+  const rig = useMemo(() => lightRig(project.render?.clima), [climaKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const dragRef = useRef(null);
   const { room } = project;
   const planta = view.name === 'planta';
@@ -473,12 +481,15 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       onContextMenu={(e) => e.preventDefault()}
     >
       <color attach="background" args={[renderMode ? '#e7e3dc' : '#f3f4f6']} />
-      <ambientLight intensity={renderMode ? 0.25 : 0.6} />
-      <hemisphereLight args={['#ffffff', '#cbbfae', renderMode ? 0.35 : 0.4]} />
+      <ambientLight intensity={renderMode ? 0.25 * rig.ambient : 0.6} />
+      <hemisphereLight args={renderMode ? [rig.sky.top, rig.sky.bottom, 0.35 * rig.sky.intensity] : ['#ffffff', '#cbbfae', 0.4]} />
       <directionalLight
+        name="sol"
         castShadow
-        position={[2.5, 4.5, 3.5]}
-        intensity={renderMode ? 1.7 : 1.1}
+        visible={!renderMode || rig.sun.on}
+        position={renderMode ? rig.sun.dir.map((v) => v * 8) : [2.5, 4.5, 3.5]}
+        color={renderMode ? rig.sun.color : '#ffffff'}
+        intensity={renderMode ? rig.sun.intensity : 1.1}
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-5}
         shadow-camera-right={5}
@@ -488,10 +499,10 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
       />
       {renderMode && (
         <Environment resolution={256} frames={1}>
-          <Lightformer intensity={2} position={[0, 5, -3]} scale={[10, 4, 1]} />
-          <Lightformer intensity={1.2} position={[-5, 2, 1]} rotation-y={Math.PI / 2} scale={[10, 3, 1]} />
-          <Lightformer intensity={1.2} position={[5, 2, 1]} rotation-y={-Math.PI / 2} scale={[10, 3, 1]} />
-          <Lightformer intensity={0.8} position={[0, 2, 6]} rotation-y={Math.PI} scale={[10, 3, 1]} />
+          <Lightformer intensity={2 * rig.sky.intensity} color={rig.sky.top} position={[0, 5, -3]} scale={[10, 4, 1]} />
+          <Lightformer intensity={1.2 * rig.sky.intensity} color={rig.sky.bottom} position={[-5, 2, 1]} rotation-y={Math.PI / 2} scale={[10, 3, 1]} />
+          <Lightformer intensity={1.2 * rig.sky.intensity} color={rig.sky.bottom} position={[5, 2, 1]} rotation-y={-Math.PI / 2} scale={[10, 3, 1]} />
+          <Lightformer intensity={0.8 * rig.sky.intensity} color={rig.sky.bottom} position={[0, 2, 6]} rotation-y={Math.PI} scale={[10, 3, 1]} />
         </Environment>
       )}
       <group position={[-origin.x * S, 0, -origin.z * S]}>

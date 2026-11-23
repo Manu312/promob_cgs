@@ -386,3 +386,8 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .fav-del:hover { opacity: 1; }
 .cb-fav-io { margin-left: auto; display: inline-flex; gap: 4px; }
 .cb-import { cursor: pointer; display: inline-flex; align-items: center; }
+.prefs-dialog { width: min(560px, calc(100vw - 40px)); max-height: calc(100vh - 60px); overflow: auto; }
+.pd-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.pd-body { display: flex; flex-direction: column; gap: 4px; }
+.pd-keys { width: 100%; font-size: 13px; } .pd-keys td { padding: 2px 4px; } .pd-keys tr.clash td:first-child { color: #dc2626; font-weight: 600; }
+.pd-keys button { min-width: 140px; }

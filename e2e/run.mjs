@@ -1562,6 +1562,44 @@ try {
     check('Sin errores con los favoritos', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S33: Preferencias, Configurar atajos y menú Mostrar
+  {
+    const ui = () => page.evaluate(() => JSON.parse(localStorage.getItem('mueblesapp.ui')));
+    const col0 = (await ui()).collision !== false;
+    await clickText('.top-actions button', 'Preferencias'); await sleep(300);
+    const fieldIn = (txt) => page.evaluateHandle((txt) => [...document.querySelectorAll('.prefs-dialog .field')].find((f) => f.textContent.includes(txt)).querySelector('input'), txt);
+    let step = await fieldIn('Paso de las flechas');
+    await step.click({ clickCount: 3 }); await step.type('25'); await page.keyboard.press('Enter'); await sleep(200);
+    check('Preferencias: paso de flechas 25 mm', (await ui()).moveStep === 25 && (await ui()).prefs?.arrowStep === 25);
+    await clickText('.pd-tabs button', 'Configurar atajos'); await sleep(200);
+    await page.click('tr[data-action="collision"] td:nth-child(2) button'); await sleep(200);
+    await page.keyboard.press('k'); await sleep(300);
+    check('Atajo propio: Colisión = K', (await ui()).shortcuts?.collision === 'K');
+    await shot('08e-atajos');
+    await clickText('.prefs-dialog .row-btns button', 'Cerrar'); await sleep(300);
+    await page.mouse.move(700, 700);
+    await page.keyboard.press('k'); await sleep(300);
+    check('K cambia la colisión', ((await ui()).collision !== false) === !col0);
+    await page.keyboard.press('b'); await sleep(300);
+    check('B quedó libre (no hace nada)', ((await ui()).collision !== false) === !col0);
+    await page.keyboard.press('k'); await sleep(300);
+    if (!(await page.$('.sb-menu'))) await clickText('.sb-show button', 'Mostrar'); await sleep(200);
+    const items = await page.$$eval('.sb-menu label', (l) => l.map((x) => x.textContent.trim()));
+    check('Mostrar: planos, flechas, hotpoints, inserción, invisibles', ['Planos importados', 'Flechas de medidas', 'HotPoints', 'Posición de inserción', 'Módulos invisibles'].every((t) => items.includes(t)));
+    await page.evaluate(() => [...document.querySelectorAll('.sb-menu label')].find((l) => l.textContent.includes('Flechas de medidas')).querySelector('input').click()); await sleep(300);
+    check('Mostrar → sin flechas de medidas', (await ui()).show?.flechas === false);
+    await page.evaluate(() => [...document.querySelectorAll('.sb-menu label')].find((l) => l.textContent.includes('Flechas de medidas')).querySelector('input').click()); await sleep(300);
+    // dejar todo como estaba
+    await clickText('.top-actions button', 'Preferencias'); await sleep(300);
+    step = await fieldIn('Paso de las flechas');
+    await step.click({ clickCount: 3 }); await step.type('10'); await page.keyboard.press('Enter'); await sleep(200);
+    await clickText('.pd-tabs button', 'Configurar atajos'); await sleep(200);
+    await page.click('tr[data-action="collision"] td:nth-child(3) button'); await sleep(200);
+    await clickText('.prefs-dialog .row-btns button', 'Cerrar'); await sleep(300);
+    check('Atajos y paso vuelven a lo normal', !(await ui()).shortcuts?.collision && (await ui()).moveStep === 10);
+    check('Sin errores con preferencias y atajos', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

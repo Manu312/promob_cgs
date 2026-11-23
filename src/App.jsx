@@ -49,6 +49,7 @@ import ErrorBoundary from './ui/ErrorBoundary.jsx';
 import { download, money } from './ui/fields.jsx';
 import { useHistoryState, saveAndReport } from './ui/useHistoryState.js';
 import { mb } from './domain/storage.js';
+import { useAuth } from './ui/AuthGate.jsx';
 import { describeSelection } from './domain/selection.js';
 import { toggleId, selectAllIds, moveGroup, rotateGroup, describeMulti } from './domain/multiSelect.js';
 import { expandToGroups, groupModules, ungroupModules, selectionGroup, pruneGroups } from './domain/groups.js';
@@ -127,6 +128,7 @@ export default function App() {
   const autoLower = ui.autoLower !== false;
   const toggleUi = (k) => setUi((u) => ({ ...u, [k]: u[k] === false }));
   const [storageAlert, setStorageAlert] = useStorageAlert(); // guardado que no entra: se avisa
+  const auth = useAuth(); // login (Supabase): usuario y Salir
   // Paneles laterales (pestañas verticales a la izquierda): Lista de Módulos o Inserción Automática.
   const side = ui.side ?? (ui.listOpen ? 'lista' : null);
   const setSide = (s) => setUi((u) => ({ ...u, listOpen: undefined, side: (u.side ?? (u.listOpen ? 'lista' : null)) === s ? null : s }));
@@ -1100,6 +1102,7 @@ export default function App() {
           <button onClick={history.undo} disabled={!history.canUndo} title="Deshacer (Ctrl+Z)">↶ Deshacer</button>
           <button onClick={history.redo} disabled={!history.canRedo} title="Rehacer (Ctrl+Y)">↷ Rehacer</button>
           <button onClick={() => setPrefsOpen(true)} title="Preferencias y atajos">Preferencias</button>
+          {auth.user && <button className="auth-out" onClick={auth.signOut} title={`Sesión de ${auth.user.email}: salir`}>Salir</button>}
           <button onClick={newProject}>Nuevo</button>
           <button onClick={() => fileRef.current?.click()}>Abrir</button>
           <button onClick={exportProject}>Guardar archivo</button>

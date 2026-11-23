@@ -899,6 +899,30 @@ try {
     check('Sin errores con copiar y pegar', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S4: Ubicar en el catálogo (Ctrl+Shift+L) y Sustitución rápida (S)
+  {
+    let pm = await project();
+    const ma = pm.modules.find((m) => m.type === 'bajo_mixto');
+    const q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), ma.id);
+    await page.mouse.click(q.x, q.y); await sleep(300);
+    await page.keyboard.down('Control'); await page.keyboard.down('Shift'); await page.keyboard.press('KeyL'); await page.keyboard.up('Shift'); await page.keyboard.up('Control'); await sleep(700);
+    const pickedTxt = await page.$eval('.mod-btn.picked span', (e) => e.textContent).catch(() => '');
+    check('Ctrl+Shift+L ubica el módulo en la barra de modulación', pickedTxt.length > 0, pickedTxt);
+    // marcar otro ítem de la misma subfamilia y sustituir con S
+    const other = await page.evaluate(() => { const b = [...document.querySelectorAll('.cb-items .mod-btn')].find((x) => !x.classList.contains('picked')); b?.click(); return b?.querySelector('span')?.textContent; });
+    await sleep(300);
+    check('El botón Sustitución rápida se habilita', !(await page.$eval('.cb-replace', (b) => b.disabled)));
+    await page.keyboard.press('KeyS'); await sleep(500);
+    pm = await project();
+    const r = pm.modules.find((m) => m.id === ma.id);
+    check('S sustituye el módulo en el mismo lugar', r && (r.name === other || r.itemId) && r.x === ma.x && r.z === ma.z && r.rot === ma.rot, `${ma.type} → ${r?.type} (${other})`);
+    await shot('07c-sustitucion');
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+    check('Deshacer vuelve al módulo original', (await project()).modules.find((m) => m.id === ma.id).type === 'bajo_mixto');
+    await page.keyboard.press('Escape'); await sleep(200);
+    check('Sin errores con la sustitución', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

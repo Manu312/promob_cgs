@@ -8,7 +8,7 @@ const ITEM_W = 122; // ancho de cada miniatura (px) para el paginado
 
 // Barra de modulación, arriba del visor como en Promob: biblioteca → familia → ítems →
 // subfamilia, con atrás/adelante y "Más usados". Clic elige el ítem; doble clic lo inserta.
-export default function CatalogBar({ nav, setNav, counts = {}, onInsert, onDragItem, onFind, thumbCtx }) {
+export default function CatalogBar({ nav, setNav, counts = {}, onInsert, onDragItem, onFind, thumbCtx, onPick, onReplace, canReplace }) {
   const masUsados = nav?.[0] === MAS;
   const r = resolvePath(masUsados ? [] : nav || []);
   const path = masUsados ? [MAS] : r.path;
@@ -31,7 +31,7 @@ export default function CatalogBar({ nav, setNav, counts = {}, onInsert, onDragI
   useEffect(() => {
     if (!focusId) return;
     const i = r.sub.items.findIndex((x) => x.id === focusId);
-    if (i >= 0) { setPicked(focusId); setPage(Math.floor(i / perPage)); }
+    if (i >= 0) { setPicked(focusId); setPage(Math.floor(i / perPage)); onPick?.(r.sub.items[i], null); }
   }, [focusId, perPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = (p) => {
@@ -65,7 +65,7 @@ export default function CatalogBar({ nav, setNav, counts = {}, onInsert, onDragI
             const v = variant[item.id] ?? null;
             return (
               <div key={item.id} className={`mod-btn${picked === item.id ? ' picked' : ''}`} role="button" tabIndex={0} title="Arrastralo al 3D o hacé doble clic para insertarlo"
-                onClick={() => setPicked(item.id)} onDoubleClick={() => onInsert(item, v)}
+                onClick={() => { setPicked(item.id); onPick?.(item, v); }} onDoubleClick={() => onInsert(item, v)}
                 draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', item.id); e.dataTransfer.effectAllowed = 'copy'; setPicked(item.id); onDragItem?.(item, v); }}
                 onDragEnd={() => onDragItem?.(null)}>
                 {thumbCtx ? <ModelThumb item={item} variant={v} ctx={thumbCtx} /> : <Silhouette item={item} />}
@@ -90,6 +90,8 @@ export default function CatalogBar({ nav, setNav, counts = {}, onInsert, onDragI
         <button className="cb-nav" disabled={!hist.back.length} onClick={back} title="Atrás" aria-label="Atrás">⟵</button>
         <button className="cb-nav" disabled={!hist.fwd.length} onClick={fwd} title="Adelante" aria-label="Adelante">⟶</button>
         {onFind && <button className="cb-nav" onClick={onFind} title="Localizar Rápido (Ctrl+L)" aria-label="Localizar Rápido"><IconSearch /></button>}
+        {onReplace && <button className="cb-nav cb-replace" disabled={!canReplace} onClick={onReplace}
+          title="Sustitución rápida (S): reemplaza el módulo seleccionado por el ítem marcado en la barra" aria-label="Sustitución rápida">⇄</button>}
         {!masUsados && r.group.subgroups.map((s) => tab(s.id === r.sub.id, s.label, () => go([r.lib.id, r.group.id, s.id]), s.id))}
       </div>
     </div>

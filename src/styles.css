@@ -372,3 +372,10 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .fe-floor { fill: rgba(216,209,196,.7); stroke: #2563eb; stroke-width: 1.5; }
 .fe-add circle { fill: #fff; stroke: #16a34a; } .fe-add text { font-size: 12px; fill: #16a34a; pointer-events: none; } .fe-add { cursor: copy; }
 .fe-vertex { cursor: move; }
+.rl-cols { display: grid; grid-template-columns: 180px 1fr; gap: 12px; }
+.rl-groups { display: flex; flex-direction: column; gap: 4px; }
+.rl-groups .radio.on { font-weight: 600; }
+.rl-add { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.rl-table input { width: 100%; }
+.rl-table td, .rl-table th { padding: 2px 4px; font-size: 12px; }
+.ruler-label span { font-size: 10px; color: #b91c1c; background: rgba(255,255,255,.8); padding: 0 3px; border-radius: 2px; white-space: nowrap; }

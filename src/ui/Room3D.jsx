@@ -76,6 +76,32 @@ function CurvedWall({ len, H, T, sOut, flecha, material }) {
   return <mesh geometry={geo} material={material} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow />;
 }
 
+// Reglas de una pared (Mostrar → Grilla y reglas): una línea por altura, con su texto.
+function WallRulers({ w, group }) {
+  const geo = useMemo(() => {
+    const v = [];
+    const off = 3; // apenas adelante de la cara interior
+    for (const r of group.rulers) {
+      const a = [w.a[0] - w.n[0] * off, w.a[1] - w.n[1] * off], b = [w.b[0] - w.n[0] * off, w.b[1] - w.n[1] * off];
+      v.push(a[0] * S, r.value * S, a[1] * S, b[0] * S, r.value * S, b[1] * S);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    return g;
+  }, [w, group]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return (
+    <group>
+      <lineSegments geometry={geo} raycast={() => null}><lineBasicMaterial color="#dc2626" /></lineSegments>
+      {group.rulers.map((r, i) => (
+        <Html key={i} position={[(w.a[0] - w.n[0] * 3) * S, r.value * S, (w.a[1] - w.n[1] * 3) * S]} className="ruler-label" zIndexRange={[5, 0]}>
+          <span>{r.value} {r.text}</span>
+        </Html>
+      ))}
+    </group>
+  );
+}
+
 // Grilla del piso (Editar grilla del piso): líneas cada intervalo dentro del contorno del piso.
 function FloorGridLines({ room, pts }) {
   const g = floorGridOf(room);
@@ -249,7 +275,7 @@ const firstHitIn = (e) => {
   return false;
 };
 
-export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu, selectedOpeningId, onOpeningDown, selectedColumnId, onColumnDown, onWallDouble, onFloorDouble, onFloorClick, onFloorDown, onFloorMenu, wallHoles = {}, floorHoles = [] }) {
+export function Room3D({ rulers = null, room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu, selectedOpeningId, onOpeningDown, selectedColumnId, onColumnDown, onWallDouble, onFloorDouble, onFloorClick, onFloorDown, onFloorMenu, wallHoles = {}, floorHoles = [] }) {
   const walls = useMemo(() => roomWalls(room).filter((w) => w.wall.visible), [room]);
   // Esquina de cada pared: la pared que llega a su vértice de inicio.
   const incomingOf = useMemo(() => new Map(wallCorners(room).map((c) => [c.outgoing.id, c.incoming])), [room]);
@@ -286,6 +312,7 @@ export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDo
         onDoubleClick={onFloorDouble ? (e) => { if (!firstHitIn(e)) return; e.stopPropagation(); onFloorDouble(); } : undefined}
         onContextMenu={onFloorMenu ? (e) => { if (!firstHitIn(e)) return; e.stopPropagation(); onFloorMenu(e.nativeEvent); } : undefined} />
       <FloorGridLines room={room} pts={floorPts} />
+      {rulers && walls.map((w) => rulers(w.wall) && <WallRulers key={'r' + w.id} w={w} group={rulers(w.wall)} />)}
       {walls.map((w) => (
         <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} origin={origin}
           openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide} lowerH={room.lowerH}

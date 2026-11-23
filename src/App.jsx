@@ -59,6 +59,9 @@ import { sagittaFromPoint } from './domain/curvedWalls.js';
 import { joinWalls, angleFrom304050, pointOnWall, projectOnAngle } from './domain/wallJoin.js';
 import { fitFloor, standardFloor, setFloorShape, setFloorGrid, floorGridOf, snapToFloorGrid } from './domain/floor.js';
 import { FloorShapeEditor, FloorGridEditor } from './ui/FloorEditors.jsx';
+import { rulerGroups, wallRulers, snapToRulers } from './domain/rulers.js';
+import RulersDialog from './ui/RulersDialog.jsx';
+import { modulesOnWall } from './domain/wallEdit.js';
 import { FILL_MODES, fillMode, nextFillMode } from './domain/fillModes.js';
 import { applyRoomMaterial, copyFinish, setFinishProps, finishesOf } from './domain/roomMaterials.js';
 import MaterialsPanel from './ui/MaterialsPanel.jsx';
@@ -208,7 +211,11 @@ export default function App() {
     if (!m) return p;
     const t = nudgeTarget(m, axis, sign, step, ui.relative !== false);
     if (axis !== 'h') return placeModule(p, m.id, t.x, t.z, false);
-    const y = ui.collision !== false ? collideLift(m, t.y, p.room, p.modules) : t.y;
+    let ty = t.y;
+    const rg = rulerGroupFor(m, p.room); // reglas de la pared: atraen (salvo si ya está pegado a una)
+    const onRuler = rg && rg.rulers.some((r) => r.value === (m.y || 0) || r.value === (m.y || 0) + m.params.height);
+    if (rg && !onRuler) ty = snapToRulers(ty, m.params.height, rg);
+    const y = ui.collision !== false ? collideLift(m, ty, p.room, p.modules) : ty;
     return y === (m.y || 0) ? p : { ...p, modules: p.modules.map((o) => (o.id === m.id ? { ...o, y } : o)) };
   });
   const rotateBy = (deg) => selectedId && (multiSel
@@ -413,6 +420,7 @@ export default function App() {
     else if (action === 'split') doSplit(wallId, offset);
     else if (action === 'join-canto' || action === 'join-t') setJoinTool({ movingId: wallId, mode: action === 'join-t' ? 't' : 'canto' });
     else if (action === '304050') setDlg304({ wallId, A: 300, B: 400, C: 500 });
+    else if (action === 'rulers') setRulersDlg({ wallId });
     else if (action === 'strips') setStripDlg({ wallId });
     else if (action === 'regions') setRegionDlg({ surface: { kind: 'wall', wallId } });
     else if (action === 'delete') setDeleteDlg({ wallId });
@@ -474,6 +482,16 @@ export default function App() {
   // Editores de franjas y de regiones (Promob: Editar Faixas / Editar Regiões).
   const [stripDlg, setStripDlg] = useState(null);
   const [joinTool, setJoinTool] = useState(null); // Encuentro de paredes: { movingId, mode }
+  // Réguas: grupos (guardados para todos los proyectos) y el de cada pared
+  const [rulersDlg, setRulersDlg] = useState(null);
+  const groupsR = rulerGroups(ui.rulerGroups);
+  const rulerGroupFor = (m, room) => {
+    for (const w of room.walls) {
+      if (!w.rulerGroup) continue;
+      if (modulesOnWall(room, w.id, [m]).length) return wallRulers(w, groupsR);
+    }
+    return null;
+  };
   // Piso: menú del clic derecho, forma y grilla
   const [floorMenu, setFloorMenu] = useState(null);
   const [floorDlg, setFloorDlg] = useState(null); // 'shape' | 'grid'
@@ -1061,6 +1079,7 @@ export default function App() {
                 onWallDouble={(id) => goView({ name: 'pared', wallId: id })} onFloorDouble={() => goView({ name: 'planta' })}
                 navTool={navTool} navRef={navRef} surfaceRef={surfaceRef}
                 onFloorMenu={(ev) => setFloorMenu({ x: ev.clientX, y: ev.clientY })}
+                rulersOf={ui.showRulers ? (w) => wallRulers(w, groupsR) : null}
                 onMoveHotpoint={(id, x, z) => setProject((p) => {
                   const g = roomWalls(p.room).find((w) => w.id === id);
                   if (!g) return p;
@@ -1143,6 +1162,10 @@ export default function App() {
                 </div>
               </div>
             )}
+            {rulersDlg && <RulersDialog wallLabel={`Pared ${project.room.walls.findIndex((w) => w.id === rulersDlg.wallId) + 1}`}
+              current={project.room.walls.find((w) => w.id === rulersDlg.wallId)?.rulerGroup || null} groups={groupsR}
+              onPick={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, rulersDlg.wallId, { rulerGroup: id }) }))}
+              onGroups={(gs) => setUi((u) => ({ ...u, rulerGroups: gs }))} onClose={() => setRulersDlg(null)} />}
             {floorMenu && (
               <div className="menu-backdrop" onPointerDown={() => setFloorMenu(null)} onContextMenu={(e) => { e.preventDefault(); setFloorMenu(null); }}>
                 <div className="wall-menu floor-menu" style={{ left: floorMenu.x, top: floorMenu.y }} onPointerDown={(e) => e.stopPropagation()}>
@@ -1200,7 +1223,7 @@ export default function App() {
               <span className="sb-sel">{(multiSel ? describeMulti(project, selectedIds, !!selectionGroup(project, selectedIds)) : describeSelection(project, selection)) || 'Sin selección'}</span>
               {axisLock && <span className="sb-lock" title="X / Y cambian la traba">Movimiento trabado: solo {axisLock === 'x' ? 'ancho (X)' : 'profundidad (Y)'}</span>}
               <span className="sb-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</span>
-              <StatusToggles ui={ui} onToggle={toggleUi} showDims={showDims} onShowDims={setShowDims}
+              <StatusToggles ui={ui} onToggle={toggleUi} showDims={showDims} onShowDims={setShowDims} onShowRulers={(v) => setUi((u) => ({ ...u, showRulers: v }))}
                 planImage={project.planImage} onPlanImage={(visible) => setProject((p) => ({ ...p, planImage: { ...p.planImage, visible } }))} />
             </div>
             </div>

@@ -517,7 +517,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, onFloorMenu, surfaceRef, onMoveHotpoint, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, onFloorMenu, rulersOf, surfaceRef, onMoveHotpoint, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -671,7 +671,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
       )}
       <group position={[-origin.x * S, 0, -origin.z * S]}>
         <FillGroup outline>
-        <Room3D room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown}
+        <Room3D rulers={!renderMode ? rulersOf : null} room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown}
           onWallMenu={renderMode || drawing || annotating ? null : onWallMenu}
           selectedOpeningId={renderMode ? null : selectedOpeningId} onOpeningDown={renderMode || drawing ? null : onOpeningDown}
           selectedColumnId={renderMode ? null : selectedColumnId} onColumnDown={renderMode || drawing ? null : onColumnDown}

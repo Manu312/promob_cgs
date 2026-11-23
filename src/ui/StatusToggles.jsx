@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 // Interruptores de la barra inferior derecha, como en Promob: Mostrar ▾ · Colisión ·
 // Acoplamientos · Auto Rebajar. El activo se ve enmarcado.
-export default function StatusToggles({ ui, onToggle, showDims, onShowDims, planImage, onPlanImage }) {
+export default function StatusToggles({ ui, onToggle, showDims, onShowDims, planImage, onPlanImage, onShowRulers }) {
   const [open, setOpen] = useState(false);
   const on = (k) => ui[k] !== false;
   const sw = (k, label, title) => (
@@ -15,6 +15,7 @@ export default function StatusToggles({ ui, onToggle, showDims, onShowDims, plan
         {open && (
           <span className="sb-menu" onMouseLeave={() => setOpen(false)}>
             <label><input type="checkbox" checked={showDims} onChange={(e) => onShowDims(e.target.checked)} /> Cotas</label>
+            <label><input type="checkbox" checked={!!ui.showRulers} onChange={(e) => onShowRulers?.(e.target.checked)} /> Grilla y reglas</label>
             {planImage && <label><input type="checkbox" checked={!!planImage.visible} onChange={(e) => onPlanImage(e.target.checked)} /> Plano de referencia</label>}
           </span>
         )}

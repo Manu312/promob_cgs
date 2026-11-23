@@ -793,6 +793,44 @@ try {
   await page.keyboard.press('Escape'); await sleep(300);
   check('Sin errores con el 360°', errors.length === 0, errors.slice(-3).join(' | '));
 
+  // Fase 7b S1: selección múltiple en el 3D (Ctrl+clic, Ctrl+T) y acciones en grupo
+  {
+    await page.keyboard.press('Escape'); await sleep(200);
+    let pm = await project();
+    const ma = pm.modules.find((m) => m.type === 'bajo_mixto');
+    const mb = pm.modules.filter((m) => m.type === 'alacena').at(-1);
+    const ctrlClick = async (id) => {
+      const q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), id);
+      await page.keyboard.down('Control'); await page.mouse.click(q.x, q.y); await page.keyboard.up('Control'); await sleep(300);
+    };
+    await ctrlClick(ma.id); await ctrlClick(mb.id);
+    const sbTxt = await page.$eval('.sb-sel', (e) => e.textContent);
+    check('Ctrl+clic suma módulos a la selección', sbTxt.startsWith('2 módulos seleccionados'), sbTxt);
+    check('Propiedades muestra la selección múltiple', !!(await page.$('.multi-sel')));
+    await shot('07a-seleccion-multiple');
+    const before = new Map(pm.modules.map((m) => [m.id, m]));
+    await page.keyboard.press('PageUp'); await sleep(300);
+    pm = await project();
+    const raised = pm.modules.filter((m) => (m.y || 0) !== (before.get(m.id).y || 0));
+    check('Subir con la selección múltiple mueve los dos (y nada más)', raised.length === 2 && raised.every((m) => (m.y || 0) - (before.get(m.id).y || 0) === 10), raised.map((m) => m.type).join(','));
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+    const b2 = new Map((await project()).modules.map((m) => [m.id, m]));
+    await dragBy(ma.id, 0, 6, 20); // hacia el frente: ahí no hay nada contra qué chocar
+    pm = await project();
+    const dza = pm.modules.find((m) => m.id === ma.id).z - b2.get(ma.id).z;
+    const dzb = pm.modules.find((m) => m.id === mb.id).z - b2.get(mb.id).z;
+    check('Arrastrar uno de la selección mueve el conjunto rígido', dza !== 0 && dza === dzb, `${dza} / ${dzb}`);
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+    await ctrlClick(mb.id);
+    check('Ctrl+clic en uno ya seleccionado lo quita', (await page.$eval('.sb-sel', (e) => e.textContent)).startsWith('Bajo') || !(await page.$('.multi-sel')));
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyT'); await page.keyboard.up('Control'); await sleep(300);
+    const nVis = (await project()).modules.filter((m) => !m.hidden).length;
+    check('Ctrl+T selecciona todos los módulos visibles', (await page.$eval('.sb-sel', (e) => e.textContent)).startsWith(`${nVis} módulos seleccionados`), await page.$eval('.sb-sel', (e) => e.textContent));
+    await page.keyboard.press('Escape'); await sleep(200);
+    check('Esc deja sin selección', (await page.$eval('.sb-sel', (e) => e.textContent)) === 'Sin selección');
+    check('Sin errores con la selección múltiple', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

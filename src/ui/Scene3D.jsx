@@ -370,7 +370,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -407,7 +407,10 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
     if (renderMode) return;
     e.stopPropagation();
     if (handleHit(e)) return;
-    onSelect(mod.id);
+    // Ctrl+clic (como Promob): suma o quita el módulo de la selección, sin arrastrar.
+    if ((e.ctrlKey || e.metaKey) && onToggleSelect) { onToggleSelect(mod.id); return; }
+    // Si ya era parte de una selección múltiple, se conserva y se arrastra todo el conjunto.
+    if (!(selectedIds.length > 1 && selectedIds.includes(mod.id))) onSelect(mod.id);
     if (!leftButton(e)) return;
     const [rx, rz] = toRoom(e.point);
     startDrag({ kind: 'module', id: mod.id, planeY: e.point.y, offX: rx - mod.x, offZ: rz - mod.z });
@@ -526,10 +529,10 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
         {project.modules.map((m) => {
           const b = builtById.get(m.id);
           if (!b || m.hidden) return null; // oculto desde la Lista de módulos
-          return <ModuleObject key={m.id} mod={m} b={b} selected={m.id === selectedId} showSel={!renderMode} onDown={onDown}
+          return <ModuleObject key={m.id} mod={m} b={b} selected={selectedIds.includes(m.id) || m.id === selectedId} showSel={!renderMode} onDown={onDown}
             onMenu={renderMode || drawing || annotating ? null : onModuleMenu}
             openState={openFronts[m.id]} onToggleFront={renderMode ? null : onToggleFront}
-            onResizeDown={onResize ? onResizeDown : null} planta={planta} />;
+            onResizeDown={onResize && selectedIds.length < 2 ? onResizeDown : null} planta={planta} />;
         })}
       </group>
       {/* sombra de contacto solo del visor: su textura vive en este renderer, no va a la ventana de render */}

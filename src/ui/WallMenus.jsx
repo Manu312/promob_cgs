@@ -20,6 +20,7 @@ export function WallContextMenu({ menu, wall, onAction, onClose }) {
         {item('join-t', 'Encuentro en T…')}
         {item('304050', '30-40-50…')}
         <hr />
+        {item('rulers', 'Reglas…')}
         {item('strips', 'Editar franjas…')}
         {item('regions', 'Editar regiones…')}
         <hr />

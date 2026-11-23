@@ -1467,6 +1467,37 @@ try {
     check('Sin errores con el piso', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S21: Reglas de pared (grupo, Mostrar → Grilla y reglas, atracción de alturas)
+  {
+    await clickText('.vp-toolbar button', 'Planta'); await sleep(1200);
+    let pm = await project();
+    const nz = (id) => pm.room.nodes.find((n) => n.id === id).z;
+    const back = [...pm.room.walls].sort((a, b) => (nz(a.n0) + nz(a.n1)) - (nz(b.n0) + nz(b.n1)))[0];
+    const wp = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2000, 75), back.id);
+    await page.mouse.click(wp.x, wp.y, { button: 'right' }); await sleep(400);
+    await clickText('.wall-menu button', 'Reglas'); await sleep(300);
+    await page.evaluate(() => [...document.querySelectorAll('.rulers-dialog .rl-groups .radio')].find((l) => l.textContent.includes('Cocina')).querySelector('input').click()); await sleep(300);
+    check('Reglas: la pared toma el grupo Cocina', (await project()).room.walls.find((w) => w.id === back.id).rulerGroup === 'cocina');
+    await clickText('.rulers-dialog .row-btns button', 'Cerrar'); await sleep(200);
+    await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(900);
+    if (!(await page.$('.sb-menu'))) await clickText('.sb-show button', 'Mostrar'); await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('.sb-menu label')].find((l) => l.textContent.includes('Grilla y reglas')).querySelector('input').click()); await sleep(600);
+    check('Mostrar → Grilla y reglas dibuja las reglas', (await page.$$('.ruler-label')).length >= 4);
+    await shot('07t-reglas');
+    pm = await project();
+    const al = pm.modules.filter((m) => m.type === 'alacena').at(-1);
+    const q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), al.id);
+    await page.mouse.click(q.x, q.y); await sleep(300);
+    await page.keyboard.press('PageUp'); await sleep(250); await page.keyboard.press('PageUp'); await sleep(250);
+    const y2 = (await project()).modules.find((m) => m.id === al.id).y;
+    check('Las reglas atraen: subir 20 mm desde 1450 vuelve a la regla', y2 === al.y || y2 === 1450, `${al.y} → ${y2}`);
+    await page.keyboard.press('Escape');
+    for (let i = 0; i < 3; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(200); }
+    if (!(await page.$('.sb-menu'))) await clickText('.sb-show button', 'Mostrar'); await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('.sb-menu label')].find((l) => l.textContent.includes('Grilla y reglas')).querySelector('input').click()); await sleep(300);
+    check('Sin errores con las reglas', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

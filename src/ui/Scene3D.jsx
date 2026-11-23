@@ -13,7 +13,7 @@ import { fitBoxPose, zoomWindowPose, walkPose } from '../domain/navigation.js';
 import { fillMode } from '../domain/fillModes.js';
 import { FillContext, FillGroup, useFill, NONE_MATERIAL } from './fill3d.jsx';
 import { GeometryMesh } from './Geometry3D.jsx';
-import { outlineOf, boundsOf } from '../domain/geometry.js';
+import { outlineOf, boundsOf, holesOn, holesInGeometry } from '../domain/geometry.js';
 import { mat3d, metal, stone, finishMat } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
 import { ModuleDistances, OpeningDims, HeightRuler, Annotations } from './Cotas.jsx';
@@ -255,6 +255,7 @@ function SurfacePicker({ surfaceRef }) {
         while (o) {
           if (!o.visible) vis = false;
           if (o.userData?.regionId) return vis ? { kind: 'region', id: o.userData.regionId } : null;
+          if (o.userData?.geometryId) return { kind: 'geometry', id: o.userData.geometryId };
           if (o.userData?.wallId) { // con la posición (u, v) en la cara, para las franjas
             if (!vis) return null;
             const l = o.worldToLocal(hit.point.clone());
@@ -658,7 +659,8 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
           selectedColumnId={renderMode ? null : selectedColumnId} onColumnDown={renderMode || drawing ? null : onColumnDown}
           onWallDouble={renderMode || drawing || annotating ? null : onWallDouble} onFloorDouble={renderMode || drawing || annotating ? null : onFloorDouble}
           onFloorClick={(e) => { if (e.delta > 2 || dragRef.current || drawing || annotating || onFloorDown) return; onSelect(null); }}
-          onFloorDown={renderMode || drawing || annotating ? null : onFloorDown} />
+          onFloorDown={renderMode || drawing || annotating ? null : onFloorDown}
+          wallHoles={Object.fromEntries(room.walls.map((w) => [w.id, holesOn(project, { kind: 'wall', wallId: w.id })]))} floorHoles={holesOn(project, { kind: 'floor' })} />
         </FillGroup>
         {view.name === 'frente' && !renderMode && <HeightRuler room={room} modules={project.modules} />}
         {selectedOpeningId && !renderMode && <OpeningDims room={room} id={selectedOpeningId} onEdit={onOpeningDim} />}
@@ -673,7 +675,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
         {ghost && <GhostBox mod={ghost} />}
         <FillGroup>
           {(project.geometries || []).map((g) => (
-            <GeometryMesh key={g.id} g={g} room={room} modules={project.modules} selected={!renderMode && g.id === selectedGeoId}
+            <GeometryMesh key={g.id} g={g} room={room} modules={project.modules} selected={!renderMode && g.id === selectedGeoId} holes={g.hole?.on ? [] : holesInGeometry(project, g)}
               onDown={renderMode || drawing || annotating ? null : onGeometryDown} onMenu={onGeometryMenu ? (e, gg) => { e.stopPropagation(); onSelectGeometry?.(gg.id); onGeometryMenu(gg, e.nativeEvent); } : null} />
           ))}
         </FillGroup>

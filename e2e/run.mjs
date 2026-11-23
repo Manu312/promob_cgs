@@ -1263,6 +1263,29 @@ try {
     check('Sin errores con las geometrías', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S13: Perforar (geometría que agujerea la pared) y área húmeda sobre una tapa
+  {
+    let pm = await project();
+    const nz = (id) => pm.room.nodes.find((n) => n.id === id).z;
+    const back = [...pm.room.walls].sort((x, y) => (nz(x.n0) + nz(x.n1)) - (nz(y.n0) + nz(y.n1)))[0];
+    await page.select('.vp-geometry', 'circ'); await sleep(200);
+    const w1 = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2300, -2), back.id);
+    await page.mouse.click(w1.x + 120, w1.y, { button: 'right' }); await sleep(200);
+    await page.mouse.click(w1.x + 120, w1.y); await sleep(150); await page.mouse.move(w1.x + 160, w1.y); await sleep(100); await page.mouse.click(w1.x + 160, w1.y); await sleep(400);
+    pm = await project();
+    const circ = pm.geometries.at(-1);
+    check('Circular sobre la pared', circ.kind === 'circ' && circ.plane.kind === 'wall');
+    await page.mouse.click(w1.x + 120, w1.y, { button: 'right' }); await sleep(300);
+    await clickText('.geo-menu button', 'Perforar'); await sleep(500);
+    pm = await project();
+    check('Clic derecho → Perforar: la geometría agujerea la pared', pm.geometries.find((g) => g.id === circ.id)?.hole?.on === true);
+    await shot('07m-perforar-pared');
+    const depthIn = await page.evaluateHandle(() => [...document.querySelectorAll('.geometry-panel .field')].find((f) => f.textContent.startsWith('Profundidad'))?.querySelector('input'));
+    check('Perforante: profundidad (vacía = pasante)', !!depthIn && (await depthIn.evaluate((e) => e.placeholder)) === 'pasante');
+    await page.keyboard.press('Escape');
+    check('Sin errores al perforar', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);
@@ -1277,7 +1300,7 @@ try {
   const libPaths = await page.$$eval('table.edit tbody tr td:first-child input[type=text]', (els) => els.map((e) => e.value));
   check('Precios muestra la biblioteca (Colores, Maderas, Granitos › color › nombre…)', libPaths.includes('Colores > Blanco') && libPaths.includes('Maderas > Roble') && libPaths.includes('Granitos > Gris > Gris Mara') && libPaths.includes('Cuarzo > Blanco Estelar'), libPaths.length + ' materiales');
   const blancoRow = await page.evaluateHandle(() => [...document.querySelectorAll('table.edit tbody tr')].find((r) => [...r.querySelectorAll('input[type=text]')].some((i) => i.value === 'Melamina 18mm Blanco')));
-  const priceInputs = await blancoRow.$$('input[type=number]');
+  const priceInputs = await blancoRow.$$('input[type=number], input[inputmode=decimal]');
   await priceInputs.at(-1).click({ clickCount: 3 });
   await priceInputs.at(-1).type('200000');
   await page.keyboard.press('Enter'); await sleep(500);

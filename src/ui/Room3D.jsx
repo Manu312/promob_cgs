@@ -34,6 +34,32 @@ function WallOverlays({ room, w, H, gap, zc, ops }) {
   );
 }
 
+// Pared perforada por geometrías (Promob "Furar"): el alzado de la pared extruido con los vanos y
+// los agujeros. Un agujero con profundidad menor al espesor solo cala la parte de adentro.
+function HoledWall({ len, H, T, zc, gap, openings, holes, material, finishMat }) {
+  const geos = useMemo(() => {
+    const rect = (u0, v0, u1, v1) => [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+    const path = (pts, Cls) => { const p = new Cls(); pts.forEach(([u, v], i) => (i ? p.lineTo(u * S, v * S) : p.moveTo(u * S, v * S))); p.closePath(); return p; };
+    const opPts = openings.map((o) => rect(o.offset, o.sill, o.offset + o.width, o.sill + o.height));
+    const hPts = holes.map((h) => ({ pts: h.pts.map(([u, v]) => [u, v - gap]), depth: h.depth }));
+    const partial = Math.min(T, Math.max(0, ...hPts.filter((h) => h.depth && h.depth < T).map((h) => h.depth)));
+    const layer = (depth, withPartial) => {
+      const shape = path(rect(0, 0, len, H), THREE.Shape);
+      for (const o of opPts) shape.holes.push(path(o, THREE.Path));
+      for (const h of hPts) if (!h.depth || h.depth >= T || withPartial) shape.holes.push(path(h.pts, THREE.Path));
+      return new THREE.ExtrudeGeometry(shape, { depth: depth * S, bevelEnabled: false });
+    };
+    // capa de adentro (con los agujeros parciales) y el resto del espesor
+    return partial > 0 ? [{ g: layer(partial, true), z0: 0, d: partial }, { g: layer(T - partial, false), z0: partial, d: T - partial }] : [{ g: layer(T, true), z0: 0, d: T }];
+  }, [len, H, T, gap, openings, holes]);
+  useEffect(() => () => geos.forEach((x) => x.g.dispose()), [geos]);
+  const inSign = zc > 0 ? 1 : -1; // el cuerpo crece desde z = 0 (cara interior) hacia afuera
+  const mats = finishMat ? [finishMat, material] : material;
+  return geos.map((x, i) => (
+    <mesh key={i} geometry={x.g} material={mats} position={[0, 0, inSign > 0 ? x.z0 * S : -(x.z0 + x.d) * S]} castShadow receiveShadow />
+  ));
+}
+
 // Región: en pared (u, v) o en piso (x, z); la geometría se libera al cambiar.
 function RegionMesh({ r, gap = 0, floor = false, position, rotation }) {
   const geo = useMemo(() => new THREE.ShapeGeometry(new THREE.Shape(r.pts.map(([a, b]) => (floor ? new THREE.Vector2(a * S, -b * S) : new THREE.Vector2(a * S, (b - gap) * S))))), [r.pts, gap, floor]);
@@ -115,7 +141,7 @@ function SlopedWall({ len, h0, h1, T, zc, openings, material }) {
 }
 
 
-function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onDown: onWallDown, onMenu, onDouble, selectedOpeningId, onOpeningDown, finish, room }) {
+function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onDown: onWallDown, onMenu, onDouble, selectedOpeningId, onOpeningDown, finish, room, holes = [] }) {
   const ref = useRef();
   const W = w.wall;
   const T = w.t;
@@ -150,7 +176,9 @@ function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onD
     <group ref={ref} position={[w.a[0] * S, gap * S, w.a[1] * S]} rotation={[0, theta, 0]} onPointerDown={onDown} userData={{ wallId: w.id, gap }}
       onDoubleClick={onDouble ? (e) => { if (!ref.current?.visible || !firstHitIn(e)) return; e.stopPropagation(); onDouble(w.id); } : undefined}
       onContextMenu={(e) => { if (!onMenu || !ref.current?.visible) return; e.stopPropagation(); onMenu(e, w); }}>
-      {sloped
+      {!sloped && holes.length > 0
+        ? <HoledWall len={w.len} H={H} T={T} zc={zc} gap={gap} openings={ops} holes={holes} material={mat} finishMat={finishMaterial(finish, w.len, H, mat)} />
+        : sloped
         ? <SlopedWall len={w.len} h0={h0} h1={h1} T={T} zc={zc} openings={ops} material={mat} />
         : pieces.map((p, i) => {
           // con material, la cara interior (la del lado z = 0 del cuerpo) lo lleva; las otras quedan igual
@@ -180,15 +208,16 @@ const firstHitIn = (e) => {
   return false;
 };
 
-export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu, selectedOpeningId, onOpeningDown, selectedColumnId, onColumnDown, onWallDouble, onFloorDouble, onFloorClick, onFloorDown }) {
+export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu, selectedOpeningId, onOpeningDown, selectedColumnId, onColumnDown, onWallDouble, onFloorDouble, onFloorClick, onFloorDown, wallHoles = {}, floorHoles = [] }) {
   const walls = useMemo(() => roomWalls(room).filter((w) => w.wall.visible), [room]);
   // Esquina de cada pared: la pared que llega a su vértice de inicio.
   const incomingOf = useMemo(() => new Map(wallCorners(room).map((c) => [c.outgoing.id, c.incoming])), [room]);
   const floorPts = useMemo(() => floorPolygon(room), [room]);
   const floorGeo = useMemo(() => {
     const shape = new THREE.Shape(floorPts.map(([x, z]) => new THREE.Vector2(x * S, -z * S)));
+    for (const h of floorHoles) shape.holes.push(new THREE.Path(h.pts.map(([x, z]) => new THREE.Vector2(x * S, -z * S)))); // perforado por geometrías
     return new THREE.ShapeGeometry(shape);
-  }, [floorPts]);
+  }, [floorPts, floorHoles]);
   const H = room.h;
   const fin = useMemo(() => finishesOf(room), [room]);
   const floorM = finishMaterial(fin.floor, 1000, 1000) || floorMat; // UV del piso en metros
@@ -201,7 +230,7 @@ export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDo
       {walls.map((w) => (
         <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} origin={origin}
           openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide} lowerH={room.lowerH}
-          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu} onDouble={onWallDouble} finish={fin.walls[w.id]} room={room}
+          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu} onDouble={onWallDouble} finish={fin.walls[w.id]} room={room} holes={wallHoles[w.id] || []}
           selectedOpeningId={selectedOpeningId} onOpeningDown={onOpeningDown} />
       ))}
       {regionsOn(room, { kind: 'floor' }).filter((r) => r.finish).map((r) => (

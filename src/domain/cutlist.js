@@ -53,8 +53,17 @@ const toWorld = (m, [lx, lz]) => {
   const ux = lx - m.params.width / 2, uz = lz - m.params.depth / 2;
   return [m.x + fw / 2 + ex[0] * ux + ez[0] * uz, m.z + fd / 2 + ex[1] * ux + ez[1] * uz];
 };
-export function cutoutsFor(modules) {
+// `geometries`: las perforantes hechas sobre un módulo (área húmeda) también calan su tapa.
+export function cutoutsFor(modules, geometries = []) {
   const out = {};
+  for (const g of geometries) {
+    if (!g.hole?.on || g.plane?.kind !== 'module' || g.visible === false) continue;
+    const sup = modules.find((o) => o.id === g.plane.id && !o.hidden);
+    if (!sup) continue;
+    const pts = (g.kind === 'circ' ? [[g.cx - g.radius, g.cy - g.radius], [g.cx + g.radius, g.cy + g.radius]] : g.pts).map((q) => toLocal(sup, q));
+    const xs = pts.map((q) => q[0]), zs = pts.map((q) => q[1]);
+    (out[sup.id] = out[sup.id] || []).push({ x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs), z1: Math.max(...zs) });
+  }
   for (const m of modules) {
     const def = MODULE_TYPES[m.type];
     if (m.hidden || def?.kind !== 'aparato') continue;
@@ -76,7 +85,7 @@ export function cutoutsFor(modules) {
 }
 
 export function buildAll(project, settings) {
-  const holes = cutoutsFor(project.modules);
+  const holes = cutoutsFor(project.modules, project.geometries || []);
   return project.modules.map((mod, i) => {
     const mats = resolveMats(mod, project, settings);
     const b = buildModule(mod, { t: mats.cajas.t, tf: mats.puertas.t, tb: mats.fondos.t, tc: mats.cajones.t, rules: resolveRules(mod, project), holes: holes[mod.id] || [] });

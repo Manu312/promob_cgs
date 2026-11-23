@@ -158,3 +158,31 @@ export function geometryBudgetLines(project) {
 }
 
 export { rectPts, circlePts };
+
+// ---------------- Perforar (Promob "Furar") ----------------
+// Una geometría perforante agujerea su plano: la pared, el piso, la tapa del módulo (área
+// húmeda: después se inserta la bacha) u otra geometría del mismo plano que se superponga.
+// `depth` null = pasante; con profundidad, solo esa parte del espesor.
+
+export function setHole(g, on, depth = g.hole?.depth ?? null) {
+  return { ...g, hole: { on: !!on, depth: depth == null || depth === '' ? null : Math.max(1, +depth) } };
+}
+
+const samePlane = (a, b) => a.kind === b.kind && (a.kind !== 'wall' || a.wallId === b.wallId) && (a.kind !== 'module' || a.id === b.id);
+
+// Agujeros sobre una superficie (pared, piso o módulo): contorno en coordenadas del plano.
+export function holesOn(project, plane) {
+  return (project.geometries || [])
+    .filter((g) => g.hole?.on && g.visible !== false && samePlane(g.plane, plane))
+    .map((g) => ({ id: g.id, pts: outlineOf(g), depth: g.hole.depth }));
+}
+
+// Agujeros que otras geometrías perforantes le hacen a `g` (mismo plano y se superponen).
+export function holesInGeometry(project, g) {
+  const b = boundsOf(outlineOf(g));
+  return holesOn(project, g.plane).filter((h) => {
+    if (h.id === g.id) return false;
+    const hb = boundsOf(h.pts);
+    return hb.x0 < b.x1 && hb.x1 > b.x0 && hb.y0 < b.y1 && hb.y1 > b.y0;
+  });
+}

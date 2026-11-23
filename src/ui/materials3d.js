@@ -103,7 +103,13 @@ function stoneTexture({ color, grain, pattern = 'granito', id = '' }) {
   return t;
 }
 
+// Material del 3D para un material del catálogo; guarda su color base (modos de relleno lisos).
 export function mat3d(m) {
+  const r = mat3dRaw(m);
+  if (m?.color && r && !r.userData.baseColor) r.userData.baseColor = m.color;
+  return r;
+}
+function mat3dRaw(m) {
   if (m?.kind === 'piedra') {
     const key = `piedra|${m.id}|${m.color}|${m.grain}|${m.pattern}`;
     if (!cache.has(key)) cache.set(key, new THREE.MeshStandardMaterial({ map: stoneTexture(m), roughness: m.pattern === 'cuarzo' ? 0.35 : 0.22, metalness: 0.02 }));

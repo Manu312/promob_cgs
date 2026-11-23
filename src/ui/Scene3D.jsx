@@ -1,5 +1,5 @@
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, OrthographicCamera, Environment, Lightformer, ContactShadows } from '@react-three/drei';
+import { OrbitControls, OrthographicCamera, Environment, Lightformer, ContactShadows, Edges } from '@react-three/drei';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { lightRig } from '../domain/render.js';
@@ -10,6 +10,8 @@ import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
 import { viewPose, wallViewPose, orthoZoom } from '../domain/views.js';
 import { fitBoxPose, zoomWindowPose, walkPose } from '../domain/navigation.js';
+import { fillMode } from '../domain/fillModes.js';
+import { FillContext, FillGroup, useFill, NONE_MATERIAL } from './fill3d.jsx';
 import { mat3d, metal, stone, finishMat } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
 import { ModuleDistances, OpeningDims, HeightRuler, Annotations } from './Cotas.jsx';
@@ -184,13 +186,20 @@ function ModuleObject({ mod, b, selected, showSel, onDown, onMenu, onResizeDown,
   const W = mod.params.width, D = mod.params.depth, H = mod.params.height;
   const tfm = useMemo(() => frontTransforms(b, openState, D), [b, openState, D]);
   const dbl = (p) => (p.front != null && onToggleFront ? (e) => { e.stopPropagation(); onToggleFront(mod.id, p.front); } : undefined);
+  const fill = useFill();
   return (
     <group position={[(mod.x + fw / 2) * S, (mod.y || 0) * S, (mod.z + fd / 2) * S]} rotation={[0, ((mod.rot || 0) * Math.PI) / 180, 0]} onPointerDown={(e) => onDown(e, mod)}
       onContextMenu={onMenu ? (e) => onMenu(e, mod) : undefined}>
-      <group position={[(-W / 2) * S, 0, (-D / 2) * S]}>
+      <FillGroup position={[(-W / 2) * S, 0, (-D / 2) * S]}>
         {b.parts.map((p, i) => <FrontMove key={i} T={p.front != null ? tfm.get(p.front) : null}><PartMesh p={p} material={mat3d(b.mats[p.slot])} onDoubleClick={dbl(p)} /></FrontMove>)}
         {b.decors.map((d, i) => <FrontMove key={'d' + i} T={d.front != null ? tfm.get(d.front) : null}><DecorMesh d={d} stoneMat={b.mats.tapas ? mat3d(b.mats.tapas) : null} /></FrontMove>)}
-      </group>
+      </FillGroup>
+      {fill.box && ( // Caja de contorno: solo el contorno del módulo (y se puede elegir haciendo clic adentro)
+        <mesh position={[0, (H / 2) * S, 0]} material={NONE_MATERIAL} userData={{ noFill: true }}>
+          <boxGeometry args={[W * S, H * S, D * S]} />
+          <Edges color="#374151" />
+        </mesh>
+      )}
       {selected && showSel && <SelBox w={W} h={H} d={D} />}
       {selected && showSel && onResizeDown && <ResizeHandles W={W} H={H} D={D} planta={planta} onDown={(e, k) => onResizeDown(e, mod, k)} />}
     </group>
@@ -219,7 +228,8 @@ function CameraRig({ view, room, controlsRef, origin }) {
     const pose = g ? wallViewPose(g, wh, origin, 45, aspect) : viewPose(view.name, box, 45, aspect);
     camera.position.set(...pose.pos);
     if (ortho) {
-      camera.zoom = planta ? planFitZoom(b, size.width, size.height)
+      // en Planta queda margen alrededor: los paneles de las herramientas (abajo) no tapan las paredes
+      camera.zoom = planta ? planFitZoom(b, size.width, size.height, 1.8)
         : g ? orthoZoom(g.len / 1000, wh / 1000, size.width, size.height)
           : orthoZoom(Math.hypot(box.w, box.d) / 1000, Math.hypot(box.w, box.d, box.h) / 1000, size.width, size.height);
       camera.updateProjectionMatrix();
@@ -440,7 +450,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, navTool = 'select', navRef, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, navTool = 'select', navRef, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -556,7 +566,8 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
       onPointerMissed={() => !dragRef.current && !drawing && !annotating && onSelect(null)}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <color attach="background" args={[renderMode ? '#e7e3dc' : '#f3f4f6']} />
+      <FillContext.Provider value={fillMode(fill)}>
+      <color attach="background" args={[fillMode(fill).bg || (renderMode ? '#e7e3dc' : '#f3f4f6')]} />
       <ambientLight intensity={renderMode ? 0.25 * rig.ambient : 0.6} />
       <hemisphereLight args={renderMode ? [rig.sky.top, rig.sky.bottom, 0.35 * rig.sky.intensity] : ['#ffffff', '#cbbfae', 0.4]} />
       <directionalLight
@@ -582,12 +593,14 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
         </Environment>
       )}
       <group position={[-origin.x * S, 0, -origin.z * S]}>
+        <FillGroup outline>
         <Room3D room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown}
           onWallMenu={renderMode || drawing || annotating ? null : onWallMenu}
           selectedOpeningId={renderMode ? null : selectedOpeningId} onOpeningDown={renderMode || drawing ? null : onOpeningDown}
           selectedColumnId={renderMode ? null : selectedColumnId} onColumnDown={renderMode || drawing ? null : onColumnDown}
           onWallDouble={renderMode || drawing || annotating ? null : onWallDouble} onFloorDouble={renderMode || drawing || annotating ? null : onFloorDouble}
           onFloorClick={(e) => { if (e.delta > 2 || dragRef.current || drawing || annotating) return; onSelect(null); }} />
+        </FillGroup>
         {view.name === 'frente' && !renderMode && <HeightRuler room={room} modules={project.modules} />}
         {selectedOpeningId && !renderMode && <OpeningDims room={room} id={selectedOpeningId} onEdit={onOpeningDim} />}
         {planta && !renderMode && <PlanGrid room={room} />}
@@ -620,6 +633,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
       <DevProbe project={project} origin={origin} openFronts={openFronts} />
       {pickRef && <Picker pickRef={pickRef} origin={origin} />}
       <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
+      </FillContext.Provider>
     </Canvas>
   );
 }

@@ -1035,6 +1035,31 @@ try {
     check('Sin errores con la navegación', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S8: modos de relleno (F10 el siguiente, Ctrl+F10 Presentación)
+  {
+    const fillNow = () => page.$eval('.vp-fill', (e) => e.value);
+    check('Relleno por defecto: Texturas', (await fillNow()) === 'texturas');
+    const px = async () => page.evaluate(() => { const c = document.querySelector('.vp-area canvas'); const g = document.createElement('canvas'); g.width = 80; g.height = 50; const x = g.getContext('2d'); x.drawImage(c, 0, 0, 80, 50); const d = x.getImageData(0, 0, 80, 50).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]; return s / (d.length / 4) / 3; });
+    const lum0 = await px();
+    await page.select('.vp-fill', 'oculto-bn'); await sleep(1200);
+    const lumBN = await px();
+    check('Oculto B/N: fondo negro y líneas blancas', lumBN < lum0 / 2, `${lum0.toFixed(0)} → ${lumBN.toFixed(0)}`);
+    await shot('07f-relleno-oculto-bn');
+    await page.keyboard.press('F10'); await sleep(600);
+    check('F10 pasa al siguiente modo', (await fillNow()) === 'sin-relleno');
+    await page.keyboard.down('Control'); await page.keyboard.press('F10'); await page.keyboard.up('Control'); await sleep(800);
+    check('Ctrl+F10 pasa a Presentación', (await fillNow()) === 'presentacion');
+    await page.select('.vp-fill', 'caja'); await sleep(800);
+    const pm = await project();
+    const ma = pm.modules.find((m) => m.type === 'bajo_mixto');
+    const q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), ma.id);
+    await page.mouse.click(q.x, q.y); await sleep(300);
+    check('Caja de contorno: el módulo se sigue eligiendo con un clic', (await page.$eval('.sb-sel', (e) => e.textContent)).length > 0 && (await page.$eval('.sb-sel', (e) => e.textContent)) !== 'Sin selección');
+    await page.keyboard.press('Escape');
+    await page.select('.vp-fill', 'texturas'); await sleep(600);
+    check('Sin errores con los modos de relleno', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

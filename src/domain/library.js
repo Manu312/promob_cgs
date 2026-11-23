@@ -197,7 +197,8 @@ export const LIBRARY = [
 // Módulo recién insertado desde un ítem: guarda el nombre del ítem (si no es el del tipo) y,
 // si se apoya (tapas), toma la altura de lo que tiene debajo (o queda a su altura si no hay nada).
 export function withItem(mod, item, modules) {
-  let m = item.label !== MODULE_TYPES[item.type].label ? { ...mod, name: item.label } : mod;
+  // se guarda de qué ítem salió (Ubicar en el catálogo, Sustitución rápida)
+  let m = { ...(item.label !== MODULE_TYPES[item.type].label ? { ...mod, name: item.label } : mod), itemId: item.id };
   if (item.rest === false) { const { rest: _r, ...rest } = m; m = rest; } // eslint-disable-line no-unused-vars
   if (m.rest) { const y = restingHeight(m, modules); if (y > 0) m = { ...m, y }; }
   return m;

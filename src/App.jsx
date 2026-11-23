@@ -52,6 +52,7 @@ import { describeSelection } from './domain/selection.js';
 import { toggleId, selectAllIds, moveGroup, rotateGroup, describeMulti } from './domain/multiSelect.js';
 import { expandToGroups, groupModules, ungroupModules, selectionGroup, pruneGroups } from './domain/groups.js';
 import { pasteModules, sideOffset } from './domain/clipboard.js';
+import { replaceModule, findItemForModule } from './domain/replace.js';
 import ReposicionarDialog from './ui/ReposicionarDialog.jsx';
 
 function usePersistent(key, init, migrate = (x) => x) {
@@ -345,6 +346,7 @@ export default function App() {
     } else if (action === 'rotate') rotateSelected();
     else if (action === 'duplicate') duplicateSelected();
     else if (action === 'reposition') duplicateSelected(true);
+    else if (action === 'locate') locateSelected();
     else if (action === 'delete') deleteSelected();
     else if (action === 'group') groupSelected();
     else if (action === 'ungroup') ungroupSelected();
@@ -396,6 +398,27 @@ export default function App() {
       setProject((p) => ({ ...p, modules: [...p.modules, mod] }));
       setSelectedId(mod.id);
     },
+  };
+  // Sustitución rápida (S / Ctrl+Shift+K): el ítem marcado en la barra reemplaza a lo seleccionado.
+  const [picked, setPicked] = useState(null); // { item, variant }
+  const replaceSelected = () => {
+    if (!picked || !selectedIds.length) return;
+    const { item, variant } = picked;
+    setProject((p) => ({
+      ...p,
+      modules: p.modules.map((m) => {
+        if (!selectedIds.includes(m.id)) return m;
+        const fresh = withAutoInsert(withItem(newModule(item.type, p, itemParams(item, variant), item.y), item, p.modules), p, (x) => resolveRules(x, p));
+        return replaceModule(m, fresh);
+      }),
+    }));
+    countUse(item);
+  };
+  // Ubicar en el catálogo (Ctrl+Shift+L): la barra de modulación va al ítem del módulo seleccionado.
+  const locateSelected = () => {
+    const m = project.modules.find((o) => o.id === selectedId);
+    const hit = m && findItemForModule(m);
+    if (hit) setUi((u) => ({ ...u, catalogPath: [...hit.path, hit.item.id] }));
   };
   const insertItem = (item, variant = null) => {
     countUse(item);
@@ -453,6 +476,8 @@ export default function App() {
         if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); history.redo(); return; }
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startDrawWalls(); return; }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l' && tab === 'diseno' && !inField) { e.preventDefault(); locateSelected(); return; }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'k' && tab === 'diseno' && !inField) { e.preventDefault(); replaceSelected(); return; }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'l' && tab === 'diseno') { e.preventDefault(); setQuickFind(true); return; }
       if (tab !== 'diseno' || inField) return;
       const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
@@ -468,6 +493,7 @@ export default function App() {
       if (plain && key === 'o' && selectedId) { setProject((p) => toggleHidden(p, selectedIds)); return; } // visible / oculto
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 't') { e.preventDefault(); selectIds(selectAllIds(project)); return; } // Seleccionar todo
       if (plain && key === 'u') { groupSelected(); return; } // Agrupar
+      if (plain && key === 's') { replaceSelected(); return; } // Sustituir
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'u') { e.preventDefault(); ungroupSelected(); return; } // Desagrupar
       if (plain && key === 'x') { setAxisLock((l) => (l === 'x' ? null : 'x')); return; }
       if (plain && key === 'y') { setAxisLock((l) => (l === 'z' ? null : 'z')); return; }
@@ -580,7 +606,8 @@ export default function App() {
           <section className="viewport">
             <CatalogBar nav={ui.catalogPath} setNav={(p) => setUi((u) => ({ ...u, catalogPath: p }))} counts={ui.catalogUse} onInsert={insertItem} thumbCtx={thumbCtx}
               onDragItem={(item, variant) => { dragItemRef.current = item ? { item, variant } : null; if (!item) setGhost(null); }}
-              onFind={() => setQuickFind(true)} />
+              onFind={() => setQuickFind(true)} onPick={(item, variant) => setPicked({ item, variant })}
+              onReplace={replaceSelected} canReplace={!!picked && selectedIds.length > 0} />
             {quickFind && <QuickFind thumbCtx={thumbCtx} onClose={() => setQuickFind(false)} onInsert={insertItem}
               onShow={(path, item) => setUi((u) => ({ ...u, catalogPath: [...path, item.id] }))} />}
             <div className="vp-area" ref={vpRef} {...vpDrag}>

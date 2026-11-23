@@ -295,3 +295,10 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .sc-sun { fill: #fbbf24; stroke: #d97706; stroke-width: 1.5; }
 .rd-color { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .rd-bg-preview { height: 84px; border: 1px solid var(--line); border-radius: 4px; background-size: cover; background-position: center; display: grid; place-items: center; font-size: 11px; color: #6b7280; }
+.render-area-wm { position: absolute; pointer-events: none; }
+.rd-wm-thumb { max-width: 96px; max-height: 48px; border: 1px solid var(--line); background: repeating-conic-gradient(#f3f4f6 0 25%, #e5e7eb 0 50%) 0 0 / 10px 10px; }
+.rd-wm-pos { display: grid; grid-template-columns: repeat(3, 34px); gap: 3px; padding: 4px; border: 1px solid var(--line); border-radius: 4px; width: max-content; background: #f8fafc; }
+.rd-wm-pos button { height: 24px; padding: 0; display: grid; place-items: center; }
+.rd-wm-pos button i { width: 10px; height: 6px; background: #cbd5e1; border-radius: 1px; }
+.rd-wm-pos button.on { border-color: var(--accent); background: var(--accent-weak); }
+.rd-wm-pos button.on i { background: var(--accent); }

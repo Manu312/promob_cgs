@@ -129,6 +129,42 @@ export function shrinkSize(w, h, max) {
   return { width: Math.max(1, Math.round(w * s)), height: Math.max(1, Math.round(h * s)) };
 }
 
+// --- Marca de agua (Fase 7.4) ---
+// Como en Promob: imagen a su tamaño (se achica solo si no entra), 9 posiciones, transparencia
+// (más alta = menos visible) y distancia al borde en px, medida desde los bordes de la posición elegida.
+// Se guarda aparte del proyecto para reutilizarla en todos los renders.
+export const WM_POSITIONS = [
+  ['sup-izq', 'Superior izquierda'], ['sup-centro', 'Superior centro'], ['sup-der', 'Superior derecha'],
+  ['centro-izq', 'Centro izquierda'], ['centro', 'Centro'], ['centro-der', 'Centro derecha'],
+  ['inf-izq', 'Inferior izquierda'], ['inf-centro', 'Inferior centro'], ['inf-der', 'Inferior derecha'],
+];
+export const DEFAULT_WATERMARK = { use: false, image: null, position: 'centro', transparency: 50, offset: 20 };
+export const WM_IMAGE_MAX = 1024;
+
+export function normalizeWatermark(w) {
+  const s = w && typeof w === 'object' ? w : {};
+  const d = DEFAULT_WATERMARK;
+  return {
+    use: s.use === true,
+    image: typeof s.image === 'string' && s.image.startsWith('data:image/') ? s.image : null,
+    position: WM_POSITIONS.some(([k]) => k === s.position) ? s.position : d.position,
+    transparency: Number.isFinite(+s.transparency) ? Math.min(100, Math.max(0, Math.round(+s.transparency))) : d.transparency,
+    offset: Number.isFinite(+s.offset) ? Math.min(2000, Math.max(0, Math.round(+s.offset))) : d.offset,
+  };
+}
+
+// Dónde va la marca (imagen iw × ih) en un render W × H. Opacidad = 1 − transparencia.
+export function watermarkRect(iw, ih, W, H, position, offset) {
+  const room = { w: Math.max(1, W - 2 * offset), h: Math.max(1, H - 2 * offset) };
+  const s = Math.min(1, room.w / iw, room.h / ih);
+  const w = iw * s;
+  const h = ih * s;
+  const [v, hz] = position === 'centro' ? ['centro', 'centro'] : position.split('-');
+  const x = hz === 'izq' ? offset : hz === 'der' ? W - w - offset : (W - w) / 2;
+  const y = v === 'sup' ? offset : v === 'inf' ? H - h - offset : (H - h) / 2;
+  return { x, y, w, h };
+}
+
 export const DEFAULT_RENDER = {
   quality: 'final',
   samples: { final: 400, profesional: 1000 },

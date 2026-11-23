@@ -705,6 +705,56 @@ try {
   await page.keyboard.press('Escape'); await sleep(300);
   check('Sin errores con el fondo', errors.length === 0, errors.slice(-3).join(' | '));
 
+  // Marca de agua (Fase 7 S4): imagen, posición, transparencia y distancia al borde
+  const pixelAt = (x, y) => page.$eval('.render-window canvas.rw-image', (c, x, y) => [...c.getContext('2d').getImageData(x, y, 1, 1).data], x, y);
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.rd-tabs button', 'Marca de agua'); await sleep(200);
+  await page.$eval('.rd-wm-file', async (input) => {
+    const c = document.createElement('canvas'); c.width = 100; c.height = 50;
+    const g = c.getContext('2d'); g.fillStyle = '#ff0000'; g.fillRect(0, 0, 100, 50);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    const dt = new DataTransfer(); dt.items.add(new File([blob], 'logo.png', { type: 'image/png' }));
+    input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  let wmSaved = null;
+  for (let i = 0; i < 20 && !wmSaved?.image; i++) { await sleep(300); wmSaved = await page.evaluate(() => JSON.parse(localStorage.getItem('mueblesapp.render.watermark'))); }
+  check('Marca de agua: la imagen se guarda para los próximos renders', wmSaved?.use === true && wmSaved.image?.startsWith('data:image/png'));
+  await page.click('.rd-wm-pos button[aria-label="Inferior derecha"]'); await sleep(200);
+  await page.$eval('.rd-slider input[type=range]', (el) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '0');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await sleep(300);
+  check('Marca de agua visible en el área del render', !!(await page.$('.render-area .render-area-wm')));
+  await shot('04g-marca-agua');
+  await clickText('.rd-tabs button', 'Calidad'); await sleep(200);
+  const wmSize = await page.$eval('.rd-size b', (e) => e.textContent.replace(/\s/g, '').split('×').map(Number));
+  await clickText('.render-dialog footer button', 'Renderizar'); await sleep(2000);
+  // logo 100 × 50 a 20 px de los bordes inferior y derecho
+  const wmPx = await pixelAt(wmSize[0] - 20 - 50, wmSize[1] - 20 - 25);
+  check('Render con marca de agua abajo a la derecha (opaca)', wmPx[0] > 230 && wmPx[1] < 30 && wmPx[2] < 30, `${wmSize.join('×')} ${wmPx.join(',')}`);
+  const outPx = await pixelAt(wmSize[0] - 20 - 50, wmSize[1] - 20 - 25 - 60);
+  check('Fuera de la marca no hay rojo', !(outPx[0] > 230 && outPx[1] < 30 && outPx[2] < 30), outPx.join(','));
+  await shot('04h-render-marca');
+  await clickText('.render-window button', 'Cerrar'); await sleep(300);
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.rd-tabs button', 'Marca de agua'); await sleep(200);
+  await page.$eval('.rd-slider input[type=range]', (el) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '60');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await sleep(200);
+  await clickText('.render-dialog footer button', 'Renderizar'); await sleep(2000);
+  const semi = await pixelAt(wmSize[0] - 20 - 50, wmSize[1] - 20 - 25);
+  check('Transparencia 60 %: la marca se mezcla con la imagen (ni rojo puro ni sin rojo)', semi[1] > 60 && semi[0] > semi[1] + 40, semi.join(','));
+  await clickText('.render-window button', 'Cerrar'); await sleep(300);
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.rd-tabs button', 'Marca de agua'); await sleep(200);
+  await clickText('.render-dialog .check', 'Usar marca de agua'); await sleep(200);
+  check('Destildar "Usar marca de agua" la apaga', (await page.evaluate(() => JSON.parse(localStorage.getItem('mueblesapp.render.watermark')).use)) === false);
+  await page.keyboard.press('Escape'); await sleep(300);
+  check('Sin errores con la marca de agua', errors.length === 0, errors.slice(-3).join(' | '));
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

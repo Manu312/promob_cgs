@@ -12,6 +12,8 @@ import { viewPose, wallViewPose, orthoZoom } from '../domain/views.js';
 import { fitBoxPose, zoomWindowPose, walkPose } from '../domain/navigation.js';
 import { fillMode } from '../domain/fillModes.js';
 import { FillContext, FillGroup, useFill, NONE_MATERIAL } from './fill3d.jsx';
+import { GeometryMesh } from './Geometry3D.jsx';
+import { outlineOf, boundsOf } from '../domain/geometry.js';
 import { mat3d, metal, stone, finishMat } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
 import { ModuleDistances, OpeningDims, HeightRuler, Annotations } from './Cotas.jsx';
@@ -266,6 +268,19 @@ function SurfacePicker({ surfaceRef }) {
       }
       return null;
     };
+    // Punto (u, v) sobre el plano de la cara interior de una pared, aunque haya algo delante.
+    surfaceRef.wallPoint = (cx, cy, wallId) => {
+      let wall = null;
+      scene.traverse((o) => { if (o.userData?.wallId === wallId) wall = o; });
+      if (!wall) return null;
+      const r = gl.domElement.getBoundingClientRect();
+      ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), camera);
+      const inv = new THREE.Matrix4().copy(wall.matrixWorld).invert();
+      const local = ray.ray.clone().applyMatrix4(inv);
+      const pt = new THREE.Vector3();
+      if (!local.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), pt)) return null;
+      return [pt.x / S, pt.y / S + (wall.userData.gap || 0)];
+    };
   }, [camera, gl, scene, surfaceRef]);
   return null;
 }
@@ -411,10 +426,10 @@ function NodeHandles({ room, onNodeDown }) {
 // flechas de redimensionar. Los listeners están siempre registrados y el arrastre vive en
 // una ref que se carga en el mismo pointerdown: si se registraran al empezar (en un efecto),
 // un clic rápido soltaría el botón antes y el arrastre quedaría "pegado" al mouse.
-function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onDragEnd, controlsRef, origin }) {
+function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onMoveGeometry, onDragEnd, controlsRef, origin }) {
   const { camera, gl } = useThree();
   const live = useRef();
-  live.current = { camera, gl, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onDragEnd, origin };
+  live.current = { camera, gl, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onMoveGeometry, onDragEnd, origin };
   useEffect(() => {
     const ray = new THREE.Raycaster();
     const v = new THREE.Vector2();
@@ -450,6 +465,8 @@ function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onRe
         cb.onResize(drag.start, drag.handle, snap(delta));
       } else if (drag.kind === 'opening') {
         cb.onMoveOpening(drag.id, drag.offset0 + snap((rx - drag.sx) * drag.u[0] + (rz - drag.sz) * drag.u[1]));
+      } else if (drag.kind === 'geometry') {
+        cb.onMoveGeometry?.(drag.id, snap(rx - drag.offX), snap(rz - drag.offZ));
       } else if (drag.kind === 'column') {
         cb.onMoveColumn(drag.id, rx - drag.offX, rz - drag.offZ);
       } else if (drag.kind === 'wall') {
@@ -481,7 +498,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, surfaceRef, navTool = 'select', navRef, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, surfaceRef, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -500,6 +517,16 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
   const toRoom = (p) => [p.x / S + origin.x, p.z / S + origin.z];
 
   const leftButton = (e) => (e.nativeEvent?.button ?? 0) === 0; // los arrastres son con el botón izquierdo
+  // Geometría: se elige con un clic y, si es movible y está en el piso o sobre un módulo, se arrastra.
+  const onGeometryDown = (e, g) => {
+    if (renderMode || navLock) return;
+    e.stopPropagation();
+    onSelectGeometry?.(g.id);
+    if (!leftButton(e) || g.movable === false || g.plane.kind === 'wall') return;
+    const [rx, rz] = toRoom(e.point);
+    const b = boundsOf(outlineOf(g));
+    startDrag({ kind: 'geometry', id: g.id, planeY: e.point.y, offX: rx - b.x0, offZ: rz - b.y0 });
+  };
   const startDrag = (d) => {
     onDragStart?.(); // el arrastre completo es un solo paso de deshacer
     dragRef.current = d;
@@ -644,6 +671,13 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
         {showDims && !renderMode && <Dimensions room={room} modules={project.modules.filter((m) => !m.hidden)} onWallLength={onWallLength} onWallAngle={onWallAngle} />}
         {selectedMod && !renderMode && <ModuleDistances room={room} modules={project.modules} mod={selectedMod} onEdit={onDimEdit} vertical={!planta} />}
         {ghost && <GhostBox mod={ghost} />}
+        <FillGroup>
+          {(project.geometries || []).map((g) => (
+            <GeometryMesh key={g.id} g={g} room={room} modules={project.modules} selected={!renderMode && g.id === selectedGeoId}
+              onDown={renderMode || drawing || annotating ? null : onGeometryDown} onMenu={onGeometryMenu ? (e, gg) => { e.stopPropagation(); onSelectGeometry?.(gg.id); onGeometryMenu(gg, e.nativeEvent); } : null} />
+          ))}
+        </FillGroup>
+        {geoDraft && <GeometryMesh g={geoDraft} room={room} modules={project.modules} draft />}
         {project.modules.map((m) => {
           const b = builtById.get(m.id);
           if (!b || m.hidden) return null; // oculto desde la Lista de módulos
@@ -665,7 +699,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
       {renderRef && <RenderBridge renderRef={renderRef} room={room} origin={origin} />}
       <DevProbe project={project} origin={origin} openFronts={openFronts} />
       {pickRef && <Picker pickRef={pickRef} origin={origin} />}
-      <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
+      <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onMoveGeometry={onMoveGeometry} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
       </FillContext.Provider>
     </Canvas>
   );

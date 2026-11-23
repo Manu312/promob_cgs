@@ -1214,6 +1214,55 @@ try {
     check('Sin errores con tamponamentos', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S12: geometrías (rectangular en el piso, lineal, sobre una pared) y propiedades
+  {
+    let pm = await project();
+    const at = (x, z, y = 0) => page.evaluate((x, z, y) => window.__muebles.screenOfPoint(x, z, y), x, z, y);
+    const xs = pm.room.nodes.map((n) => n.x), zs = pm.room.nodes.map((n) => n.z);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, fz = Math.max(...zs);
+    const n0 = (pm.geometries || []).length;
+    await page.select('.vp-geometry', 'rect'); await sleep(200);
+    check('Geometría: aparece el panel de construcción', !!(await page.$('.geo-hud')));
+    let a = await at(cx - 400, fz - 1000), b = await at(cx + 200, fz - 600);
+    await page.mouse.click(a.x, a.y); await sleep(150); await page.mouse.move(b.x, b.y); await sleep(150); await page.mouse.click(b.x, b.y); await sleep(400);
+    pm = await project();
+    const rg = pm.geometries?.[n0];
+    check('Rectangular en el piso: dos clics', rg?.kind === 'rect' && rg.plane.kind === 'floor' && rg.height === 150);
+    check('Queda seleccionada con sus propiedades', !!(await page.$('.geometry-panel')));
+    const hIn = await page.evaluateHandle(() => [...document.querySelectorAll('.geometry-panel .field')].find((f) => f.textContent.startsWith('Altura'))?.querySelector('input'));
+    await hIn.click({ clickCount: 3 }); await hIn.type('900'); await page.keyboard.press('Enter'); await sleep(300);
+    check('Altura desde Propiedades', (await project()).geometries[n0].height === 900);
+    await page.evaluate(() => { const cb = [...document.querySelectorAll('.geometry-panel .check')].find((l) => l.textContent.includes('Presupuestado')); cb.querySelector('input').click(); }); await sleep(200);
+    const pIn = await page.evaluateHandle(() => [...document.querySelectorAll('.geometry-panel .field')].find((f) => f.textContent.startsWith('Precio'))?.querySelector('input'));
+    await pIn.click({ clickCount: 3 }); await pIn.type('12345'); await page.keyboard.press('Enter'); await sleep(300);
+    await shot('07l-geometria');
+    await page.keyboard.press('Escape');
+    // lineal: dos puntos y clic derecho → diálogo
+    await page.select('.vp-geometry', 'lineal'); await sleep(200);
+    a = await at(cx - 1200, fz - 900); b = await at(cx + 800, fz - 900);
+    await page.mouse.click(a.x, a.y); await sleep(150); await page.mouse.move(b.x, b.y); await sleep(100); await page.mouse.click(b.x, b.y); await sleep(150);
+    await page.mouse.click(b.x, b.y, { button: 'right' }); await sleep(300);
+    check('Al terminar la lineal aparece su diálogo', !!(await page.$('.lineal-dialog')));
+    await clickText('.lineal-dialog button', 'Finalizar'); await sleep(300);
+    pm = await project();
+    check('Lineal creada sobre el piso', pm.geometries.some((g) => g.kind === 'lineal' && g.pts.length === 2));
+    // rectangular sobre la pared del fondo: clic derecho en la pared elige el plano
+    const nz = (id) => pm.room.nodes.find((n) => n.id === id).z;
+    const back = [...pm.room.walls].sort((x, y) => (nz(x.n0) + nz(x.n1)) - (nz(y.n0) + nz(y.n1)))[0];
+    await page.select('.vp-geometry', 'rect'); await sleep(200);
+    const w1 = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2300, -2), back.id);
+    await page.mouse.click(w1.x, w1.y, { button: 'right' }); await sleep(200);
+    check('Clic derecho en una pared la toma como plano', (await page.$eval('.geo-hud', (e) => e.textContent)).includes('plano: pared'));
+    await page.mouse.click(w1.x - 80, w1.y - 30); await sleep(150); await page.mouse.move(w1.x + 60, w1.y + 30); await sleep(100); await page.mouse.click(w1.x + 60, w1.y + 30); await sleep(400);
+    pm = await project();
+    check('Rectangular sobre la pared', pm.geometries.some((g) => g.plane.kind === 'wall' && g.plane.wallId === back.id));
+    await page.keyboard.press('Escape');
+    await clickText('.tabs button', 'Presupuesto'); await sleep(500);
+    check('La geometría presupuestada aparece en el presupuesto', (await page.evaluate(() => document.body.innerText)).includes('Geometrías'));
+    await clickText('.tabs button', 'Diseño 3D'); await sleep(800);
+    check('Sin errores con las geometrías', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

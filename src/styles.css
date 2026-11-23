@@ -315,3 +315,5 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .nav-overlay.zoomWin { cursor: crosshair; }
 .nav-overlay.walk { cursor: move; }
 .zoom-box { position: absolute; border: 1.5px solid #dc2626; background: rgba(220,38,38,.08); pointer-events: none; }
+/* La barra de la vista va arriba del 3D, no encima (antes tapaba las paredes del fondo en Planta). */
+.vp-toolbar { position: static; padding: 4px 8px; border-bottom: 1px solid var(--line); background: #fafafa; pointer-events: auto; }

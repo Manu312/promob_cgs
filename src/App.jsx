@@ -55,6 +55,7 @@ import { pasteModules, sideOffset } from './domain/clipboard.js';
 import { replaceModule, findItemForModule } from './domain/replace.js';
 import { toExtreme, centerX, invertModule, shiftRotation } from './domain/moveExtras.js';
 import { VIEWS, pushView, backView, fwdView } from './domain/views.js';
+import { FILL_MODES, fillMode, nextFillMode } from './domain/fillModes.js';
 import ReposicionarDialog from './ui/ReposicionarDialog.jsx';
 
 function usePersistent(key, init, migrate = (x) => x) {
@@ -223,6 +224,9 @@ export default function App() {
   const toggleOrtho = () => view.name !== 'planta' && goView({ ...view, ortho: !view.ortho });
   // Herramientas de navegación (Promob): Pan (P), Zoom (Z), Zoom Ventana (W), Caminar (C); M vuelve a Seleccionar.
   const [navTool, setNavTool] = useState('select');
+  // Modo de relleno (Promob: Exibir > Preenchimento; F10 el siguiente, Ctrl+F10 Presentación).
+  const fill = fillMode(ui.fill).id;
+  const setFill = (id) => setUi((u) => ({ ...u, fill: id }));
   const navRef = useRef(null);
   const [zoomBox, setZoomBox] = useState(null); // recuadro del Zoom Ventana (px dentro de la vista)
   const walkRef = useRef(null);
@@ -525,6 +529,7 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startDrawWalls(); return; }
       if (e.key === 'F8' && tab === 'diseno') { e.preventDefault(); toggleOrtho(); return; } // Ortogonal / Perspectiva
       if (e.key === 'F6' && tab === 'diseno') { e.preventDefault(); navRef.current?.fitAll(); return; } // Zoom total
+      if (e.key === 'F10' && tab === 'diseno') { e.preventDefault(); setFill(e.ctrlKey ? (fill === 'presentacion' ? 'texturas' : 'presentacion') : nextFillMode(fill)); return; }
       if ((e.key === 'F5' || e.key === 'F7') && tab === 'diseno') { e.preventDefault(); if (selectedIds.length) navRef.current?.fitModules(selectedIds); return; } // Zoom total entidad
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l' && tab === 'diseno' && !inField) { e.preventDefault(); locateSelected(); return; }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'k' && tab === 'diseno' && !inField) { e.preventDefault(); replaceSelected(); return; }
@@ -706,26 +711,6 @@ export default function App() {
               onReplace={replaceSelected} canReplace={!!picked && selectedIds.length > 0} />
             {quickFind && <QuickFind thumbCtx={thumbCtx} onClose={() => setQuickFind(false)} onInsert={insertItem}
               onShow={(path, item) => setUi((u) => ({ ...u, catalogPath: [...path, item.id] }))} />}
-            <div className="vp-area" ref={vpRef} {...vpDrag}>
-            <ErrorBoundary onReset={() => { setRenderJob(null); setRenderDlg(false); setRenderMode(false); }}>
-              <Scene3D project={project} builtById={builtById} selectedId={selectedId} selectedIds={selectedIds} onSelect={selectModule} onToggleSelect={toggleSelect} onMove={onMove}
-                selectedWallId={selectedWallId} onSelectWall={selectWall}
-                onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
-                onDimEdit={onDimEdit} onWallLength={onWallLength} onWallAngle={onWallAngle}
-                onDragStart={onDragStart} onDragEnd={history.commit}
-                drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
-                onWallContext={onWallContext} onModuleContext={(m) => setModMenu(m)}
-                annotating={annTool} onAnnotatePoint={annotating ? onAnnotatePoint : onScalePoint} onAnnotateFinish={annotating ? stopAnnotate : stopScale}
-                selectedDimId={selectedDimId} onSelectDim={selectDim}
-                onRestoreWall={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, id, { lowered: false }) }))}
-                selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
-                selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
-                onWallDouble={(id) => goView({ name: 'pared', wallId: id })} onFloorDouble={() => goView({ name: 'planta' })}
-                navTool={navTool} navRef={navRef}
-                renderMode={renderMode || renderDlg || !!renderJob} renderRef={renderRef}
-                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower && !renderJob?.panorama} pickRef={pickRef} ghost={ghost}
-                openFronts={openFronts} onToggleFront={toggleFront} />
-            </ErrorBoundary>
             <div className="vp-toolbar">
               {[['perspectiva', 'Perspectiva'], ['frente', 'Frente'], ['planta', 'Planta']].map(([k, l]) => (
                 <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => goView({ name: k })}>{l}</button>
@@ -738,6 +723,9 @@ export default function App() {
               <button onClick={viewBack} disabled={!viewHist.back.length} title="Volver vista" aria-label="Volver vista">◁</button>
               <button onClick={viewFwd} disabled={!viewHist.fwd.length} title="Avanzar vista" aria-label="Avanzar vista">▷</button>
               <button className={view.ortho ? 'active-soft' : ''} disabled={view.name === 'planta'} onClick={toggleOrtho} title="Ortogonal / Perspectiva (F8)">Ortogonal</button>
+              <select className="vp-fill" value={fill} onChange={(e) => setFill(e.target.value)} title="Modo de relleno (F10: el siguiente; Ctrl+F10: Presentación)">
+                {FILL_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
               <span className="sep" />
               <button className={`nav-tool${navTool === 'pan' ? ' active' : ''}`} onClick={() => navToggle('pan')} title="Pan (P): arrastrar mueve la vista">Pan</button>
               <button className={`nav-tool${navTool === 'zoom' ? ' active' : ''}`} onClick={() => navToggle('zoom')} title="Zoom (Z): arrastrar arriba acerca, abajo aleja">Zoom</button>
@@ -765,6 +753,26 @@ export default function App() {
                 title="Configuración del render: calidad, dimensión, clima, fondo, marca de agua">Renderizar…</button>
               <button onClick={exportImage} title="Exportar imagen (PNG)">⤓</button>
             </div>
+            <div className="vp-area" ref={vpRef} {...vpDrag}>
+            <ErrorBoundary onReset={() => { setRenderJob(null); setRenderDlg(false); setRenderMode(false); }}>
+              <Scene3D project={project} builtById={builtById} selectedId={selectedId} selectedIds={selectedIds} onSelect={selectModule} onToggleSelect={toggleSelect} onMove={onMove}
+                selectedWallId={selectedWallId} onSelectWall={selectWall}
+                onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
+                onDimEdit={onDimEdit} onWallLength={onWallLength} onWallAngle={onWallAngle}
+                onDragStart={onDragStart} onDragEnd={history.commit}
+                drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
+                onWallContext={onWallContext} onModuleContext={(m) => setModMenu(m)}
+                annotating={annTool} onAnnotatePoint={annotating ? onAnnotatePoint : onScalePoint} onAnnotateFinish={annotating ? stopAnnotate : stopScale}
+                selectedDimId={selectedDimId} onSelectDim={selectDim}
+                onRestoreWall={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, id, { lowered: false }) }))}
+                selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
+                selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
+                onWallDouble={(id) => goView({ name: 'pared', wallId: id })} onFloorDouble={() => goView({ name: 'planta' })}
+                navTool={navTool} navRef={navRef}
+                renderMode={renderMode || renderDlg || !!renderJob || fill === 'presentacion'} renderRef={renderRef} fill={fill === 'presentacion' ? 'texturas' : fill}
+                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower && !renderJob?.panorama} pickRef={pickRef} ghost={ghost}
+                openFronts={openFronts} onToggleFront={toggleFront} />
+            </ErrorBoundary>
             {drawing && (
               <DrawHud draw={drawing} len={drawLen} setLen={setDrawLen} ang={drawAng} setAng={setDrawAng} lenRef={lenRef} angRef={angRef}
                 onCommit={commitTyped} onCancel={stopDrawWalls}

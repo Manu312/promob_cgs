@@ -70,9 +70,9 @@ export function finishMaterial(finish, wMm, hMm, base) {
   const m = roomMatById(finish.mat);
   if (!m) return null;
   const [rx, ry] = textureRepeat(finish, wMm, hMm);
-  const key = `${JSON.stringify(finish)}|${Math.round(wMm)}|${Math.round(hMm)}`;
+  const key = `${JSON.stringify(finish)}|${Math.round(wMm)}|${Math.round(hMm)}|${base?.side ?? 0}|${base?.transparent ? 1 : 0}`;
   if (matCache.has(key)) return matCache.get(key);
-  const opts = { roughness: m.kind === 'pintura' ? 0.92 : m.kind === 'madera' ? 0.6 : 0.35, metalness: 0, transparent: base?.transparent, opacity: base?.opacity ?? 1, depthWrite: base?.depthWrite ?? true };
+  const opts = { side: base?.side ?? THREE.FrontSide, roughness: m.kind === 'pintura' ? 0.92 : m.kind === 'madera' ? 0.6 : 0.35, metalness: 0, transparent: base?.transparent, opacity: base?.opacity ?? 1, depthWrite: base?.depthWrite ?? true };
   let mat;
   if (m.kind === 'pintura') mat = new THREE.MeshStandardMaterial({ ...opts, color: finish.tint || m.color });
   else {

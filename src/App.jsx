@@ -58,6 +58,9 @@ import { VIEWS, pushView, backView, fwdView } from './domain/views.js';
 import { FILL_MODES, fillMode, nextFillMode } from './domain/fillModes.js';
 import { applyRoomMaterial, copyFinish, setFinishProps, finishesOf } from './domain/roomMaterials.js';
 import MaterialsPanel from './ui/MaterialsPanel.jsx';
+import { StripEditor, RegionEditor } from './ui/SurfaceEditors.jsx';
+import { stripsOf, cellAt, applyStripMaterial, updateRegion } from './domain/strips.js';
+import { roomWalls } from './domain/room.js';
 import ReposicionarDialog from './ui/ReposicionarDialog.jsx';
 
 function usePersistent(key, init, migrate = (x) => x) {
@@ -379,6 +382,8 @@ export default function App() {
     if (!w) return;
     if (action === 'lowered' || action === 'transparent') setProject((p) => ({ ...p, room: updateWall(p.room, wallId, { [action]: !w[action] }) }));
     else if (action === 'split') doSplit(wallId, offset);
+    else if (action === 'strips') setStripDlg({ wallId });
+    else if (action === 'regions') setRegionDlg({ surface: { kind: 'wall', wallId } });
     else if (action === 'delete') setDeleteDlg({ wallId });
   };
   const confirmDelete = (mode, withModules) => {
@@ -434,7 +439,32 @@ export default function App() {
   const [matMenu, setMatMenu] = useState(null); // { matId, wallId, x, y }
   const [roomTool, setRoomTool] = useState(null); // { kind: 'copy', source } | { kind: 'tint' }
   const [tint, setTint] = useState('#d9c7a7');
-  const applyMat = (target, matId, scope = 'cara') => setProject((p) => ({ ...p, room: applyRoomMaterial(p.room, target, matId, scope) }));
+  // Editores de franjas y de regiones (Promob: Editar Faixas / Editar Regiões).
+  const [stripDlg, setStripDlg] = useState(null);
+  const [regionDlg, setRegionDlg] = useState(null);
+  // Cara: el material cubre toda la cara (saca el de las franjas); Todo: todas las paredes.
+  const applyMat = (target, matId, scope = 'cara') => setProject((p) => {
+    let room = applyRoomMaterial(p.room, target, matId, scope);
+    if (target.kind === 'wall' && room.stripFinishes) {
+      if (scope === 'todo') room = { ...room, stripFinishes: {} };
+      else { const { [target.wallId]: _x, ...rest } = room.stripFinishes; room = { ...room, stripFinishes: rest }; } // eslint-disable-line no-unused-vars
+    }
+    return { ...p, room };
+  });
+  // Material en una celda de franjas: Región (la celda), Perfil horizontal (fila) o vertical (columna).
+  const applyStrip = (wallId, u, v, matId, scope) => setProject((p) => {
+    const g = roomWalls(p.room).find((w) => w.id === wallId);
+    if (!g) return p;
+    const H = Math.max(g.wall.h0 ?? p.room.h, g.wall.h1 ?? p.room.h);
+    const c = cellAt(stripsOf(p.room, wallId, g.len, H), g.len, H, u, v);
+    return c ? { ...p, room: applyStripMaterial(p.room, wallId, g.len, H, c.id, matId, scope) } : p;
+  });
+  const wallHasStrips = (wallId) => {
+    const g = roomWalls(project.room).find((w) => w.id === wallId);
+    if (!g) return false;
+    const s = stripsOf(project.room, wallId, g.len, Math.max(g.wall.h0 ?? project.room.h, g.wall.h1 ?? project.room.h));
+    return s.h.length + s.v.length > 0;
+  };
   const roomTarget = selectedWallId ? { kind: 'wall', wallId: selectedWallId } : selection?.kind === 'floor' ? { kind: 'floor' } : null;
   // Con Copiar material o Cambiar tonalidad activos, el clic en una superficie o módulo es de la herramienta.
   const roomToolClick = (t) => {
@@ -470,7 +500,8 @@ export default function App() {
         e.preventDefault();
         const t = surfaceRef.current?.(e.clientX, e.clientY);
         if (t?.kind === 'floor') applyMat(t, matId);
-        else if (t?.kind === 'wall') setMatMenu({ matId, wallId: t.wallId, x: e.clientX, y: e.clientY });
+        else if (t?.kind === 'region') setProject((p) => ({ ...p, room: updateRegion(p.room, t.id, { finish: { mat: matId } }) }));
+        else if (t?.kind === 'wall') setMatMenu({ matId, wallId: t.wallId, u: t.u, v: t.v, strips: wallHasStrips(t.wallId), x: e.clientX, y: e.clientY });
         return;
       }
       const d = dragItemRef.current;
@@ -738,7 +769,9 @@ export default function App() {
           )}
           {side === 'materiales' && (
             <MaterialsPanel favs={ui.matFavs || []} onFav={(id) => setUi((u) => ({ ...u, matFavs: (u.matFavs || []).includes(id) ? u.matFavs.filter((x) => x !== id) : [...(u.matFavs || []), id] }))}
-              target={roomTarget} onApply={(id) => roomTarget && applyMat(roomTarget, id)} tool={roomTool} onTool={setRoomTool} tint={tint} onTint={setTint} />
+              target={roomTarget} onApply={(id) => roomTarget && applyMat(roomTarget, id)} tool={roomTool} onTool={setRoomTool} tint={tint} onTint={setTint}
+              onStrips={selectedWallId ? () => setStripDlg({ wallId: selectedWallId }) : null}
+              onRegions={roomTarget ? () => setRegionDlg({ surface: roomTarget }) : null} />
           )}
           {side === 'lista' && (
             <ModuleList project={project} selectedIds={selectedIds} onSelect={(id, add) => (add ? toggleSelect(id) : selectModule(id))}
@@ -856,11 +889,19 @@ export default function App() {
             {matMenu && (
               <div className="menu-backdrop" onPointerDown={() => setMatMenu(null)}>
                 <div className="wall-menu mat-scope" style={{ left: matMenu.x, top: matMenu.y }} onPointerDown={(e) => e.stopPropagation()}>
+                  {matMenu.strips && [['region', 'Región'], ['perfil-h', 'Perfil horizontal'], ['perfil-v', 'Perfil vertical']].map(([k, l]) => (
+                    <button key={k} onClick={() => { applyStrip(matMenu.wallId, matMenu.u, matMenu.v, matMenu.matId, k); setMatMenu(null); }}>{l}</button>
+                  ))}
                   <button onClick={() => { applyMat({ kind: 'wall', wallId: matMenu.wallId }, matMenu.matId, 'cara'); setMatMenu(null); }} title="Solo la cara de esta pared">Cara</button>
                   <button onClick={() => { applyMat({ kind: 'wall', wallId: matMenu.wallId }, matMenu.matId, 'todo'); setMatMenu(null); }} title="Todas las paredes">Todo</button>
                 </div>
               </div>
             )}
+            {stripDlg && <StripEditor room={project.room} wallId={stripDlg.wallId} onRoom={(fn) => setProject((p) => ({ ...p, room: fn(p.room) }))}
+              presets={ui.stripPresets || []} onPresets={(list) => setUi((u) => ({ ...u, stripPresets: list }))} onUndo={history.undo} onRedo={history.redo}
+              onRegions={() => { setRegionDlg({ surface: { kind: 'wall', wallId: stripDlg.wallId } }); setStripDlg(null); }} onClose={() => setStripDlg(null)} />}
+            {regionDlg && <RegionEditor room={project.room} surface={regionDlg.surface} onRoom={(fn) => setProject((p) => ({ ...p, room: fn(p.room) }))}
+              onUndo={history.undo} onRedo={history.redo} onClose={() => setRegionDlg(null)} />}
             {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)}
               canGroup={multiSel && !selectionGroup(project, selectedIds)} canUngroup={project.modules.some((m) => selectedIds.includes(m.id) && m.groupId)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}

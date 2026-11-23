@@ -1115,6 +1115,50 @@ try {
     check('Sin errores con los materiales del ambiente', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S10: franjas en pared (material por fila) y regiones (piso)
+  {
+    let pm = await project();
+    const nz = (id) => pm.room.nodes.find((n) => n.id === id).z;
+    const back = [...pm.room.walls].sort((a, b) => (nz(a.n0) + nz(a.n1)) - (nz(b.n0) + nz(b.n1)))[0];
+    await clickText('.side-tab', 'Materiales'); await sleep(400);
+    const wp = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2300, -2), back.id);
+    await page.mouse.click(wp.x, wp.y); await sleep(300);
+    await clickText('.rm-tools button', 'Editar franjas'); await sleep(400);
+    check('Editor de franjas abierto', !!(await page.$('.strip-editor')));
+    await clickText('.strip-editor .se-tools button', 'Franja horizontal'); await sleep(100);
+    const sv = await page.$eval('.strip-editor svg', (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+    await page.mouse.click(sv.x + sv.w / 2, sv.y + sv.h * 0.45); await sleep(300);
+    pm = await project();
+    check('Clic con "Franja horizontal" agrega una franja', (pm.room.strips?.[back.id]?.h || []).length === 1, JSON.stringify(pm.room.strips?.[back.id]));
+    await shot('07i-editor-franjas');
+    await clickText('.strip-editor .row-btns button', 'Aceptar'); await sleep(300);
+    await page.evaluate(({ x, y }) => { const dt = new DataTransfer(); dt.setData('text/x-room-mat', 'rev-subway-verde'); document.querySelector('.vp-area').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: dt })); }, wp); await sleep(400);
+    const opts = await page.$$eval('.mat-scope button', (b) => b.map((x) => x.textContent));
+    check('Con franjas, el material pregunta Región / Perfil horizontal / Perfil vertical / Cara / Todo', opts.join('|') === 'Región|Perfil horizontal|Perfil vertical|Cara|Todo', opts.join('|'));
+    await clickText('.mat-scope button', 'Perfil horizontal'); await sleep(500);
+    pm = await project();
+    check('Perfil horizontal: la fila de la franja toma el material', Object.values(pm.room.stripFinishes?.[back.id] || {}).some((f) => f.mat === 'rev-subway-verde'));
+    await shot('07j-franja-3d');
+    const xs = pm.room.nodes.map((n) => n.x), zs = pm.room.nodes.map((n) => n.z);
+    const fp = await page.evaluate((x, z) => window.__muebles.screenOfPoint(x, z, 0), (Math.min(...xs) + Math.max(...xs)) / 2, Math.max(...zs) - 250);
+    await page.mouse.click(fp.x, fp.y); await sleep(300);
+    await clickText('.rm-tools button', 'Editar regiones'); await sleep(400);
+    await clickText('.region-editor .se-tools button', 'Rectángulo'); await sleep(100);
+    const s2 = await page.$eval('.region-editor svg', (e) => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+    await page.mouse.move(s2.x + s2.w * 0.3, s2.y + s2.h * 0.4); await page.mouse.down(); await page.mouse.move(s2.x + s2.w * 0.6, s2.y + s2.h * 0.75, { steps: 5 }); await page.mouse.up(); await sleep(300);
+    pm = await project();
+    check('Región rectangular en el piso', pm.room.regions?.length === 1 && pm.room.regions[0].surface.kind === 'floor' && pm.room.regions[0].pts.length === 4);
+    await page.select('.region-editor .se-ops select', 'piso-marmol'); await sleep(200);
+    await clickText('.region-editor .se-ops button', 'Filete'); await sleep(200);
+    await clickText('.region-editor .se-ops button', 'Duplicar'); await sleep(200);
+    pm = await project();
+    check('Filete redondea y Duplicar copia la región (con su material)', pm.room.regions.length === 2 && pm.room.regions[0].pts.length > 4 && pm.room.regions[1].finish?.mat === 'piso-marmol');
+    await clickText('.region-editor .row-btns button', 'Aceptar'); await sleep(500);
+    await clickText('.side-tab', 'Materiales'); await sleep(300);
+    await page.keyboard.press('Escape');
+    check('Sin errores con franjas y regiones', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

@@ -427,3 +427,4 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .topbar { flex-wrap: nowrap; } .topbar .top-actions { flex-wrap: nowrap; }
 .top-actions button, .tabs button { white-space: nowrap; }
 .tabs { flex-wrap: nowrap; }
+.save-status { font-size: 12px; white-space: nowrap; color: #15803d; } .save-status.guardando { color: #6b7280; } .save-status.sin-conexion { color: #b45309; font-weight: 600; }

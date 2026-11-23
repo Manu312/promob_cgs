@@ -1060,6 +1060,61 @@ try {
     check('Sin errores con los modos de relleno', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S9: materiales de paredes y piso (Cara / Todo, propiedades, Copiar material, Cambiar tonalidad)
+  {
+    let pm = await project();
+    const nz = (id) => pm.room.nodes.find((n) => n.id === id).z;
+    const sorted = [...pm.room.walls].sort((a, b) => (nz(a.n0) + nz(a.n1)) - (nz(b.n0) + nz(b.n1)));
+    const back = sorted[0], other = sorted.find((w) => w.id !== back.id);
+    await clickText('.side-tab', 'Materiales'); await sleep(500);
+    const wp = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2300, -2), back.id);
+    await page.mouse.click(wp.x, wp.y); await sleep(300);
+    await clickText('.rm-tabs button', 'Pinturas'); await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('.rm-item')].find((e) => e.textContent.includes('Terracota')).click()); await sleep(500);
+    pm = await project();
+    check('Clic en un material lo aplica a la pared seleccionada (cara interior)', pm.room.finishes?.walls?.[back.id]?.mat === 'pint-terracota');
+    await shot('07g-material-pared');
+    // soltar un material sobre una pared: pregunta Cara / Todo
+    await page.evaluate(({ x, y }) => {
+      const dt = new DataTransfer(); dt.setData('text/x-room-mat', 'pint-salvia');
+      document.querySelector('.vp-area').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: dt }));
+    }, wp); await sleep(400);
+    check('Soltar un material en una pared pregunta Cara / Todo', !!(await page.$('.mat-scope')));
+    await clickText('.mat-scope button', 'Todo'); await sleep(400);
+    pm = await project();
+    check('"Todo" lo aplica a todas las paredes', pm.room.walls.every((w) => pm.room.finishes.walls[w.id]?.mat === 'pint-salvia'));
+    // piso: con la pestaña abierta, clic en el piso lo selecciona y el material va al piso
+    const xs = pm.room.nodes.map((n) => n.x), zs = pm.room.nodes.map((n) => n.z);
+    const fp = await page.evaluate((x, z) => window.__muebles.screenOfPoint(x, z, 0), (Math.min(...xs) + Math.max(...xs)) / 2, Math.max(...zs) - 250);
+    await page.mouse.click(fp.x, fp.y); await sleep(300);
+    check('Clic en el piso lo selecciona (pestaña Materiales)', (await page.$eval('.sb-sel', (e) => e.textContent)) === 'Piso');
+    await clickText('.rm-tabs button', 'Pisos'); await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('.rm-item')].find((e) => e.textContent.includes('Madera roble')).click()); await sleep(500);
+    pm = await project();
+    check('El material va al piso', pm.room.finishes.floor?.mat === 'piso-roble');
+    // propiedades en Propiedades > Ambiente > Piso
+    await page.keyboard.press('Escape'); await sleep(200);
+    const rotIn = await page.evaluateHandle(() => [...document.querySelectorAll('.finish-fields .field')].find((f) => f.textContent.includes('Rotación'))?.querySelector('input'));
+    await rotIn.click({ clickCount: 3 }); await rotIn.type('90'); await page.keyboard.press('Enter'); await sleep(300);
+    check('Rotación del material del piso', (await project()).room.finishes.floor.rot === 90);
+    await shot('07h-material-piso');
+    // Copiar material: origen la pared del fondo, destino otra pared
+    await page.mouse.click(wp.x, wp.y); await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('.rm-item')].length); // panel abierto
+    await clickText('.rm-tabs button', 'Pinturas'); await sleep(150);
+    await page.evaluate(() => [...document.querySelectorAll('.rm-item')].find((e) => e.textContent.includes('Grafito')).click()); await sleep(300);
+    await clickText('.rm-tools button', 'Copiar material'); await sleep(200);
+    await page.mouse.click(wp.x, wp.y); await sleep(300);
+    const op = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2300, -2), other.id);
+    await page.mouse.click(op.x, op.y); await sleep(400);
+    pm = await project();
+    check('Copiar material: la otra pared toma el de la pared de origen', pm.room.finishes.walls[other.id]?.mat === 'pint-grafito', pm.room.finishes.walls[other.id]?.mat);
+    await page.keyboard.press('KeyM'); await sleep(200);
+    check('M termina Copiar material', !(await page.$('.rm-tools button.active')));
+    await clickText('.side-tab', 'Materiales'); await sleep(300);
+    check('Sin errores con los materiales del ambiente', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

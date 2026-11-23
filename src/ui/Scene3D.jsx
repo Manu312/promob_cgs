@@ -188,7 +188,7 @@ function ModuleObject({ mod, b, selected, showSel, onDown, onMenu, onResizeDown,
   const dbl = (p) => (p.front != null && onToggleFront ? (e) => { e.stopPropagation(); onToggleFront(mod.id, p.front); } : undefined);
   const fill = useFill();
   return (
-    <group position={[(mod.x + fw / 2) * S, (mod.y || 0) * S, (mod.z + fd / 2) * S]} rotation={[0, ((mod.rot || 0) * Math.PI) / 180, 0]} onPointerDown={(e) => onDown(e, mod)}
+    <group position={[(mod.x + fw / 2) * S, (mod.y || 0) * S, (mod.z + fd / 2) * S]} rotation={[0, ((mod.rot || 0) * Math.PI) / 180, 0]} onPointerDown={(e) => onDown(e, mod)} userData={{ moduleId: mod.id }}
       onContextMenu={onMenu ? (e) => onMenu(e, mod) : undefined}>
       <FillGroup position={[(-W / 2) * S, 0, (-D / 2) * S]}>
         {b.parts.map((p, i) => <FrontMove key={i} T={p.front != null ? tfm.get(p.front) : null}><PartMesh p={p} material={mat3d(b.mats[p.slot])} onDoubleClick={dbl(p)} /></FrontMove>)}
@@ -236,6 +236,26 @@ function CameraRig({ view, room, controlsRef, origin }) {
     }
     if (c) { c.target.set(...pose.target); c.update(); } else camera.lookAt(...pose.target);
   });
+  return null;
+}
+
+// Superficie del ambiente bajo un punto de la pantalla: pared o piso (un módulo delante la tapa).
+function SurfacePicker({ surfaceRef }) {
+  const { camera, gl, scene } = useThree();
+  useEffect(() => {
+    const ray = new THREE.Raycaster();
+    surfaceRef.current = (cx, cy) => {
+      const r = gl.domElement.getBoundingClientRect();
+      ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), camera);
+      for (const hit of ray.intersectObjects(scene.children, true)) {
+        if (!hit.object.isMesh || !hit.object.visible) continue;
+        let o = hit.object, vis = true;
+        while (o) { if (!o.visible) vis = false; if (o.userData?.wallId) return vis ? { kind: 'wall', wallId: o.userData.wallId } : null; if (o.userData?.floor) return { kind: 'floor' }; if (o.userData?.moduleId) return { kind: 'module', id: o.userData.moduleId }; o = o.parent; }
+        if (vis) return null;
+      }
+      return null;
+    };
+  }, [camera, gl, scene, surfaceRef]);
   return null;
 }
 
@@ -450,7 +470,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, navTool = 'select', navRef, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, surfaceRef, navTool = 'select', navRef, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -599,7 +619,8 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
           selectedOpeningId={renderMode ? null : selectedOpeningId} onOpeningDown={renderMode || drawing ? null : onOpeningDown}
           selectedColumnId={renderMode ? null : selectedColumnId} onColumnDown={renderMode || drawing ? null : onColumnDown}
           onWallDouble={renderMode || drawing || annotating ? null : onWallDouble} onFloorDouble={renderMode || drawing || annotating ? null : onFloorDouble}
-          onFloorClick={(e) => { if (e.delta > 2 || dragRef.current || drawing || annotating) return; onSelect(null); }} />
+          onFloorClick={(e) => { if (e.delta > 2 || dragRef.current || drawing || annotating || onFloorDown) return; onSelect(null); }}
+          onFloorDown={renderMode || drawing || annotating ? null : onFloorDown} />
         </FillGroup>
         {view.name === 'frente' && !renderMode && <HeightRuler room={room} modules={project.modules} />}
         {selectedOpeningId && !renderMode && <OpeningDims room={room} id={selectedOpeningId} onEdit={onOpeningDim} />}
@@ -628,6 +649,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
         enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={NAV_BUTTONS[navTool] || (planta ? (drawing || annotating ? DRAW_BUTTONS : PLAN_BUTTONS) : ROTATE_BUTTONS)} />
       <CameraRig view={view} room={room} controlsRef={controlsRef} origin={origin} />
       {navRef && <NavBridge navRef={navRef} controlsRef={controlsRef} project={project} origin={origin} />}
+      {surfaceRef && <SurfacePicker surfaceRef={surfaceRef} />}
       <Capturer captureRef={captureRef} />
       {renderRef && <RenderBridge renderRef={renderRef} room={room} origin={origin} />}
       <DevProbe project={project} origin={origin} openFronts={openFronts} />

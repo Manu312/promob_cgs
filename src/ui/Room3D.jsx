@@ -4,6 +4,8 @@ import { Html, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { roomWalls, wallPieces } from '../domain/room.js';
 import { wallCorners, floorPolygon, wallFacesCamera } from '../domain/walls.js';
+import { finishesOf } from '../domain/roomMaterials.js';
+import { finishMaterial } from './roomTextures.js';
 import { footprint } from '../domain/modules.js';
 import { CotaLabel } from './Cotas.jsx';
 import { wallDims } from '../domain/dimensions.js';
@@ -78,7 +80,7 @@ function SlopedWall({ len, h0, h1, T, zc, openings, material }) {
 }
 
 
-function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onDown: onWallDown, onMenu, onDouble, selectedOpeningId, onOpeningDown }) {
+function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onDown: onWallDown, onMenu, onDouble, selectedOpeningId, onOpeningDown, finish }) {
   const ref = useRef();
   const W = w.wall;
   const T = w.t;
@@ -110,14 +112,17 @@ function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onD
     onWallDown(e, w);
   };
   return (
-    <group ref={ref} position={[w.a[0] * S, gap * S, w.a[1] * S]} rotation={[0, theta, 0]} onPointerDown={onDown}
+    <group ref={ref} position={[w.a[0] * S, gap * S, w.a[1] * S]} rotation={[0, theta, 0]} onPointerDown={onDown} userData={{ wallId: w.id }}
       onDoubleClick={onDouble ? (e) => { if (!ref.current?.visible || !firstHitIn(e)) return; e.stopPropagation(); onDouble(w.id); } : undefined}
       onContextMenu={(e) => { if (!onMenu || !ref.current?.visible) return; e.stopPropagation(); onMenu(e, w); }}>
       {sloped
         ? <SlopedWall len={w.len} h0={h0} h1={h1} T={T} zc={zc} openings={ops} material={mat} />
-        : pieces.map((p, i) => (
-          <Box key={i} c={[((p.u0 + p.u1) / 2) * S, ((p.v0 + p.v1) / 2) * S, zc * S]} s={[(p.u1 - p.u0) * S, (p.v1 - p.v0) * S, T * S]} m={mat} />
-        ))}
+        : pieces.map((p, i) => {
+          // con material, la cara interior (la del lado z = 0 del cuerpo) lo lleva; las otras quedan igual
+          const fm = finishMaterial(finish, p.u1 - p.u0, p.v1 - p.v0, mat);
+          const m = fm ? [mat, mat, mat, mat, zc > 0 ? mat : fm, zc > 0 ? fm : mat] : mat;
+          return <Box key={i} c={[((p.u0 + p.u1) / 2) * S, ((p.v0 + p.v1) / 2) * S, zc * S]} s={[(p.u1 - p.u0) * S, (p.v1 - p.v0) * S, T * S]} m={m} />;
+        })}
       {ops.map((o) => (
         <Opening key={o.id} o={o} T={T} zc={zc} selected={o.id === selectedOpeningId}
           onDown={onOpeningDown ? (e) => { if (!ref.current?.visible) return; e.stopPropagation(); onOpeningDown(e, o, w); } : null} />
@@ -139,7 +144,7 @@ const firstHitIn = (e) => {
   return false;
 };
 
-export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu, selectedOpeningId, onOpeningDown, selectedColumnId, onColumnDown, onWallDouble, onFloorDouble, onFloorClick }) {
+export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu, selectedOpeningId, onOpeningDown, selectedColumnId, onColumnDown, onWallDouble, onFloorDouble, onFloorClick, onFloorDown }) {
   const walls = useMemo(() => roomWalls(room).filter((w) => w.wall.visible), [room]);
   // Esquina de cada pared: la pared que llega a su vértice de inicio.
   const incomingOf = useMemo(() => new Map(wallCorners(room).map((c) => [c.outgoing.id, c.incoming])), [room]);
@@ -149,15 +154,18 @@ export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDo
     return new THREE.ShapeGeometry(shape);
   }, [floorPts]);
   const H = room.h;
+  const fin = useMemo(() => finishesOf(room), [room]);
+  const floorM = finishMaterial(fin.floor, 1000, 1000) || floorMat; // UV del piso en metros
   return (
     <group>
-      <mesh geometry={floorGeo} rotation={[-Math.PI / 2, 0, 0]} material={floorMat} receiveShadow
+      <mesh geometry={floorGeo} rotation={[-Math.PI / 2, 0, 0]} material={floorM} receiveShadow userData={{ floor: true }}
         onClick={onFloorClick ? (e) => { if (firstHitIn(e)) onFloorClick(e); } : undefined}
+        onPointerDown={onFloorDown ? (e) => { if (!firstHitIn(e)) return; e.stopPropagation(); onFloorDown(); } : undefined}
         onDoubleClick={onFloorDouble ? (e) => { if (!firstHitIn(e)) return; e.stopPropagation(); onFloorDouble(); } : undefined} />
       {walls.map((w) => (
         <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} origin={origin}
           openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide} lowerH={room.lowerH}
-          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu} onDouble={onWallDouble}
+          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu} onDouble={onWallDouble} finish={fin.walls[w.id]}
           selectedOpeningId={selectedOpeningId} onOpeningDown={onOpeningDown} />
       ))}
       {room.columns.map((c) => (

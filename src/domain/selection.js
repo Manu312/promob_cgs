@@ -30,6 +30,7 @@ export function describeSelection(project, sel) {
     if (!a) return '';
     return a.kind === 'lin' ? `Cota lineal · ${annotationValue(a)} mm` : `Cota angular · ${annotationValue(a)}°`;
   }
+  if (sel.kind === 'floor') return 'Piso';
   if (sel.kind === 'module') {
     const m = project.modules.find((x) => x.id === sel.id);
     if (!m) return '';

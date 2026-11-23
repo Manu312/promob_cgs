@@ -1,3 +1,5 @@
+import FinishFields from './FinishFields.jsx';
+import { finishesOf, setFinishProps, clearFinish } from '../domain/roomMaterials.js';
 import { roomWalls } from '../domain/room.js';
 import { wallAngles } from '../domain/walls.js';
 import { setWallLength, setWallAngle, updateWall } from '../domain/wallEdit.js';
@@ -21,6 +23,9 @@ export default function WallPanel({ room, wallId, onRoom, onBack, onDelete, onSp
         {onSplit && <button onClick={() => onSplit(wallId, g.len / 2)} title="Parte la pared en dos tramos iguales">Dividir al medio</button>}
         {onDelete && <button className="danger" onClick={() => onDelete(wallId)}>Eliminar…</button>}
       </div>
+      <FinishFields title="Material (cara interior)" finish={finishesOf(room).walls[wallId]}
+        onProps={(patch) => onRoom((r) => setFinishProps(r, { kind: 'wall', wallId }, patch))}
+        onClear={() => onRoom((r) => clearFinish(r, { kind: 'wall', wallId }))} />
       <h4>Dimensiones</h4>
       <NumField label="Largo" unit="mm" value={g.len} min={100} max={30000} step={10} onChange={(v) => onRoom((r) => setWallLength(r, wallId, v))} />
       <NumField label="Ángulo absoluto" unit="°" value={ang.abs} min={0} max={359.99} step={0.5} onChange={(v) => onRoom((r) => setWallAngle(r, wallId, v, 'abs'))} />

@@ -1,3 +1,5 @@
+import FinishFields from './FinishFields.jsx';
+import { finishesOf, setFinishProps, clearFinish } from '../domain/roomMaterials.js';
 import { OPENING_TYPES, roomWalls, rid, rebuildFromShape, setWallDefaults } from '../domain/room.js';
 import { useRef, useState } from 'react';
 import { placePlanImage, dataUrlTooBig } from '../domain/planImage.js';
@@ -97,6 +99,10 @@ export default function RoomEditor({ room, onChange, onSelectWall, onDrawWalls, 
       <NumField label="Espesor paredes" unit="mm" value={room.t} min={50} max={400} step={10} onChange={(v) => onChange(setWallDefaults(room, { t: v }))} />
 
       <ListField label="Regla de alturas (Frente)" value={room.refHeights || []} parse={parseHeights} onChange={(v) => set({ refHeights: v })} />
+
+      <FinishFields title="Piso" finish={finishesOf(room).floor}
+        onProps={(patch) => onChange(setFinishProps(room, { kind: 'floor' }, patch))}
+        onClear={() => onChange(clearFinish(room, { kind: 'floor' }))} />
 
       {onSelectWall && (
         <>

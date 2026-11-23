@@ -60,7 +60,8 @@ export function FillGroup({ children, outline = false, ...props }) {
     ref.current?.traverse((o) => {
       if (!o.isMesh || o.userData.noFill) return;
       if (o.material !== o.userData.fillApplied) o.userData.fillOrig = o.material; // React le puso uno nuevo
-      const m = fillMaterial(mode, o.userData.fillOrig);
+      const orig = o.userData.fillOrig;
+      const m = Array.isArray(orig) ? orig.map((x) => fillMaterial(mode, x)) : fillMaterial(mode, orig);
       o.material = m;
       o.userData.fillApplied = m;
       let e = o.userData.fillEdges;

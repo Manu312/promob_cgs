@@ -59,6 +59,8 @@ import { FILL_MODES, fillMode, nextFillMode } from './domain/fillModes.js';
 import { applyRoomMaterial, copyFinish, setFinishProps, finishesOf } from './domain/roomMaterials.js';
 import MaterialsPanel from './ui/MaterialsPanel.jsx';
 import { StripEditor, RegionEditor } from './ui/SurfaceEditors.jsx';
+import TamponamentoEditor from './ui/TamponamentoEditor.jsx';
+import { linearItemFor, DEFAULT_TOP_ITEMS } from './domain/tamponamento.js';
 import { stripsOf, cellAt, applyStripMaterial, updateRegion } from './domain/strips.js';
 import { roomWalls } from './domain/room.js';
 import ReposicionarDialog from './ui/ReposicionarDialog.jsx';
@@ -405,6 +407,7 @@ export default function App() {
     else if (action === 'duplicate') duplicateSelected();
     else if (action === 'reposition') duplicateSelected(true);
     else if (action === 'locate') locateSelected();
+    else if (action === 'tampon') setTamponDlg({ ids: selectedIds });
     else if (action === 'delete') deleteSelected();
     else if (action === 'group') groupSelected();
     else if (action === 'ungroup') ungroupSelected();
@@ -484,16 +487,45 @@ export default function App() {
     } else if (s.kind !== 'module' && t.kind !== 'module') setProject((p) => ({ ...p, room: copyFinish(p.room, s, t) }));
     return true;
   };
+  // Tamponamentos (Promob): tapas y laterales para los módulos seleccionados.
+  const [tamponDlg, setTamponDlg] = useState(null);
+  const insertModules = (list) => {
+    const mods = list.filter(Boolean).map((m) => ({ id: uid(), mats: {}, ...m }));
+    if (!mods.length) return;
+    setProject((p) => ({ ...p, modules: [...p.modules, ...mods] }));
+    selectIds(mods.map((m) => m.id));
+  };
+  // Ítems lineales (tapa, estante): arrastrados sobre varios módulos, los cubren a todos.
+  const LINEAR = { tapa: DEFAULT_TOP_ITEMS[0], estante: DEFAULT_TOP_ITEMS[2] };
+  const linearRef = useRef(null); // ids de los módulos por los que pasó el arrastre
+  const linearGhost = (e) => {
+    const d = dragItemRef.current;
+    if (!d || !LINEAR[d.item.type]) return null;
+    const t = surfaceRef.current?.(e.clientX, e.clientY);
+    const ids = linearRef.current || [];
+    if (t?.kind === 'module' && !ids.includes(t.id)) {
+      const m = project.modules.find((o) => o.id === t.id);
+      const first = project.modules.find((o) => o.id === ids[0]);
+      if (m && m.type !== 'tapa' && m.type !== 'estante' && (!first || (first.rot || 0) === (m.rot || 0))) linearRef.current = [...ids, t.id];
+    }
+    const mods = project.modules.filter((o) => (linearRef.current || []).includes(o.id));
+    if (!mods.length) return null;
+    const lin = linearItemFor(mods, LINEAR[d.item.type]);
+    // conserva lo propio del ítem (p. ej. la tapa para bacha); las medidas son las de los módulos
+    return { id: 'ghost', mats: {}, ...lin, params: { ...lin.params, ...(d.item.params || {}), width: lin.params.width, depth: lin.params.depth, height: lin.params.height } };
+  };
   const vpDrag = {
     onDragOver: (e) => {
       if (e.dataTransfer?.types?.includes('text/x-room-mat')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; return; }
       if (!dragItemRef.current) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
+      const lin = linearGhost(e);
+      if (lin) { setGhost((g) => (g && g.x === lin.x && g.z === lin.z && g.params.width === lin.params.width ? g : lin)); return; }
       const m = ghostAt(e.clientX, e.clientY);
       setGhost((g) => (m && g && g.x === m.x && g.z === m.z && g.rot === m.rot ? g : m));
     },
-    onDragLeave: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setGhost(null); },
+    onDragLeave: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) { setGhost(null); linearRef.current = null; } },
     onDrop: (e) => {
       const matId = e.dataTransfer?.getData?.('text/x-room-mat');
       if (matId) {
@@ -507,6 +539,16 @@ export default function App() {
       const d = dragItemRef.current;
       if (!d) return;
       e.preventDefault();
+      const lin = linearGhost(e);
+      linearRef.current = null;
+      if (lin) { // cubre los módulos por los que pasó (ajusta sus medidas a ellos)
+        dragItemRef.current = null;
+        setGhost(null);
+        countUse(d.item);
+        const { id: _g, ...mod } = lin; // eslint-disable-line no-unused-vars
+        insertModules([withItem({ ...mod, id: uid() }, d.item, project.modules)].map((m) => ({ ...m, rest: undefined })));
+        return;
+      }
       const m = ghostAt(e.clientX, e.clientY);
       dragItemRef.current = null;
       setGhost(null);
@@ -902,6 +944,9 @@ export default function App() {
               onRegions={() => { setRegionDlg({ surface: { kind: 'wall', wallId: stripDlg.wallId } }); setStripDlg(null); }} onClose={() => setStripDlg(null)} />}
             {regionDlg && <RegionEditor room={project.room} surface={regionDlg.surface} onRoom={(fn) => setProject((p) => ({ ...p, room: fn(p.room) }))}
               onUndo={history.undo} onRedo={history.redo} onClose={() => setRegionDlg(null)} />}
+            {tamponDlg && <TamponamentoEditor mods={project.modules.filter((m) => tamponDlg.ids.includes(m.id))}
+              items={ui.topItems || []} onItems={(list) => setUi((u) => ({ ...u, topItems: list }))}
+              onInsert={insertModules} onClose={() => setTamponDlg(null)} />}
             {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)}
               canGroup={multiSel && !selectionGroup(project, selectedIds)} canUngroup={project.modules.some((m) => selectedIds.includes(m.id) && m.groupId)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}

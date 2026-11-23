@@ -1159,6 +1159,61 @@ try {
     check('Sin errores con franjas y regiones', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S11: Editor de tamponamentos e ítems lineales (tapa arrastrada sobre varios módulos)
+  {
+    let pm = await project();
+    const bajos = pm.modules.filter((m) => (m.y || 0) === 0 && m.params.height < 1000 && (m.rot || 0) === 0 && !m.hidden).sort((a, b) => a.x - b.x);
+    const pos = (id) => page.evaluate((id) => window.__muebles.screenOf(id, 100), id);
+    // sección independiente de las anteriores: vista Perspectiva, sin selección y con los demás módulos
+    // ocultos (las secciones de antes dejan, por ejemplo, un placard parado delante de los bajos)
+    await page.keyboard.press('Escape'); await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(1200);
+    const others = pm.modules.filter((m) => !m.hidden && !bajos.slice(0, 2).some((b) => b.id === m.id)).map((m) => m.id);
+    const toggleOthers = async () => {
+      await clickText('.side-tab', 'Lista de Módulos'); await sleep(300);
+      for (const id of others) { await page.click(`.ml-row[data-id="${id}"] .ml-bulb`); await sleep(80); }
+      await clickText('.side-tab', 'Lista de Módulos'); await sleep(300);
+    };
+    await toggleOthers();
+    pm = await project();
+    { const q = await pos(bajos[0].id); await page.mouse.click(q.x, q.y); await sleep(250); }
+    { const q = await pos(bajos[1].id); await page.keyboard.down('Control'); await page.mouse.click(q.x, q.y); await page.keyboard.up('Control'); await sleep(250); }
+    const q0 = await pos(bajos[0].id);
+    await page.mouse.click(q0.x, q0.y, { button: 'right' }); await sleep(300);
+    await clickText('.module-menu button', 'Editar tamponamentos'); await sleep(400);
+    check('Editor de tamponamentos abierto con la selección', (await page.$eval('.tampon-editor h3', (e) => e.textContent)).includes('2 módulos'));
+    await shot('07k-tamponamentos');
+    const n0 = pm.modules.length;
+    await clickText('.tampon-editor .row-btns button', 'Insertar ambos'); await sleep(400);
+    pm = await project();
+    const add = pm.modules.slice(n0);
+    const span = Math.max(...bajos.slice(0, 2).map((m) => m.x + m.params.width)) - bajos[0].x;
+    check('Insertar ambos: una tapa sobre los dos módulos y un lateral a cada lado', add.length === 3 && add[0].type === 'tapa' && add[0].params.width === span && add.slice(1).every((m) => m.type === 'vista'), add.map((m) => `${m.type}:${m.params.width}`).join(','));
+    await clickText('.tampon-editor .row-btns button', 'Aceptar'); await sleep(300);
+    for (let i = 0; i < 1; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(250); }
+    check('Deshacer saca lo insertado', (await project()).modules.length === n0);
+    await page.keyboard.press('Escape'); await sleep(200);
+    // ítem lineal: arrastrar una tapa del catálogo pasando por dos bajos
+    await clickText('.cb-libs .cb-tab', 'Cocinas'); await clickText('.cb-groups .cb-tab', 'Tapas/Estantes'); await clickText('.cb-subs .cb-tab', 'Tapas'); await sleep(300);
+    const qa = await pos(bajos[0].id), qb = await pos(bajos[1].id);
+    await page.evaluate(({ qa, qb }) => {
+      const btn = document.querySelector('.cb-items .mod-btn');
+      const dt = new DataTransfer();
+      btn.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+      const vp = document.querySelector('.vp-area');
+      for (const q of [qa, qb]) vp.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, clientX: q.x, clientY: q.y, dataTransfer: dt }));
+      vp.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, clientX: qb.x, clientY: qb.y, dataTransfer: dt }));
+      btn.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+    }, { qa, qb }); await sleep(500);
+    pm = await project();
+    const lin = pm.modules.at(-1);
+    check('Tapa arrastrada sobre dos bajos los cubre a los dos', pm.modules.length === n0 + 1 && lin.type === 'tapa' && lin.params.width === span && lin.x === bajos[0].x, `${lin.type} ${lin.x} ${lin.params.width} (span ${span})`);
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+    await page.keyboard.press('Escape');
+    await toggleOthers();
+    check('Los demás módulos vuelven a verse', (await project()).modules.filter((m) => others.includes(m.id)).every((m) => !m.hidden));
+    check('Sin errores con tamponamentos', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

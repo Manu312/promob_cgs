@@ -60,6 +60,8 @@ import { joinWalls, angleFrom304050, pointOnWall, projectOnAngle } from './domai
 import { fitFloor, standardFloor, setFloorShape, setFloorGrid, floorGridOf, snapToFloorGrid } from './domain/floor.js';
 import { FloorShapeEditor, FloorGridEditor } from './ui/FloorEditors.jsx';
 import { rulerGroups, wallRulers, snapToRulers } from './domain/rulers.js';
+import { makeFavorite, placeFavorite, removeFavorite, exportFavorites, importFavorites, favoriteGroups } from './domain/favorites.js';
+import FavoriteDialog from './ui/FavoriteDialog.jsx';
 import { INSERT_DIRECTIONS, INSERT_ORIENTATIONS, placeRelative, orientItem, changePlane, detachModule } from './domain/insertion.js';
 import RulersDialog from './ui/RulersDialog.jsx';
 import { modulesOnWall } from './domain/wallEdit.js';
@@ -446,6 +448,7 @@ export default function App() {
     else if (action === 'reposition') duplicateSelected(true);
     else if (action === 'locate') locateSelected();
     else if (action === 'tampon') setTamponDlg({ ids: selectedIds });
+    else if (action === 'favorite') setFavDlg({ ids: expandToGroups(project, selectedIds) });
     else if (action === 'detach') setProject((p) => ({ ...p, modules: p.modules.map((m) => (selectedIds.includes(m.id) ? (m.detached ? { ...m, detached: false } : detachModule(m)) : m)) }));
     else if (action === 'delete') deleteSelected();
     else if (action === 'group') groupSelected();
@@ -486,6 +489,10 @@ export default function App() {
   const [joinTool, setJoinTool] = useState(null); // Encuentro de paredes: { movingId, mode }
   // Réguas: grupos (guardados para todos los proyectos) y el de cada pared
   const [rulersDlg, setRulersDlg] = useState(null);
+  // Módulos favoritos (guardados para todos los proyectos)
+  const [favDlg, setFavDlg] = useState(null);
+  const favorites = ui.favorites || [];
+  const [favMsg, setFavMsg] = useState(null);
   // Cambiar de plano (clic derecho durante el arrastre): piso, arriba de un módulo o una pared.
   const onChangePlane = useCallback((id, cx, cy) => {
     const t = surfaceRef.current?.(cx, cy);
@@ -738,6 +745,7 @@ export default function App() {
       setGhost(null);
       if (!m) return;
       if (d.item.compose) { countUse(d.item); insertModules(composeAt(d.item, m)); return; }
+      if (d.item.favorite) { countUse(d.item); insertModules(placeFavorite(d.item.favorite, { x: m.x, z: m.z, y: m.y, rot: m.rot }, uid)); return; }
       const mod = withAutoInsert(withItem({ ...m, id: uid() }, d.item, project.modules), project, (x) => resolveRules(x, project));
       countUse(d.item);
       setProject((p) => ({ ...p, modules: [...p.modules, mod] }));
@@ -780,6 +788,14 @@ export default function App() {
     return o.type === item.type && !ui.insertOrient ? { type: item.type, params: itemParams(item, variant), y: item.y } : { type: o.type, params: o.params, y: item.y };
   };
   const insertItem = (item, variant = null) => {
+    if (item.favorite) { // el conjunto guardado, en la posición libre de su primer módulo
+      countUse(item);
+      const m0 = item.favorite.modules[0];
+      const b = newModule(m0.type, project, m0.params, item.favorite.y0);
+      insertModules(placeFavorite(item.favorite, { x: b.x, z: b.z, y: item.favorite.y0, rot: 0 }, uid));
+      setTab('diseno');
+      return;
+    }
     const base = ui.insertDir && project.modules.find((o) => o.id === selectedId);
     if (base && !item.compose) {
       countUse(item);
@@ -1046,7 +1062,11 @@ export default function App() {
               onRemove={(ids) => { setProject((p) => removeModules(p, ids)); setSelectedId(null); }} />
           )}
           <section className="viewport">
-            <CatalogBar nav={ui.catalogPath} setNav={(p) => setUi((u) => ({ ...u, catalogPath: p }))} counts={ui.catalogUse} onInsert={insertItem} thumbCtx={thumbCtx}
+            <CatalogBar favorites={favorites}
+              onRemoveFavorite={(id) => setUi((u) => ({ ...u, favorites: removeFavorite(u.favorites || [], id) }))}
+              onExportFavorites={() => download('favoritos.mueblesapp.json', new Blob([exportFavorites(favorites)], { type: 'application/json' }))}
+              onImportFavorites={(text) => { const r = importFavorites(text, favorites); if (r.error) setFavMsg(r.error); else { setUi((u) => ({ ...u, favorites: r.list })); setFavMsg(`Se importaron ${r.added} favorito${r.added === 1 ? '' : 's'}.`); } }}
+              nav={ui.catalogPath} setNav={(p) => setUi((u) => ({ ...u, catalogPath: p }))} counts={ui.catalogUse} onInsert={insertItem} thumbCtx={thumbCtx}
               onDragItem={(item, variant) => { dragItemRef.current = item ? { item, variant } : null; if (!item) setGhost(null); }}
               onFind={() => setQuickFind(true)} onPick={(item, variant) => setPicked({ item, variant })}
               onReplace={replaceSelected} canReplace={!!picked && selectedIds.length > 0} />
@@ -1213,6 +1233,10 @@ export default function App() {
                 </div>
               </div>
             )}
+            {favDlg && <FavoriteDialog count={favDlg.ids.length} groups={favoriteGroups(favorites)} capture={() => captureRef.current?.(1)}
+              onSave={(info) => { const f = makeFavorite(project.modules.filter((m) => favDlg.ids.includes(m.id)), info); if (f) setUi((u) => ({ ...u, favorites: [...(u.favorites || []), f], catalogPath: ['__fav', f.group || 'General'] })); }}
+              onClose={() => setFavDlg(null)} />}
+            {favMsg && <div className="menu-backdrop dim" onPointerDown={() => setFavMsg(null)}><div className="wall-dialog fav-msg" role="alert"><p>{favMsg}</p><div className="row-btns"><button className="active" onClick={() => setFavMsg(null)}>Aceptar</button></div></div></div>}
             {rulersDlg && <RulersDialog wallLabel={`Pared ${project.room.walls.findIndex((w) => w.id === rulersDlg.wallId) + 1}`}
               current={project.room.walls.find((w) => w.id === rulersDlg.wallId)?.rulerGroup || null} groups={groupsR}
               onPick={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, rulersDlg.wallId, { rulerGroup: id }) }))}

@@ -1539,6 +1539,29 @@ try {
     check('Sin errores con la inserción', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S23: Módulos favoritos (guardar con nombre e imagen, insertar, quitar)
+  {
+    const pm = await project();
+    const al = pm.modules.filter((m) => m.type === 'alacena').at(-1);
+    const q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), al.id);
+    await page.mouse.click(q.x, q.y); await sleep(300);
+    await page.mouse.click(q.x, q.y, { button: 'right' }); await sleep(300);
+    await clickText('.module-menu button', 'Agregar a favoritos'); await sleep(900);
+    await page.type('.favorite-dialog input', 'Alacena e2e');
+    check('Favorito: la imagen es la vista actual', ((await page.$eval('.fav-preview', (i) => i.src).catch(() => '')) || '').startsWith('data:image/jpeg'));
+    await clickText('.favorite-dialog button', 'Guardar'); await sleep(500);
+    check('Favoritos: aparece en la pestaña ♥ Favoritos', (await page.$$eval('.cb-items .mod-btn span', (s) => s.map((x) => x.textContent))).includes('Alacena e2e'));
+    await shot('07v-favoritos');
+    const ib = await page.$('.cb-items .mod-btn'); await ib.click({ count: 2 }); await sleep(500);
+    const nu = (await project()).modules.filter((m) => !pm.modules.some((o) => o.id === m.id));
+    check('Insertar un favorito copia medidas y materiales', nu.length === 1 && nu[0].params.width === al.params.width && JSON.stringify(nu[0].mats) === JSON.stringify(al.mats));
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+    await page.click('.cb-items .fav-del'); await sleep(300);
+    check('Quitar de favoritos', (await page.$$('.cb-items .mod-btn')).length === 0);
+    await clickText('.cb-tab', 'Cocinas'); await sleep(300);
+    check('Sin errores con los favoritos', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

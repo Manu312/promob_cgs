@@ -45,3 +45,50 @@ test('cámara del render: con el área a todo el alto conserva el FOV; con medio
   const f = renderFov(45, 0.5);
   assert.ok(Math.abs(Math.tan((f * Math.PI) / 360) - Math.tan((45 * Math.PI) / 360) / 2) < 1e-9);
 });
+
+// Clima: sol y cielo (#100)
+import { CLIMAS, DEFAULT_CLIMA, normalizeClima, applyClima, sunDirection, lightRig, azimuthFromPoint, altitudeFromPoint } from '../src/domain/render.js';
+
+test('clima: presets como Promob y "No aplicar"; elegir amanecer o atardecer baja el sol', () => {
+  assert.deepEqual(CLIMAS.map((c) => c.label), ['Luz blanca', 'Nublado', 'Amanecer', 'Neblina', 'Soleado', 'Atardecer', 'No aplicar']);
+  const a = applyClima(DEFAULT_CLIMA, 'atardecer');
+  assert.equal(a.preset, 'atardecer');
+  assert.ok(a.altitude <= 15);
+  assert.equal(applyClima(DEFAULT_CLIMA, 'xx'), DEFAULT_CLIMA);
+});
+
+test('clima: normaliza azimut (0–359) y altitud (0–90) e intensidades (0–300 %)', () => {
+  const c = normalizeClima({ azimuth: -90, altitude: 120, sunIntensity: 999, skyIntensity: 'x', preset: 'raro' });
+  assert.deepEqual([c.azimuth, c.altitude, c.sunIntensity, c.skyIntensity, c.preset], [270, 90, 300, 100, 'blanca']);
+  assert.equal(normalizeClima({ azimuth: 725 }).azimuth, 5);
+});
+
+test('dirección del sol: azimut 0 = fondo (−z), 90 = derecha (+x); altitud 90 = cenit', () => {
+  const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-9);
+  assert.ok(near(sunDirection(0, 0), [0, 0, -1]));
+  assert.ok(near(sunDirection(90, 0), [1, 0, 0]));
+  assert.ok(near(sunDirection(123, 90), [0, 1, 0]));
+});
+
+test('luces: intensidades en % del preset; sol apagado o "No aplicar" no ilumina', () => {
+  const r = lightRig({ preset: 'soleado', sunIntensity: 50, skyIntensity: 200 });
+  const p = CLIMAS.find((c) => c.id === 'soleado');
+  assert.ok(Math.abs(r.sun.intensity - p.sunI / 2) < 1e-9);
+  assert.ok(Math.abs(r.sky.intensity - p.skyI * 2) < 1e-9);
+  assert.equal(lightRig({ sun: false }).sun.on, false);
+  const n = lightRig({ preset: 'ninguno' });
+  assert.deepEqual([n.sun.on, n.sky.intensity, n.ambient], [false, 0, 1]);
+  assert.equal(lightRig({ ambient: false }).ambient, 0);
+});
+
+test('controles visuales: brújula (0° arriba, horario) y arco de altitud (0° horizonte, 90° cenit)', () => {
+  assert.equal(azimuthFromPoint(50, 50, 50, 0), 0);
+  assert.equal(azimuthFromPoint(50, 50, 100, 50), 90);
+  assert.equal(azimuthFromPoint(50, 50, 50, 100), 180);
+  assert.equal(azimuthFromPoint(50, 50, 0, 50), 270);
+  assert.equal(altitudeFromPoint(0, 100, 100, 100), 0);
+  assert.equal(altitudeFromPoint(0, 100, 0, 0), 90);
+  assert.equal(altitudeFromPoint(0, 100, 50, 50), 45);
+  assert.equal(altitudeFromPoint(0, 100, -10, 120), 0);
+  assert.equal(altitudeFromPoint(0, 100, -10, 20), 90);
+});

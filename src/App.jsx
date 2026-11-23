@@ -34,7 +34,7 @@ import { sampleProject, emptyProject, normalizeProject } from './domain/project.
 import Scene3D from './ui/Scene3D.jsx';
 import RenderDialog, { RenderArea } from './ui/RenderDialog.jsx';
 import RenderWindow from './ui/RenderWindow.jsx';
-import { normalizeRender, qualityOf, renderSize, fitRect } from './domain/render.js';
+import { normalizeRender, qualityOf, renderSize, fitRect, lightRig } from './domain/render.js';
 import CatalogBar from './ui/CatalogBar.jsx';
 import QuickFind from './ui/QuickFind.jsx';
 import ModuleList from './ui/ModuleList.jsx';
@@ -439,7 +439,7 @@ export default function App() {
     if (!renderRef.current) return;
     setSelectedId(null);
     setRenderDlg(false);
-    setRenderJob({ size: renderOut, quality: qualityOf(renderCfg) });
+    setRenderJob({ size: renderOut, quality: qualityOf(renderCfg), rig: lightRig(renderCfg.clima) });
   };
 
   const exportImage = () => {
@@ -566,9 +566,9 @@ export default function App() {
             {renderDlg && (
               <RenderDialog config={renderCfg} view={vpSize} onClose={() => setRenderDlg(false)}
                 onChange={(fn) => setProject((p) => ({ ...p, render: normalizeRender(fn(normalizeRender(p.render))) }))}
-                onRender={startRender} />
+                onRender={startRender} onBegin={history.begin} onEnd={history.commit} />
             )}
-            {renderJob && <RenderWindow bridge={renderRef.current} size={renderJob.size} quality={renderJob.quality}
+            {renderJob && <RenderWindow bridge={renderRef.current} size={renderJob.size} quality={renderJob.quality} rig={renderJob.rig}
               fileName={`${project.name || 'render'}.png`} onClose={() => setRenderJob(null)} />}
             {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}

@@ -24,12 +24,85 @@ export const SIZE_MODES = [['ambiente', 'Ambiente 3D'], ['preset', 'Tamaños pre
 export const MIN_SIDE = 64;
 export const MAX_SIDE = 8192;
 
+// --- Clima: sol y cielo (Fase 7.2) ---
+// Presets como los de Promob. Las intensidades del diálogo multiplican las del preset (100 % = el preset).
+// `alt`/`az` = posición del sol sugerida por el preset (amanecer y atardecer, sol bajo).
+export const CLIMAS = [
+  { id: 'blanca', label: 'Luz blanca', sun: '#ffffff', sunI: 1.6, top: '#ffffff', bottom: '#dcdad6', skyI: 1, alt: 50 },
+  { id: 'nublado', label: 'Nublado', sun: '#dde4ec', sunI: 0.45, top: '#c7d1dc', bottom: '#9ea8b3', skyI: 1.05, alt: 60 },
+  { id: 'amanecer', label: 'Amanecer', sun: '#ffd7aa', sunI: 1.3, top: '#ffe1c2', bottom: '#b4a3c4', skyI: 0.75, alt: 12, az: 80 },
+  { id: 'neblina', label: 'Neblina', sun: '#eef0f1', sunI: 0.3, top: '#eceeef', bottom: '#cfd5d8', skyI: 1.15, alt: 40 },
+  { id: 'soleado', label: 'Soleado', sun: '#fff3dc', sunI: 2.2, top: '#b9d5ff', bottom: '#ebe4d6', skyI: 0.95, alt: 55 },
+  { id: 'atardecer', label: 'Atardecer', sun: '#ffa865', sunI: 1.4, top: '#ffc994', bottom: '#8c78a6', skyI: 0.65, alt: 10, az: 260 },
+  { id: 'ninguno', label: 'No aplicar', sun: '#ffffff', sunI: 0, top: '#ffffff', bottom: '#ffffff', skyI: 0 },
+];
+
+export const DEFAULT_CLIMA = { preset: 'blanca', sun: true, sunIntensity: 100, skyIntensity: 100, azimuth: 135, altitude: 50, ambient: true };
+
+const clamp = (v, a, b, d) => (Number.isFinite(+v) ? Math.min(b, Math.max(a, +v)) : d);
+const wrap360 = (v) => ((Math.round(+v) % 360) + 360) % 360;
+
+export function normalizeClima(c) {
+  const s = c && typeof c === 'object' ? c : {};
+  const d = DEFAULT_CLIMA;
+  return {
+    preset: CLIMAS.some((x) => x.id === s.preset) ? s.preset : d.preset,
+    sun: s.sun !== false,
+    sunIntensity: clamp(s.sunIntensity, 0, 300, d.sunIntensity),
+    skyIntensity: clamp(s.skyIntensity, 0, 300, d.skyIntensity),
+    azimuth: Number.isFinite(+s.azimuth) ? wrap360(s.azimuth) : d.azimuth,
+    altitude: clamp(Math.round(+s.altitude), 0, 90, d.altitude),
+    ambient: s.ambient !== false,
+  };
+}
+
+// Elegir un preset: el sol se mueve a la posición sugerida (si la tiene).
+export function applyClima(c, id) {
+  const p = CLIMAS.find((x) => x.id === id);
+  if (!p) return c;
+  return { ...c, preset: id, ...(p.alt != null ? { altitude: p.alt } : {}), ...(p.az != null ? { azimuth: p.az } : {}) };
+}
+
+// Dirección hacia el sol (vector unitario, ejes de la escena: x derecha, y arriba, z hacia el frente).
+// Azimut 0° = hacia el fondo de la planta (−z), 90° = derecha (+x), en sentido horario visto desde arriba.
+export function sunDirection(azimuth, altitude) {
+  const az = (azimuth * Math.PI) / 180;
+  const al = (altitude * Math.PI) / 180;
+  return [Math.sin(az) * Math.cos(al), Math.sin(al), -Math.cos(az) * Math.cos(al)];
+}
+
+// Luces que resultan de la configuración del clima.
+export function lightRig(clima) {
+  const c = normalizeClima(clima);
+  const p = CLIMAS.find((x) => x.id === c.preset);
+  const none = p.id === 'ninguno';
+  const sunOn = c.sun && !none && c.altitude > 0;
+  return {
+    sun: { on: sunOn, color: p.sun, intensity: sunOn ? p.sunI * (c.sunIntensity / 100) : 0, dir: sunDirection(c.azimuth, c.altitude) },
+    sky: { top: p.top, bottom: p.bottom, intensity: none ? 0 : p.skyI * (c.skyIntensity / 100) },
+    ambient: c.ambient ? 1 : 0,
+  };
+}
+
+// Brújula: ángulo (azimut) del punto (x, y) respecto del centro (cx, cy) de un control en pantalla
+// (y hacia abajo); 0° arriba, sentido horario.
+export function azimuthFromPoint(cx, cy, x, y) {
+  return wrap360((Math.atan2(x - cx, cy - y) * 180) / Math.PI);
+}
+
+// Arco de altitud: cuarto de círculo con centro abajo a la izquierda; 0° = horizonte, 90° = cenit.
+export function altitudeFromPoint(cx, cy, x, y) {
+  const a = (Math.atan2(cy - y, x - cx) * 180) / Math.PI;
+  return Math.round(Math.min(90, Math.max(0, a)));
+}
+
 export const DEFAULT_RENDER = {
   quality: 'final',
   samples: { final: 400, profesional: 1000 },
   bounces: { final: 6, profesional: 10 },
   size: { mode: 'ambiente', preset: 'fhd', width: 1920, height: 1080, lock: true },
   showArea: true,
+  clima: DEFAULT_CLIMA,
 };
 
 const clampSide = (v) => Math.min(MAX_SIDE, Math.max(MIN_SIDE, Math.round(+v || 0)));
@@ -52,6 +125,7 @@ export function normalizeRender(r) {
       width: clampSide(size.width), height: clampSide(size.height), lock: size.lock !== false,
     },
     showArea: src.showArea !== false,
+    clima: normalizeClima(src.clima),
   };
 }
 

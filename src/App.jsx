@@ -65,6 +65,11 @@ import FavoriteDialog from './ui/FavoriteDialog.jsx';
 import { prefsOf, applyPrefsToNewProject } from './domain/prefs.js';
 import { remapEvent } from './domain/shortcuts.js';
 import PrefsDialog from './ui/PrefsDialog.jsx';
+import { parseDxf, segmentsToWalls } from './domain/dxf.js';
+import { validateExternal, addExternal, updateExternal, removeExternal } from './domain/externals.js';
+import { DxfImportDialog, ExternalsPanel } from './ui/ImportDialogs.jsx';
+import { rid as wallRid } from './domain/walls.js';
+import { normalizeRoom } from './domain/room.js';
 import { INSERT_DIRECTIONS, INSERT_ORIENTATIONS, placeRelative, orientItem, changePlane, detachModule } from './domain/insertion.js';
 import RulersDialog from './ui/RulersDialog.jsx';
 import { modulesOnWall } from './domain/wallEdit.js';
@@ -495,6 +500,37 @@ export default function App() {
   // Módulos favoritos (guardados para todos los proyectos)
   const [favDlg, setFavDlg] = useState(null);
   const [prefsOpen, setPrefsOpen] = useState(false);
+  // Importar: planta DXF (referencia o paredes) y modelos 3D (entidades externas)
+  const [dxfDlg, setDxfDlg] = useState(null); // { dxf, fileName }
+  const [importMsg, setImportMsg] = useState(null);
+  const [importsOpen, setImportsOpen] = useState(false);
+  const dxfInput = useRef(null), modelInput = useRef(null);
+  const onDxfFile = async (f) => {
+    if (!f) return;
+    if (f.size > 8 * 1024 * 1024) { setImportMsg('El DXF pesa más de 8 MB.'); return; }
+    const d = parseDxf(await f.text());
+    if (d.error) { setImportMsg(d.error); return; }
+    if (!d.entities.length) { setImportMsg('El DXF no tiene líneas, arcos, círculos ni polilíneas.'); return; }
+    setDxfDlg({ dxf: d, fileName: f.name });
+  };
+  const acceptDxf = ({ segments, mode }) => {
+    if (mode === 'walls') {
+      const { nodes, walls } = segmentsToWalls(segments, { id: (p) => wallRid(p) });
+      if (!walls.length) { setImportMsg('No hay tramos rectos para convertir en paredes.'); return; }
+      setProject((p) => ({ ...p, room: normalizeRoom({ ...p.room, nodes, walls: walls.map((w) => ({ ...w, t: p.room.t, h0: p.room.h, h1: p.room.h })), openings: [] }) }));
+    } else setProject((p) => ({ ...p, planDxf: { segments, visible: true, x: 0, z: 0 } }));
+    setImportsOpen(true);
+  };
+  const onModelFile = async (f) => {
+    if (!f) return;
+    const isText = /\.(obj|gltf)$/i.test(f.name);
+    const text = isText ? await f.text() : null;
+    const v = validateExternal({ name: f.name, size: f.size, text });
+    if (v.error) { setImportMsg(v.error); return; }
+    const data = isText ? text : await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f); });
+    setProject((p) => addExternal(p, { name: f.name.replace(/\.[^.]+$/, ''), format: v.format, data, units: v.format === 'stl' || v.format === 'obj' ? 'mm' : 'm' }));
+    setImportsOpen(true);
+  };
   const prefs = prefsOf(ui);
   const show = { planos: true, flechas: true, hotpoints: false, insercion: true, invisibles: false, ...(ui.show || {}) }; // menú Mostrar
   const favorites = ui.favorites || [];
@@ -1117,6 +1153,14 @@ export default function App() {
                 onChange={(e) => setUi((u) => ({ ...u, insertOrient: e.target.value || null }))}>
                 {INSERT_ORIENTATIONS.map(([k, l]) => <option key={k} value={k}>Orientación: {l.toLowerCase()}</option>)}
               </select>
+              <select className="vp-import" value="" title="Importar planta DXF o modelo 3D" onChange={(e) => { const v = e.target.value; if (v === 'dxf') dxfInput.current?.click(); else if (v === '3d') modelInput.current?.click(); else if (v === 'list') setImportsOpen(true); }}>
+                <option value="">Importar…</option>
+                <option value="dxf">Planta DXF…</option>
+                <option value="3d">Modelo 3D (OBJ, STL, GLB)…</option>
+                <option value="list">Ver importados</option>
+              </select>
+              <input ref={dxfInput} type="file" accept=".dxf" hidden onChange={(e) => { onDxfFile(e.target.files?.[0]); e.target.value = ''; }} />
+              <input ref={modelInput} type="file" accept=".obj,.stl,.glb,.gltf" hidden onChange={(e) => { onModelFile(e.target.files?.[0]); e.target.value = ''; }} />
               <select className="vp-geometry" value={geoTool?.kind || ''} title="Construir geometría" onChange={(e) => (e.target.value ? startGeometry(e.target.value) : setGeoTool(null))}>
                 <option value="">Geometría…</option>
                 {GEOMETRY_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
@@ -1245,6 +1289,11 @@ export default function App() {
                 </div>
               </div>
             )}
+            {dxfDlg && <DxfImportDialog dxf={dxfDlg.dxf} fileName={dxfDlg.fileName} onAccept={acceptDxf} onClose={() => setDxfDlg(null)} />}
+            {importMsg && <div className="menu-backdrop dim" onPointerDown={() => setImportMsg(null)}><div className="wall-dialog import-msg" role="alert"><p>{importMsg}</p><div className="row-btns"><button className="active" onClick={() => setImportMsg(null)}>Aceptar</button></div></div></div>}
+            {importsOpen && <ExternalsPanel externals={project.externals || []} planDxf={project.planDxf || null}
+              onChange={(id, patch) => setProject((p) => updateExternal(p, id, patch))} onRemove={(id) => setProject((p) => removeExternal(p, id))}
+              onDxf={(patch) => setProject((p) => ({ ...p, planDxf: patch ? { ...p.planDxf, ...patch } : null }))} onClose={() => setImportsOpen(false)} />}
             {prefsOpen && <PrefsDialog ui={ui} onClose={() => setPrefsOpen(false)} onShortcuts={(sc) => setUi((u) => ({ ...u, shortcuts: sc }))}
               onPrefs={(patch) => setUi((u) => ({ ...u, prefs: { ...prefsOf(u), ...patch }, ...(patch.fill ? { fill: patch.fill } : {}), ...(patch.arrowStep ? { moveStep: patch.arrowStep } : {}) }))} />}
             {favDlg && <FavoriteDialog count={favDlg.ids.length} groups={favoriteGroups(favorites)} capture={() => captureRef.current?.(1)}

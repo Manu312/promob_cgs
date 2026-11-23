@@ -391,3 +391,11 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .pd-body { display: flex; flex-direction: column; gap: 4px; }
 .pd-keys { width: 100%; font-size: 13px; } .pd-keys td { padding: 2px 4px; } .pd-keys tr.clash td:first-child { color: #dc2626; font-weight: 600; }
 .pd-keys button { min-width: 140px; }
+.dxf-dialog { width: min(760px, calc(100vw - 40px)); }
+.dxf-cols { display: flex; gap: 12px; }
+.dxf-preview { background: #fafafa; border: 1px solid var(--line); flex: none; } .dxf-preview line { stroke: #4c1d95; stroke-width: 1; }
+.dxf-opts { display: flex; flex-direction: column; gap: 4px; flex: 1; max-height: 320px; overflow: auto; }
+.externals-panel .rd-body { padding: 8px 12px 12px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.ext-item { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.ext-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+.vp-import { width: auto; }

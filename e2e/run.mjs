@@ -1600,6 +1600,41 @@ try {
     check('Sin errores con preferencias y atajos', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S32: Importar planta DXF (referencia y paredes) e importar modelo 3D (OBJ)
+  {
+    const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'muebles-e2e-'));
+    const L = (x0, y0, x1, y1, l = 'MUROS') => ['0', 'LINE', '8', l, '10', x0, '20', y0, '11', x1, '21', y1];
+    fs.writeFileSync(path.join(dir, 'planta.dxf'), ['0', 'SECTION', '2', 'HEADER', '9', '$INSUNITS', '70', '4', '0', 'ENDSEC', '0', 'SECTION', '2', 'ENTITIES',
+      ...L(0, 0, 4000, 0), ...L(4000, 0, 4000, 3000), ...L(4000, 3000, 0, 3000), ...L(0, 3000, 0, 0),
+      '0', 'CIRCLE', '8', 'MESA', '10', '2000', '20', '1500', '40', '500', '0', 'ENDSEC', '0', 'EOF'].join('\n'));
+    fs.writeFileSync(path.join(dir, 'caja.obj'), ['v 0 0 0', 'v 0.5 0 0', 'v 0.5 0.8 0', 'v 0 0.8 0', 'v 0 0 0.5', 'v 0.5 0 0.5', 'v 0.5 0.8 0.5', 'v 0 0.8 0.5', 'f 1 2 3 4', 'f 5 6 7 8', 'f 1 2 6 5', 'f 2 3 7 6', 'f 3 4 8 7', 'f 4 1 5 8'].join('\n'));
+    const room0 = (await project()).room;
+    const [dxfIn, objIn] = await page.$$('.vp-toolbar input[type=file]');
+    await dxfIn.uploadFile(path.join(dir, 'planta.dxf')); await sleep(800);
+    check('DXF: diálogo con capas y medidas', (await page.$eval('.dxf-opts .hint', (h) => h.textContent).catch(() => '')).startsWith('4000 × 3000') && (await page.$$('.dxf-opts .check')).length === 2);
+    await clickText('.dxf-dialog .row-btns button', 'Importar'); await sleep(600);
+    check('DXF como dibujo de referencia', ((await project()).planDxf?.segments.length || 0) >= 4);
+    await objIn.uploadFile(path.join(dir, 'caja.obj')); await sleep(1200);
+    const ex = (await project()).externals || [];
+    check('Modelo 3D OBJ importado como entidad externa', ex.length === 1 && ex[0].format === 'obj');
+    await page.evaluate(() => { const i = document.querySelector('.externals-panel .ext-item[data-id] select'); i.value = 'm'; i.dispatchEvent(new Event('change', { bubbles: true })); }); await sleep(400);
+    check('Unidades del modelo: metros', (await project()).externals[0].units === 'm');
+    await shot('08d-importados');
+    await dxfIn.uploadFile(path.join(dir, 'planta.dxf')); await sleep(800);
+    await page.evaluate(() => document.querySelectorAll('.dxf-opts input[name=dxfmode]')[1].click()); await sleep(200);
+    await page.evaluate(() => [...document.querySelectorAll('.dxf-opts .check')].find((l) => l.textContent.includes('MESA')).querySelector('input').click()); await sleep(200);
+    await clickText('.dxf-dialog .row-btns button', 'Importar'); await sleep(800);
+    const r = (await project()).room;
+    check('DXF convertido en paredes (4 paredes de 4000 × 3000)', r.walls.length === 4 && Math.max(...r.nodes.map((n) => n.x)) === 4000 && Math.max(...r.nodes.map((n) => n.z)) === 3000);
+    const dirty = async () => { const q = await project(); return JSON.stringify(q.room.nodes) !== JSON.stringify(room0.nodes) || (q.externals || []).length > 0 || !!q.planDxf; };
+    for (let i = 0; i < 25 && (await dirty()); i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(200); }
+    check('Deshacer vuelve el ambiente y saca lo importado', JSON.stringify((await project()).room.nodes) === JSON.stringify(room0.nodes) && !((await project()).externals || []).length);
+    await clickText('.externals-panel .icon-btn', '✕'); await sleep(200);
+    fs.rmSync(dir, { recursive: true, force: true });
+    check('Sin errores al importar', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

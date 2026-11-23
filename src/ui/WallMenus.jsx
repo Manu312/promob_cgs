@@ -51,7 +51,7 @@ export function WallDeleteDialog({ label, onConfirm, onCancel }) {
 }
 
 // Menú contextual del módulo (clic derecho): tamaño máximo hasta el obstáculo y acciones rápidas.
-export function ModuleContextMenu({ menu, canMax, onAction, onClose }) {
+export function ModuleContextMenu({ menu, canMax, onAction, onClose, canGroup, canUngroup }) {
   useEffect(() => {
     const k = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', k);
@@ -68,6 +68,10 @@ export function ModuleContextMenu({ menu, canMax, onAction, onClose }) {
         <hr />
         {item('rotate', 'Rotar 90°')}
         {item('duplicate', 'Duplicar')}
+        <hr />
+        <button disabled={!canGroup} onClick={() => onAction('group')} title="Agrupar los módulos seleccionados (U)">Agrupar</button>
+        <button disabled={!canUngroup} onClick={() => onAction('ungroup')} title="Desagrupar (Ctrl+U)">Desagrupar</button>
+        <hr />
         {item('delete', 'Eliminar')}
       </div>
     </div>

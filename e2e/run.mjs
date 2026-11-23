@@ -831,6 +831,39 @@ try {
     check('Sin errores con la selección múltiple', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S2: Agrupar (U) y Desagrupar (Ctrl+U)
+  {
+    let pm = await project();
+    const ma = pm.modules.find((m) => m.type === 'bajo_mixto');
+    const mb = pm.modules.filter((m) => m.type === 'alacena').at(-1);
+    const clickMod = async (id, ctrl = false) => {
+      const q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), id);
+      if (ctrl) await page.keyboard.down('Control');
+      await page.mouse.click(q.x, q.y);
+      if (ctrl) await page.keyboard.up('Control');
+      await sleep(300);
+    };
+    await clickMod(ma.id, true); await clickMod(mb.id, true);
+    await page.keyboard.press('KeyU'); await sleep(300);
+    pm = await project();
+    const ga = pm.modules.find((m) => m.id === ma.id).groupId;
+    check('U agrupa los seleccionados', !!ga && pm.modules.find((m) => m.id === mb.id).groupId === ga);
+    await page.keyboard.press('Escape'); await sleep(200);
+    await clickMod(ma.id);
+    const sbg = await page.$eval('.sb-sel', (e) => e.textContent);
+    check('Clic en un integrante selecciona el grupo entero', sbg.startsWith('Grupo de 2 módulos'), sbg);
+    check('El panel muestra el grupo', (await page.$eval('.multi-sel h3', (e) => e.textContent)) === 'Grupo');
+    await shot('07b-grupo');
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyU'); await page.keyboard.up('Control'); await sleep(300);
+    pm = await project();
+    check('Ctrl+U desagrupa', !pm.modules.some((m) => m.groupId));
+    await page.keyboard.press('Escape'); await sleep(200);
+    await clickMod(ma.id);
+    check('Desagrupado, el clic vuelve a elegir un solo módulo', !(await page.$('.multi-sel')));
+    await page.keyboard.press('Escape'); await sleep(200);
+    check('Sin errores con los grupos', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

@@ -418,7 +418,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
   // Clic derecho en un módulo: su menú (tamaño máximo, rotar, duplicar, eliminar).
   const onModuleMenu = (e, mod) => {
     e.stopPropagation();
-    onSelect(mod.id);
+    if (!(selectedIds.length > 1 && selectedIds.includes(mod.id))) onSelect(mod.id); // el menú actúa sobre la selección
     onModuleContext?.({ id: mod.id, x: e.nativeEvent.clientX, y: e.nativeEvent.clientY });
   };
   // Abertura: se selecciona y se arrastra solo a lo largo de su pared.

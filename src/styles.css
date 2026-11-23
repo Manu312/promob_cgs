@@ -293,3 +293,5 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .sc-room { fill: #e5e7eb; stroke: #9ca3af; }
 .sc-ray { stroke: #f59e0b; stroke-width: 2; stroke-dasharray: 3 2; }
 .sc-sun { fill: #fbbf24; stroke: #d97706; stroke-width: 1.5; }
+.rd-color { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.rd-bg-preview { height: 84px; border: 1px solid var(--line); border-radius: 4px; background-size: cover; background-position: center; display: grid; place-items: center; font-size: 11px; color: #6b7280; }

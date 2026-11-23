@@ -660,6 +660,51 @@ try {
   await page.keyboard.press('Escape'); await sleep(300);
   check('Sin errores con el clima', errors.length === 0, errors.slice(-3).join(' | '));
 
+  // Fondo del render (Fase 7 S3): color, degradé e imagen; solo en la imagen renderizada
+  const countColor = (rgb) => page.$eval('.render-window canvas.rw-image', (c, rgb) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0, t = 0;
+    for (let i = 0; i < d.length; i += 4 * 101) { t++; if (Math.abs(d[i] - rgb[0]) + Math.abs(d[i + 1] - rgb[1]) + Math.abs(d[i + 2] - rgb[2]) < 24) n++; }
+    return n / t;
+  }, rgb);
+  const setColorInput = (sel, value) => page.$eval(sel, (el, v) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, value);
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.rd-tabs button', 'Fondo'); await sleep(200);
+  await clickText('.render-dialog .radio', 'Color'); await sleep(100);
+  await setColorInput('.rd-color input', '#d02020'); await sleep(300);
+  check('Fondo: el color queda en el proyecto', (await project()).render.background.color === '#d02020');
+  await clickText('.render-dialog footer button', 'Renderizar'); await sleep(1500);
+  const redFrac = await countColor([208, 32, 32]);
+  check('Render con fondo de color: se ve detrás del ambiente', redFrac > 0.02, `${(redFrac * 100).toFixed(1)} %`);
+  await clickText('.render-window button', 'Cerrar'); await sleep(300);
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.rd-tabs button', 'Fondo'); await sleep(200);
+  await clickText('.render-dialog .radio', 'Imagen'); await sleep(200);
+  await page.$eval('.rd-file', async (input) => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 32;
+    const g = c.getContext('2d'); g.fillStyle = '#1e40ff'; g.fillRect(0, 0, 64, 32);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    const dt = new DataTransfer(); dt.items.add(new File([blob], 'fondo.png', { type: 'image/png' }));
+    input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  let bgp = null;
+  for (let i = 0; i < 20 && !bgp?.image; i++) { await sleep(300); bgp = (await project()).render.background; }
+  check('Fondo: la imagen elegida se guarda con el proyecto', bgp.mode === 'imagen' && bgp.image?.startsWith('data:image/jpeg'), bgp.image?.slice(0, 30));
+  await shot('04e-fondo');
+  await clickText('.render-dialog footer button', 'Renderizar'); await sleep(2000);
+  const blueFrac = await countColor([30, 64, 255]);
+  check('Render con imagen de fondo: cubre el cuadro detrás del ambiente', blueFrac > 0.02, `${(blueFrac * 100).toFixed(1)} %`);
+  await shot('04f-render-fondo');
+  await clickText('.render-window button', 'Cerrar'); await sleep(300);
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.rd-tabs button', 'Fondo'); await sleep(200);
+  await clickText('.render-dialog .radio', 'Degradé'); await sleep(200);
+  await page.keyboard.press('Escape'); await sleep(300);
+  check('Sin errores con el fondo', errors.length === 0, errors.slice(-3).join(' | '));
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

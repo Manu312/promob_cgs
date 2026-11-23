@@ -92,3 +92,24 @@ test('controles visuales: brújula (0° arriba, horario) y arco de altitud (0° 
   assert.equal(altitudeFromPoint(0, 100, -10, 120), 0);
   assert.equal(altitudeFromPoint(0, 100, -10, 20), 90);
 });
+
+// Fondo del render (#101)
+import { normalizeBackground, coverRect, shrinkSize, DEFAULT_BACKGROUND } from '../src/domain/render.js';
+
+test('fondo: color por defecto; valida modo, colores e imagen', () => {
+  assert.deepEqual(normalizeBackground(undefined), DEFAULT_BACKGROUND);
+  const b = normalizeBackground({ mode: 'degrade', color: '#123456', color2: 'rojo', image: 'http://x/y.png' });
+  assert.deepEqual([b.mode, b.color, b.color2, b.image], ['degrade', '#123456', '#ffffff', null]);
+  assert.equal(normalizeBackground({ mode: 'imagen', image: 'data:image/jpeg;base64,AAA' }).image, 'data:image/jpeg;base64,AAA');
+  assert.equal(normalizeBackground({ mode: 'otro' }).mode, 'color');
+});
+
+test('imagen de fondo: cubre todo el cuadro sin deformarse (se recorta lo que sobra)', () => {
+  assert.deepEqual(coverRect(1000, 1000, 1600, 900), { x: 0, y: -350, w: 1600, h: 1600 });
+  assert.deepEqual(coverRect(4000, 1000, 1600, 900), { x: -1000, y: 0, w: 3600, h: 900 });
+});
+
+test('al cargar, la imagen se achica a un lado mayor máximo (no se agranda)', () => {
+  assert.deepEqual(shrinkSize(4096, 2048, 2048), { width: 2048, height: 1024 });
+  assert.deepEqual(shrinkSize(800, 600, 2048), { width: 800, height: 600 });
+});

@@ -96,6 +96,39 @@ export function altitudeFromPoint(cx, cy, x, y) {
   return Math.round(Math.min(90, Math.max(0, a)));
 }
 
+// --- Fondo del render (Fase 7.3) ---
+// Solo aparece en la imagen renderizada (no ilumina la escena): color, degradé (color principal arriba
+// → color gradual abajo, como cielo → horizonte) o imagen, que cubre todo el cuadro sin deformarse.
+export const BG_MODES = [['color', 'Color'], ['degrade', 'Degradé'], ['imagen', 'Imagen']];
+export const DEFAULT_BACKGROUND = { mode: 'color', color: '#e7e3dc', color2: '#ffffff', image: null };
+export const BG_IMAGE_MAX = 2048; // px del lado mayor al cargar la imagen (se guarda con el proyecto)
+
+const isHex = (c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+export function normalizeBackground(b) {
+  const s = b && typeof b === 'object' ? b : {};
+  const d = DEFAULT_BACKGROUND;
+  return {
+    mode: BG_MODES.some(([k]) => k === s.mode) ? s.mode : d.mode,
+    color: isHex(s.color) ? s.color : d.color,
+    color2: isHex(s.color2) ? s.color2 : d.color2,
+    image: typeof s.image === 'string' && s.image.startsWith('data:image/') ? s.image : null,
+  };
+}
+
+// Rectángulo donde se dibuja una imagen para cubrir todo el cuadro W × H (centrada, se recorta lo que sobra).
+export function coverRect(iw, ih, W, H) {
+  const s = Math.max(W / iw, H / ih);
+  const w = iw * s;
+  const h = ih * s;
+  return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+}
+
+// Tamaño reducido para que el lado mayor no pase de `max` (no agranda).
+export function shrinkSize(w, h, max) {
+  const s = Math.min(1, max / Math.max(w, h));
+  return { width: Math.max(1, Math.round(w * s)), height: Math.max(1, Math.round(h * s)) };
+}
+
 export const DEFAULT_RENDER = {
   quality: 'final',
   samples: { final: 400, profesional: 1000 },
@@ -103,6 +136,7 @@ export const DEFAULT_RENDER = {
   size: { mode: 'ambiente', preset: 'fhd', width: 1920, height: 1080, lock: true },
   showArea: true,
   clima: DEFAULT_CLIMA,
+  background: DEFAULT_BACKGROUND,
 };
 
 const clampSide = (v) => Math.min(MAX_SIDE, Math.max(MIN_SIDE, Math.round(+v || 0)));
@@ -126,6 +160,7 @@ export function normalizeRender(r) {
     },
     showArea: src.showArea !== false,
     clima: normalizeClima(src.clima),
+    background: normalizeBackground(src.background),
   };
 }
 

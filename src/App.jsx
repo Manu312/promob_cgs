@@ -54,6 +54,7 @@ import { expandToGroups, groupModules, ungroupModules, selectionGroup, pruneGrou
 import { pasteModules, sideOffset } from './domain/clipboard.js';
 import { replaceModule, findItemForModule } from './domain/replace.js';
 import { toExtreme, centerX, invertModule, shiftRotation } from './domain/moveExtras.js';
+import { VIEWS, pushView, backView, fwdView } from './domain/views.js';
 import ReposicionarDialog from './ui/ReposicionarDialog.jsx';
 
 function usePersistent(key, init, migrate = (x) => x) {
@@ -209,6 +210,17 @@ export default function App() {
   }), [setProject]);
   const onMoveNode = useCallback((id, x, z) => setProject((p) => ({ ...p, room: moveNode(p.room, id, x, z) })), [setProject]);
   const recenter = () => setView((v) => ({ ...v, tick: v.tick + 1 }));
+  // Vistas (Promob): ir a una vista guarda la anterior para Volver / Avanzar vista (últimas 20).
+  const [viewHist, setViewHist] = useState({ back: [], fwd: [] });
+  const goView = (next) => {
+    const nv = { name: next.name, wallId: next.wallId, ortho: next.name === 'planta' ? false : (next.ortho ?? view.ortho ?? false) };
+    setViewHist((h) => pushView(h, view, nv));
+    setView((v) => ({ ...nv, tick: v.tick + 1 }));
+    if (nv.name === 'planta') setShowDims(true); else { stopDrawWalls(); stopAnnotate(); stopScale(); }
+  };
+  const viewBack = () => { const r = backView(viewHist, view); if (r) { setViewHist(r.hist); setView((v) => ({ ...r.view, tick: v.tick + 1 })); } };
+  const viewFwd = () => { const r = fwdView(viewHist, view); if (r) { setViewHist(r.hist); setView((v) => ({ ...r.view, tick: v.tick + 1 })); } };
+  const toggleOrtho = () => view.name !== 'planta' && goView({ ...view, ortho: !view.ortho });
   // Aberturas (a lo largo de su pared) y columnas (imán a paredes y grilla).
   const onMoveOpening = useCallback((id, offset) => setProject((p) => ({ ...p, room: updateOpening(p.room, id, { offset }) })), [setProject]);
   const onMoveColumn = useCallback((id, x, z) => setProject((p) => ({ ...p, room: moveColumn(p.room, id, x, z, gridStep) })), [setProject, gridStep]);
@@ -477,6 +489,7 @@ export default function App() {
         if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); history.redo(); return; }
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') { e.preventDefault(); startDrawWalls(); return; }
+      if (e.key === 'F8' && tab === 'diseno') { e.preventDefault(); toggleOrtho(); return; } // Ortogonal / Perspectiva
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l' && tab === 'diseno' && !inField) { e.preventDefault(); locateSelected(); return; }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'k' && tab === 'diseno' && !inField) { e.preventDefault(); replaceSelected(); return; }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'l' && tab === 'diseno') { e.preventDefault(); setQuickFind(true); return; }
@@ -667,14 +680,23 @@ export default function App() {
                 onRestoreWall={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, id, { lowered: false }) }))}
                 selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
+                onWallDouble={(id) => goView({ name: 'pared', wallId: id })} onFloorDouble={() => goView({ name: 'planta' })}
                 renderMode={renderMode || renderDlg || !!renderJob} renderRef={renderRef}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower && !renderJob?.panorama} pickRef={pickRef} ghost={ghost}
                 openFronts={openFronts} onToggleFront={toggleFront} />
             </ErrorBoundary>
             <div className="vp-toolbar">
               {[['perspectiva', 'Perspectiva'], ['frente', 'Frente'], ['planta', 'Planta']].map(([k, l]) => (
-                <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => { setView((v) => ({ name: k, tick: v.tick + 1 })); if (k === 'planta') setShowDims(true); else { stopDrawWalls(); stopAnnotate(); stopScale(); } }}>{l}</button>
+                <button key={k} className={view.name === k ? 'active-soft' : ''} onClick={() => goView({ name: k })}>{l}</button>
               ))}
+              <select className="vp-views" value={VIEWS.some((x) => x.id === view.name) ? view.name : ''} title="Vistas"
+                onChange={(e) => e.target.value && goView({ name: e.target.value })}>
+                {!VIEWS.some((x) => x.id === view.name) && <option value="">{view.name === 'pared' ? `Pared ${project.room.walls.findIndex((w) => w.id === view.wallId) + 1}` : 'Vistas'}</option>}
+                {VIEWS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+              </select>
+              <button onClick={viewBack} disabled={!viewHist.back.length} title="Volver vista" aria-label="Volver vista">◁</button>
+              <button onClick={viewFwd} disabled={!viewHist.fwd.length} title="Avanzar vista" aria-label="Avanzar vista">▷</button>
+              <button className={view.ortho ? 'active-soft' : ''} disabled={view.name === 'planta'} onClick={toggleOrtho} title="Ortogonal / Perspectiva (F8)">Ortogonal</button>
               <button className={drawing ? 'active' : ''} onClick={() => (drawing ? stopDrawWalls() : startDrawWalls())} title="Construir paredes (Ctrl+Shift+P)">✏ Paredes</button>
               <button className={annotating ? 'active' : ''} onClick={() => (annotating ? stopAnnotate() : startAnnotate())} title="Cota manual: lineal o angular">↔ Cota</button>
               {view.name === 'planta' && (

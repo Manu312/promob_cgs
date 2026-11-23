@@ -78,7 +78,7 @@ function SlopedWall({ len, h0, h1, T, zc, openings, material }) {
 }
 
 
-function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onDown: onWallDown, onMenu, selectedOpeningId, onOpeningDown }) {
+function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onDown: onWallDown, onMenu, onDouble, selectedOpeningId, onOpeningDown }) {
   const ref = useRef();
   const W = w.wall;
   const T = w.t;
@@ -111,6 +111,7 @@ function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onD
   };
   return (
     <group ref={ref} position={[w.a[0] * S, gap * S, w.a[1] * S]} rotation={[0, theta, 0]} onPointerDown={onDown}
+      onDoubleClick={onDouble ? (e) => { if (!ref.current?.visible || !firstHitIn(e)) return; e.stopPropagation(); onDouble(w.id); } : undefined}
       onContextMenu={(e) => { if (!onMenu || !ref.current?.visible) return; e.stopPropagation(); onMenu(e, w); }}>
       {sloped
         ? <SlopedWall len={w.len} h0={h0} h1={h1} T={T} zc={zc} openings={ops} material={mat} />
@@ -131,7 +132,14 @@ function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onD
   );
 }
 
-export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu, selectedOpeningId, onOpeningDown, selectedColumnId, onColumnDown }) {
+// ¿El primer objeto que toca el clic es parte de `group`? (si hay un módulo delante, no).
+const firstHitIn = (e) => {
+  let o = e.intersections?.[0]?.object;
+  while (o) { if (o === e.eventObject) return true; o = o.parent; }
+  return false;
+};
+
+export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDown, onWallMenu, selectedOpeningId, onOpeningDown, selectedColumnId, onColumnDown, onWallDouble, onFloorDouble, onFloorClick }) {
   const walls = useMemo(() => roomWalls(room).filter((w) => w.wall.visible), [room]);
   // Esquina de cada pared: la pared que llega a su vértice de inicio.
   const incomingOf = useMemo(() => new Map(wallCorners(room).map((c) => [c.outgoing.id, c.incoming])), [room]);
@@ -143,11 +151,13 @@ export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDo
   const H = room.h;
   return (
     <group>
-      <mesh geometry={floorGeo} rotation={[-Math.PI / 2, 0, 0]} material={floorMat} receiveShadow />
+      <mesh geometry={floorGeo} rotation={[-Math.PI / 2, 0, 0]} material={floorMat} receiveShadow
+        onClick={onFloorClick ? (e) => { if (firstHitIn(e)) onFloorClick(e); } : undefined}
+        onDoubleClick={onFloorDouble ? (e) => { if (!firstHitIn(e)) return; e.stopPropagation(); onFloorDouble(); } : undefined} />
       {walls.map((w) => (
         <Wall key={w.id} w={w} prev={incomingOf.get(w.id)} origin={origin}
           openings={room.openings.filter((o) => o.wallId === w.id)} autoHide={autoHide} lowerH={room.lowerH}
-          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu}
+          selected={w.id === selectedWallId} onDown={onWallDown} onMenu={onWallMenu} onDouble={onWallDouble}
           selectedOpeningId={selectedOpeningId} onOpeningDown={onOpeningDown} />
       ))}
       {room.columns.map((c) => (

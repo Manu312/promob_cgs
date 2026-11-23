@@ -310,3 +310,4 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .pv-bar span { margin-right: auto; }
 .rw-holder[hidden] { display: none; }
 .reposicionar .rp-sub { font-size: 12px; margin-top: 4px; }
+.vp-toolbar select { width: auto; }

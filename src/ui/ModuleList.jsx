@@ -29,7 +29,7 @@ export default function ModuleList({ project, selectedIds = [], onSelect, onTogg
           <div key={pl.id} className="ml-plane">
             <button className="ml-plane-btn" onClick={() => setClosed((c) => ({ ...c, [pl.id]: !c[pl.id] }))}>{closed[pl.id] ? '⊞' : '⊟'} {pl.label} <small>({pl.ids.length})</small></button>
             {!closed[pl.id] && pl.ids.map((id) => (
-              <div key={id} className={`ml-row${sel.includes(id) ? ' on' : ''}${byId.get(id)?.hidden ? ' off' : ''}`} role="button" tabIndex={0} onClick={(e) => click(e, id)}>
+              <div key={id} data-id={id} className={`ml-row${sel.includes(id) ? ' on' : ''}${byId.get(id)?.hidden ? ' off' : ''}`} role="button" tabIndex={0} onClick={(e) => click(e, id)}>
                 <button className="ml-bulb" title={byId.get(id)?.hidden ? 'Mostrar' : 'Ocultar'} aria-label="Visibilidad"
                   onClick={(e) => { e.stopPropagation(); onToggleHidden([id]); }}><Bulb on={!byId.get(id)?.hidden} /></button>
                 <span>{moduleRowLabel(project, id)}</span>

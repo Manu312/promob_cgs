@@ -350,3 +350,8 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .se-vertex { fill: #fff; stroke: #2563eb; cursor: pointer; }
 .se-draft { fill: rgba(220,38,38,.12); stroke: #dc2626; stroke-dasharray: 4 3; }
 .se-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tampon-editor label { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.tampon-editor label select { width: auto; }
+.se-top { fill: #8b8b88; stroke: #374151; }
+.se-floor { stroke: #9ca3af; }
+.tampon-form { border-top: 1px solid var(--line); padding-top: 6px; }

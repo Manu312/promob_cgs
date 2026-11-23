@@ -399,3 +399,7 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .ext-item { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
 .ext-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
 .vp-import { width: auto; }
+/* Aviso de guardado (almacenamiento del navegador lleno o sin acceso) */
+.storage-alert { display: flex; align-items: center; gap: 10px; padding: 6px 14px; font-size: 13px; background: #fef3c7; color: #78350f; border-bottom: 1px solid #f59e0b; }
+.storage-alert.error { background: #fee2e2; color: #7f1d1d; border-bottom-color: #dc2626; }
+.storage-alert span { flex: 1; }

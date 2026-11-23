@@ -103,6 +103,8 @@ export const BG_MODES = [['color', 'Color'], ['degrade', 'Degradé'], ['imagen',
 export const DEFAULT_BACKGROUND = { mode: 'color', color: '#e7e3dc', color2: '#ffffff', image: null };
 export const BG_IMAGE_MAX = 2048; // px del lado mayor al cargar la imagen (se guarda con el proyecto)
 
+import { safeImageOrNull } from './safeData.js';
+
 const isHex = (c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
 export function normalizeBackground(b) {
   const s = b && typeof b === 'object' ? b : {};
@@ -111,7 +113,7 @@ export function normalizeBackground(b) {
     mode: BG_MODES.some(([k]) => k === s.mode) ? s.mode : d.mode,
     color: isHex(s.color) ? s.color : d.color,
     color2: isHex(s.color2) ? s.color2 : d.color2,
-    image: typeof s.image === 'string' && s.image.startsWith('data:image/') ? s.image : null,
+    image: safeImageOrNull(s.image),
   };
 }
 
@@ -146,7 +148,7 @@ export function normalizeWatermark(w) {
   const d = DEFAULT_WATERMARK;
   return {
     use: s.use === true,
-    image: typeof s.image === 'string' && s.image.startsWith('data:image/') ? s.image : null,
+    image: safeImageOrNull(s.image),
     position: WM_POSITIONS.some(([k]) => k === s.position) ? s.position : d.position,
     transparency: Number.isFinite(+s.transparency) ? Math.min(100, Math.max(0, Math.round(+s.transparency))) : d.transparency,
     offset: Number.isFinite(+s.offset) ? Math.min(2000, Math.max(0, Math.round(+s.offset))) : d.offset,

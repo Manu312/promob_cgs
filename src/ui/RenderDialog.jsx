@@ -3,6 +3,7 @@ import { QUALITIES, SIZE_PRESETS, SIZE_MODES, MIN_SIDE, MAX_SIDE, CLIMAS, BG_MOD
 import { Compass, AltitudeArc } from './SunControls.jsx';
 import { readImageFile } from './imageFile.js';
 import { NumField } from './fields.jsx';
+import { cssImageUrl } from '../domain/safeData.js';
 
 // Diálogo "Configuración del render" (como el de Promob): pestañas con la calidad y la dimensión,
 // el clima, el fondo, la marca de agua y el 360°. Cada cambio se guarda en el proyecto.
@@ -165,7 +166,7 @@ function FondoTab({ bg, onBg }) {
     setErr(null);
     try { onBg({ image: await readImageFile(file, { max: BG_IMAGE_MAX }), mode: 'imagen' }); } catch (e) { setErr(e.message); }
   };
-  const preview = bg.mode === 'imagen' && bg.image ? { backgroundImage: `url(${bg.image})` }
+  const preview = bg.mode === 'imagen' && bg.image ? { backgroundImage: cssImageUrl(bg.image) }
     : bg.mode === 'degrade' ? { background: `linear-gradient(${bg.color}, ${bg.color2})` } : { background: bg.color };
   return (
     <div className="rd-body">

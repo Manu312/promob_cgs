@@ -25,7 +25,7 @@ import { updateOpening, setOpeningDim, moveColumn, removeOpening, removeColumn }
 import { addWall, segmentEnd } from './domain/drawWalls.js';
 import { addAnnotation, removeAnnotation } from './domain/annotations.js';
 import { scalePlanImage } from './domain/planImage.js';
-import { absAngle } from './domain/walls.js';
+import { absAngle, wallGeometry } from './domain/walls.js';
 import DrawHud from './ui/DrawHud.jsx';
 import { buildAll, computeCutList, resolveRules } from './domain/cutlist.js';
 import { nestAll } from './domain/nesting.js';
@@ -60,6 +60,7 @@ import { joinWalls, angleFrom304050, pointOnWall, projectOnAngle } from './domai
 import { fitFloor, standardFloor, setFloorShape, setFloorGrid, floorGridOf, snapToFloorGrid } from './domain/floor.js';
 import { FloorShapeEditor, FloorGridEditor } from './ui/FloorEditors.jsx';
 import { rulerGroups, wallRulers, snapToRulers } from './domain/rulers.js';
+import { INSERT_DIRECTIONS, INSERT_ORIENTATIONS, placeRelative, orientItem, changePlane, detachModule } from './domain/insertion.js';
 import RulersDialog from './ui/RulersDialog.jsx';
 import { modulesOnWall } from './domain/wallEdit.js';
 import { FILL_MODES, fillMode, nextFillMode } from './domain/fillModes.js';
@@ -176,7 +177,7 @@ export default function App() {
     const m = p.modules.find((o) => o.id === id);
     if (!m) return p;
     const { x, z } = lockAxis(m, x0, z0, lock);
-    let pos = magnet ? snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id), p.room, 40, gridStep) : { x: Math.round(x), z: Math.round(z) };
+    let pos = magnet && !m.detached ? snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id), p.room, 40, gridStep) : { x: Math.round(x), z: Math.round(z) };
     // Grilla del piso con "Atraer": los bordes del módulo se pegan a sus líneas
     const fg = floorGridOf(p.room);
     if (fg.attract) { const { fw, fd } = footprint(m); pos = snapToFloorGrid(pos.x, pos.z, fw, fd, fg); }
@@ -445,6 +446,7 @@ export default function App() {
     else if (action === 'reposition') duplicateSelected(true);
     else if (action === 'locate') locateSelected();
     else if (action === 'tampon') setTamponDlg({ ids: selectedIds });
+    else if (action === 'detach') setProject((p) => ({ ...p, modules: p.modules.map((m) => (selectedIds.includes(m.id) ? (m.detached ? { ...m, detached: false } : detachModule(m)) : m)) }));
     else if (action === 'delete') deleteSelected();
     else if (action === 'group') groupSelected();
     else if (action === 'ungroup') ungroupSelected();
@@ -484,6 +486,28 @@ export default function App() {
   const [joinTool, setJoinTool] = useState(null); // Encuentro de paredes: { movingId, mode }
   // Réguas: grupos (guardados para todos los proyectos) y el de cada pared
   const [rulersDlg, setRulersDlg] = useState(null);
+  // Cambiar de plano (clic derecho durante el arrastre): piso, arriba de un módulo o una pared.
+  const onChangePlane = useCallback((id, cx, cy) => {
+    const t = surfaceRef.current?.(cx, cy);
+    if (!t) return;
+    setProject((p) => {
+      const m = p.modules.find((o) => o.id === id);
+      if (!m) return p;
+      let target = t.kind === 'module' && t.id !== id ? { kind: 'module', id: t.id } : t.kind === 'floor' ? { kind: 'floor' } : null;
+      if (t.kind === 'wall') {
+        const g = wallGeometry(p.room).find((w) => w.id === t.wallId);
+        if (g) {
+          const { fw, fd } = footprint(m);
+          const c = [m.x + fw / 2, m.z + fd / 2];
+          const s = Math.max(0, Math.min(g.len, (c[0] - g.a[0]) * g.u[0] + (c[1] - g.a[1]) * g.u[1]));
+          target = { kind: 'wall', point: [g.a[0] + g.u[0] * s, g.a[1] + g.u[1] * s] };
+        }
+      }
+      if (!target) return p;
+      const n = changePlane(m, target, p);
+      return n === m ? p : { ...p, modules: p.modules.map((o) => (o.id === id ? n : o)) };
+    });
+  }, [setProject]);
   const groupsR = rulerGroups(ui.rulerGroups);
   const rulerGroupFor = (m, room) => {
     for (const w of room.walls) {
@@ -750,10 +774,27 @@ export default function App() {
       return { ...m, x: Math.round(base.x + ex[0] * c.dx), z: Math.round(base.z + ex[1] * c.dx), rot: base.rot || 0, groupId: gid };
     });
   };
+  // Orientación de inserción (placas) y Dirección de inserción (al lado del seleccionado).
+  const oriented = (item, variant) => {
+    const o = orientItem(item.type, { ...(MODULE_TYPES[item.type]?.defaults || {}), ...itemParams(item, variant) }, ui.insertOrient || '');
+    return o.type === item.type && !ui.insertOrient ? { type: item.type, params: itemParams(item, variant), y: item.y } : { type: o.type, params: o.params, y: item.y };
+  };
   const insertItem = (item, variant = null) => {
+    const base = ui.insertDir && project.modules.find((o) => o.id === selectedId);
+    if (base && !item.compose) {
+      countUse(item);
+      const o = oriented(item, variant);
+      const fresh = withItem(newModule(o.type, project, o.params, o.y), item, project.modules);
+      const m = withAutoInsert(placeRelative(base, fresh, ui.insertDir), project, (x) => resolveRules(x, project));
+      setProject((p) => ({ ...p, modules: [...p.modules, m] }));
+      setSelectedId(m.id);
+      setTab('diseno');
+      return;
+    }
     if (item.compose) { countUse(item); const base = newModule(item.compose[0].type, project, item.compose[0].params); insertModules(composeAt(item, base)); setTab('diseno'); return; }
     countUse(item);
-    const m = withAutoInsert(withItem(newModule(item.type, project, itemParams(item, variant), item.y), item, project.modules), project, (x) => resolveRules(x, project));
+    const o = oriented(item, variant);
+    const m = withAutoInsert(withItem(newModule(o.type, project, o.params, o.y), item, project.modules), project, (x) => resolveRules(x, project));
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));
     setSelectedId(m.id);
     setTab('diseno');
@@ -1036,6 +1077,15 @@ export default function App() {
               <button className={`nav-tool${navTool === 'walk' ? ' active' : ''}`} disabled={view.name === 'planta' || view.ortho} onClick={() => navToggle('walk')} title="Caminar (C): arrastrar arriba/abajo avanza o retrocede; a los costados gira. Solo en perspectiva.">Caminar</button>
               <button className={drawing ? 'active' : ''} onClick={() => (drawing ? stopDrawWalls() : startDrawWalls())} title="Construir paredes (Ctrl+Shift+P)">✏ Paredes</button>
               <button className={annotating ? 'active' : ''} onClick={() => (annotating ? stopAnnotate() : startAnnotate())} title="Cota manual: lineal o angular">↔ Cota</button>
+              <select className="vp-insert-dir" value={ui.insertDir || ''} title="Dirección de inserción: el ítem nuevo (clic en el catálogo) va pegado al módulo seleccionado"
+                onChange={(e) => setUi((u) => ({ ...u, insertDir: e.target.value || null }))}>
+                <option value="">Inserción: libre</option>
+                {INSERT_DIRECTIONS.map(([k, l]) => <option key={k} value={k}>Inserción: {l.toLowerCase()}</option>)}
+              </select>
+              <select className="vp-insert-orient" value={ui.insertOrient || ''} title="Orientación de inserción de placas (estantes, laterales, paneles)"
+                onChange={(e) => setUi((u) => ({ ...u, insertOrient: e.target.value || null }))}>
+                {INSERT_ORIENTATIONS.map(([k, l]) => <option key={k} value={k}>Orientación: {l.toLowerCase()}</option>)}
+              </select>
               <select className="vp-geometry" value={geoTool?.kind || ''} title="Construir geometría" onChange={(e) => (e.target.value ? startGeometry(e.target.value) : setGeoTool(null))}>
                 <option value="">Geometría…</option>
                 {GEOMETRY_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
@@ -1070,7 +1120,7 @@ export default function App() {
                 onDimEdit={onDimEdit} onWallLength={onWallLength} onWallAngle={onWallAngle}
                 onDragStart={onDragStart} onDragEnd={history.commit}
                 drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
-                onWallContext={onWallContext} onModuleContext={(m) => setModMenu(m)}
+                onWallContext={onWallContext} onModuleContext={(m) => setModMenu({ ...m, detached: !!project.modules.find((o) => o.id === m.id)?.detached })}
                 annotating={annTool} onAnnotatePoint={annotating ? onAnnotatePoint : onScalePoint} onAnnotateFinish={annotating ? stopAnnotate : stopScale}
                 selectedDimId={selectedDimId} onSelectDim={selectDim}
                 onRestoreWall={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, id, { lowered: false }) }))}
@@ -1080,6 +1130,7 @@ export default function App() {
                 navTool={navTool} navRef={navRef} surfaceRef={surfaceRef}
                 onFloorMenu={(ev) => setFloorMenu({ x: ev.clientX, y: ev.clientY })}
                 rulersOf={ui.showRulers ? (w) => wallRulers(w, groupsR) : null}
+                onChangePlane={onChangePlane}
                 onMoveHotpoint={(id, x, z) => setProject((p) => {
                   const g = roomWalls(p.room).find((w) => w.id === id);
                   if (!g) return p;

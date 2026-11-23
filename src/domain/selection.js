@@ -31,6 +31,12 @@ export function describeSelection(project, sel) {
     return a.kind === 'lin' ? `Cota lineal · ${annotationValue(a)} mm` : `Cota angular · ${annotationValue(a)}°`;
   }
   if (sel.kind === 'floor') return 'Piso';
+  if (sel.kind === 'geometry') {
+    const g = (project.geometries || []).find((x) => x.id === sel.id);
+    if (!g) return '';
+    const kinds = { libre: 'libre', rect: 'rectangular', circ: 'circular', poly: 'poligonal', lineal: 'lineal' };
+    return `Geometría ${kinds[g.kind] || ''} · altura ${g.height}`;
+  }
   if (sel.kind === 'module') {
     const m = project.modules.find((x) => x.id === sel.id);
     if (!m) return '';

@@ -355,3 +355,9 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .se-top { fill: #8b8b88; stroke: #374151; }
 .se-floor { stroke: #9ca3af; }
 .tampon-form { border-top: 1px solid var(--line); padding-top: 6px; }
+.geo-overlay { cursor: crosshair; }
+.geo-hud { flex-wrap: wrap; }
+.geo-hud label { display: flex; align-items: center; gap: 3px; font-size: 12px; }
+.geo-hud input[type=number] { width: 64px; }
+.vp-toolbar .vp-geometry { max-width: 130px; }
+.geometry-panel textarea { width: 100%; font: inherit; }

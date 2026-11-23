@@ -1,6 +1,6 @@
 const r2 = (v) => Math.round(v * 100) / 100;
 
-export function computeBudget(cut, nesting, settings) {
+export function computeBudget(cut, nesting, settings, extraLines = []) {
   const lines = [];
   for (const n of nesting) {
     if (!n.sheets.length) continue;
@@ -17,6 +17,9 @@ export function computeBudget(cut, nesting, settings) {
   }
   for (const e of Object.values(cut.extras || {})) {
     lines.push({ group: 'Electrodomésticos', desc: e.name, qty: e.qty, unit: 'u', unitPrice: e.price, total: e.qty * e.price });
+  }
+  for (const e of extraLines) { // geometrías presupuestadas (Promob: Orçamento de la geometría)
+    lines.push({ group: 'Geometrías', desc: e.label, qty: e.qty, unit: 'u', unitPrice: e.price, total: e.qty * e.price });
   }
   for (const a of Object.values(cut.accItems || {})) {
     const q = r2(a.qty);

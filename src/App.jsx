@@ -61,6 +61,9 @@ import MaterialsPanel from './ui/MaterialsPanel.jsx';
 import { StripEditor, RegionEditor } from './ui/SurfaceEditors.jsx';
 import TamponamentoEditor from './ui/TamponamentoEditor.jsx';
 import { linearItemFor, DEFAULT_TOP_ITEMS } from './domain/tamponamento.js';
+import { GEOMETRY_KINDS, newGeometry, addGeometry, updateGeometry, removeGeometry, moveGeometry, outlineOf, boundsOf, resizeGeometry, regularPolygon, snapSegment, nextPoint, rectPts, convertGeometry, geometryBudgetLines } from './domain/geometry.js';
+import { GeometryHud, LinealDialog, GeometryPanel } from './ui/GeometryPanels.jsx';
+import { planeFrame } from './ui/Geometry3D.jsx';
 import { stripsOf, cellAt, applyStripMaterial, updateRegion } from './domain/strips.js';
 import { roomWalls } from './domain/room.js';
 import ReposicionarDialog from './ui/ReposicionarDialog.jsx';
@@ -145,7 +148,8 @@ export default function App() {
   const builtById = useMemo(() => new Map(built.map((b) => [b.id, b])), [built]);
   const cut = useMemo(() => computeCutList(built), [built]);
   const nesting = useMemo(() => nestAll(cut.rows, settings), [cut, settings]);
-  const budget = useMemo(() => computeBudget(cut, nesting, settings), [cut, nesting, settings]);
+  const geoBudget = useMemo(() => geometryBudgetLines(project), [project.geometries]); // eslint-disable-line react-hooks/exhaustive-deps
+  const budget = useMemo(() => computeBudget(cut, nesting, settings, geoBudget), [cut, nesting, settings, geoBudget]);
 
   const selected = project.modules.find((m) => m.id === selectedId) || null;
   // Miniaturas del catálogo: se regeneran si cambian materiales o reglas del proyecto.
@@ -514,6 +518,105 @@ export default function App() {
     // conserva lo propio del ítem (p. ej. la tapa para bacha); las medidas son las de los módulos
     return { id: 'ghost', mats: {}, ...lin, params: { ...lin.params, ...(d.item.params || {}), width: lin.params.width, depth: lin.params.depth, height: lin.params.height } };
   };
+  // Geometrías (Promob: Construir Geometria). El plano por defecto es el piso; clic derecho en una
+  // pared o en un módulo (antes del primer punto) lo cambia.
+  const selectedGeoId = selection?.kind === 'geometry' ? selection.id : null;
+  const selectedGeo = (project.geometries || []).find((g) => g.id === selectedGeoId) || null;
+  const [geoTool, setGeoTool] = useState(null); // { kind, plane, pts, cursor, opts }
+  const [linealDlg, setLinealDlg] = useState(null);
+  const [geoMsg, setGeoMsg] = useState(null);
+  const startGeometry = (kind) => {
+    stopDrawWalls(); stopAnnotate(); stopScale();
+    const d = ui.geoDefaults || {};
+    setGeoTool({ kind, plane: { kind: 'floor' }, pts: [], cursor: null, opts: { height: d.height ?? 150, offset: d.offset ?? 0, thickness: d.thickness ?? 18, incL: d.incL ?? 50, incA: d.incA ?? 5, sides: 6, arc: 360, base: 0 } });
+  };
+  const geoPlaneY = (plane) => (plane.kind === 'module' ? planeFrame({ plane }, project.room, project.modules)?.y || 0 : 0);
+  const geoProject = (plane, cx, cy) => {
+    if (plane.kind === 'wall') return surfaceRef.wallPoint?.(cx, cy, plane.wallId) || null;
+    return pickRef.current?.(cx, cy, geoPlaneY(plane)) || null;
+  };
+  const geoData = (t, cursor) => { // figura según el tipo y los puntos (para la vista previa y para crearla)
+    const p0 = t.pts[0], o = t.opts;
+    if (t.kind === 'rect') return p0 && cursor ? { pts: rectPts(p0[0], p0[1], cursor[0], cursor[1]) } : null;
+    if (t.kind === 'circ') return p0 && cursor ? { cx: p0[0], cy: p0[1], radius: Math.hypot(cursor[0] - p0[0], cursor[1] - p0[1]), arc: o.arc || 360, baseAngle: o.base || 0 } : null;
+    if (t.kind === 'poly') return p0 && cursor ? { pts: regularPolygon(p0[0], p0[1], o.sides || 6, { circ: Math.hypot(cursor[0] - p0[0], cursor[1] - p0[1]) }), sides: o.sides || 6, radius: Math.hypot(cursor[0] - p0[0], cursor[1] - p0[1]) } : null;
+    const pts = cursor ? [...t.pts, cursor] : t.pts;
+    if (t.kind === 'lineal') return pts.length >= 2 ? { pts } : null;
+    return pts.length >= 3 ? { pts } : null;
+  };
+  const geoOpts = (t) => ({ height: t.opts.height || 150, offset: t.opts.offset || 0, thickness: t.opts.thickness || 18 });
+  const createGeometry = (t, data) => {
+    if (t.opts.asDefault) setUi((u) => ({ ...u, geoDefaults: { height: t.opts.height, offset: t.opts.offset, thickness: t.opts.thickness, incL: t.opts.incL, incA: t.opts.incA } }));
+    if (t.kind === 'lineal') { setLinealDlg({ t, data }); setGeoTool(null); return; }
+    const g = newGeometry(t.kind, t.plane, data, geoOpts(t));
+    setProject((p) => addGeometry(p, g));
+    setSelection({ kind: 'geometry', id: g.id });
+    setGeoTool(null);
+  };
+  const finishLineal = ({ align, color, segments, convert }) => {
+    const { t, data } = linealDlg;
+    setLinealDlg(null);
+    const make = (pts) => ({ ...newGeometry('lineal', t.plane, { pts }, geoOpts(t)), align, color });
+    const list = segments ? data.pts.slice(0, -1).map((p, i) => make([p, data.pts[i + 1]])) : [make(data.pts)];
+    if (convert) {
+      const out = list.map((g) => convertGeometry(g, convert));
+      const bad = out.find((r) => r.error);
+      if (bad) { setGeoMsg(bad.error); }
+      else { insertModules(out.map((r) => ({ ...r.module, params: { ...(MODULE_TYPES[r.module.type]?.defaults || {}), ...r.module.params } }))); return; }
+    }
+    setProject((p) => list.reduce(addGeometry, p));
+    setSelection({ kind: 'geometry', id: list[0].id });
+  };
+  const geoClick = (cx, cy) => {
+    const t = geoTool;
+    const p = geoProject(t.plane, cx, cy);
+    if (!p) return;
+    if (t.kind === 'libre' || t.kind === 'lineal') {
+      if (t.kind === 'libre' && t.pts.length >= 3 && Math.hypot(p[0] - t.pts[0][0], p[1] - t.pts[0][1]) < 60) { createGeometry(t, { pts: t.pts }); return; }
+      const q = t.pts.length ? snapSegment(t.pts.at(-1), p, t.opts.incL || 1, t.opts.incA || 1).point : p;
+      setGeoTool({ ...t, pts: [...t.pts, q] });
+      return;
+    }
+    if (!t.pts.length) { setGeoTool({ ...t, pts: [p] }); return; }
+    const data = geoData(t, p);
+    if (data) createGeometry(t, data);
+  };
+  const geoEnter = () => {
+    const t = geoTool;
+    if (!t) return;
+    const o = t.opts, p0 = t.pts[0];
+    if ((t.kind === 'libre' || t.kind === 'lineal') && t.pts.length && o.len) {
+      setGeoTool({ ...t, pts: [...t.pts, nextPoint(t.pts.at(-1), o.len, o.ang || 0)], opts: { ...o, len: null } });
+    } else if (t.kind === 'rect' && p0 && o.w && o.d) createGeometry(t, { pts: rectPts(p0[0], p0[1], p0[0] + o.w, p0[1] + o.d) });
+    else if ((t.kind === 'circ' || t.kind === 'poly') && p0 && o.r) createGeometry(t, geoData(t, [p0[0] + o.r, p0[1]]));
+  };
+  const geoFinish = () => {
+    const t = geoTool;
+    if (t && (t.kind === 'libre' ? t.pts.length >= 3 : t.kind === 'lineal' && t.pts.length >= 2)) createGeometry(t, { pts: t.pts });
+  };
+  const geoOverlay = geoTool ? {
+    onContextMenu: (e) => {
+      e.preventDefault();
+      if (!geoTool.pts.length) { // clic derecho: elegir el plano de construcción
+        const s = surfaceRef.current?.(e.clientX, e.clientY);
+        const plane = s?.kind === 'wall' ? { kind: 'wall', wallId: s.wallId } : s?.kind === 'module' ? { kind: 'module', id: s.id } : { kind: 'floor' };
+        setGeoTool({ ...geoTool, plane });
+      } else geoFinish();
+    },
+    onPointerMove: (e) => { const c = geoProject(geoTool.plane, e.clientX, e.clientY); if (c) setGeoTool((t) => (t ? { ...t, cursor: c } : t)); },
+    onPointerDown: (e) => { if (e.button === 0) geoClick(e.clientX, e.clientY); },
+  } : null;
+  const geoDraft = geoTool && geoTool.cursor ? (() => {
+    const d = geoData(geoTool, geoTool.cursor);
+    return d ? { ...newGeometry(geoTool.kind, geoTool.plane, d, geoOpts(geoTool)), id: 'draft' } : null;
+  })() : null;
+  const onMoveGeometry = useCallback((id, x, z) => setProject((p) => {
+    const g = (p.geometries || []).find((o) => o.id === id);
+    if (!g) return p;
+    const b = boundsOf(outlineOf(g));
+    if (b.x0 === x && b.y0 === z) return p;
+    return updateGeometry(p, id, moveGeometry(g, x - b.x0, z - b.y0));
+  }), [setProject]);
   const vpDrag = {
     onDragOver: (e) => {
       if (e.dataTransfer?.types?.includes('text/x-room-mat')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; return; }
@@ -533,6 +636,7 @@ export default function App() {
         const t = surfaceRef.current?.(e.clientX, e.clientY);
         if (t?.kind === 'floor') applyMat(t, matId);
         else if (t?.kind === 'region') setProject((p) => ({ ...p, room: updateRegion(p.room, t.id, { finish: { mat: matId } }) }));
+        else if (t?.kind === 'geometry') setProject((p) => updateGeometry(p, t.id, { finish: { mat: matId, scaleX: 1, scaleY: 1, rot: 0 } }));
         else if (t?.kind === 'wall') setMatMenu({ matId, wallId: t.wallId, u: t.u, v: t.v, strips: wallHasStrips(t.wallId), x: e.clientX, y: e.clientY });
         return;
       }
@@ -674,6 +778,18 @@ export default function App() {
         else if (scaling.points.length === 2 && e.key === 'Enter') applyScale();
         return;
       }
+      if (geoTool) {
+        if (e.key === 'Escape') setGeoTool(null);
+        else if (e.key === 'Enter') geoEnter();
+        else if (/^[0-9]$/.test(e.key)) { // los números van al primer campo (largo, ancho o radio), como en Promob
+          e.preventDefault();
+          const k = geoTool.kind === 'rect' ? 'w' : geoTool.kind === 'circ' || geoTool.kind === 'poly' ? 'r' : 'len';
+          setGeoTool((t) => ({ ...t, opts: { ...t.opts, [k]: Number(String(t.opts[k] ?? '') + e.key) } }));
+          setTimeout(() => document.querySelector(`.geo-hud .gh-${k}`)?.focus(), 0);
+        }
+        return;
+      }
+      if (selectedGeoId && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); setProject((p) => removeGeometry(p, selectedGeoId)); setSelection(null); return; }
       if (selectedDimId && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); setProject((p) => removeAnnotation(p, selectedDimId)); setSelection(null); return; }
       if (drawing) { // los números van directo al largo, como en Promob
         if (e.key === 'Escape') stopDrawWalls();
@@ -851,6 +967,10 @@ export default function App() {
               <button className={`nav-tool${navTool === 'walk' ? ' active' : ''}`} disabled={view.name === 'planta' || view.ortho} onClick={() => navToggle('walk')} title="Caminar (C): arrastrar arriba/abajo avanza o retrocede; a los costados gira. Solo en perspectiva.">Caminar</button>
               <button className={drawing ? 'active' : ''} onClick={() => (drawing ? stopDrawWalls() : startDrawWalls())} title="Construir paredes (Ctrl+Shift+P)">✏ Paredes</button>
               <button className={annotating ? 'active' : ''} onClick={() => (annotating ? stopAnnotate() : startAnnotate())} title="Cota manual: lineal o angular">↔ Cota</button>
+              <select className="vp-geometry" value={geoTool?.kind || ''} title="Construir geometría" onChange={(e) => (e.target.value ? startGeometry(e.target.value) : setGeoTool(null))}>
+                <option value="">Geometría…</option>
+                {GEOMETRY_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
               {view.name === 'planta' && (
                 <span className="grid-ctl">
                   <button className={grid.magnetic ? 'active-soft' : ''} onClick={() => setGrid({ magnetic: !grid.magnetic })}
@@ -885,6 +1005,7 @@ export default function App() {
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
                 onWallDouble={(id) => goView({ name: 'pared', wallId: id })} onFloorDouble={() => goView({ name: 'planta' })}
                 navTool={navTool} navRef={navRef} surfaceRef={surfaceRef}
+                selectedGeoId={selectedGeoId} onSelectGeometry={(id) => setSelection({ kind: 'geometry', id })} onMoveGeometry={onMoveGeometry} geoDraft={geoDraft}
                 onFloorDown={side === 'materiales' || roomTool ? () => { if (!roomToolClick({ kind: 'floor' })) setSelection({ kind: 'floor' }); } : null}
                 renderMode={renderMode || renderDlg || !!renderJob || fill === 'presentacion'} renderRef={renderRef} fill={fill === 'presentacion' ? 'texturas' : fill}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower && !renderJob?.panorama} pickRef={pickRef} ghost={ghost}
@@ -925,6 +1046,10 @@ export default function App() {
               fileName={`${project.name || 'render'}${renderJob.panorama ? '-360' : ''}.png`} onClose={() => setRenderJob(null)} />}
             {reposDlg && <ReposicionarDialog initial={reposDlg.initial} onCancel={() => setReposDlg(null)}
               onOk={(o) => { setReposDlg(null); setDupOffset(o); duplicateWith(o); }} />}
+            {geoOverlay && <div className="nav-overlay geo-overlay" {...geoOverlay} />}
+            {geoTool && <GeometryHud tool={geoTool} onTool={setGeoTool} onEnter={geoEnter} onFinish={geoFinish} onCancel={() => setGeoTool(null)} />}
+            {linealDlg && <LinealDialog onOk={finishLineal} onCancel={() => setLinealDlg(null)} />}
+            {geoMsg && <div className="menu-backdrop dim" onPointerDown={() => setGeoMsg(null)}><div className="wall-dialog"><p>{geoMsg}</p><div className="row-btns"><button className="active" onClick={() => setGeoMsg(null)}>Aceptar</button></div></div></div>}
             {navOverlay && <div className={`nav-overlay ${navTool}`} {...navOverlay}>
               {zoomBox && <div className="zoom-box" style={{ left: Math.min(zoomBox.x0, zoomBox.x1), top: Math.min(zoomBox.y0, zoomBox.y1), width: Math.abs(zoomBox.x1 - zoomBox.x0), height: Math.abs(zoomBox.y1 - zoomBox.y0) }} />}
             </div>}
@@ -983,6 +1108,18 @@ export default function App() {
               styles={stylesOf(settings)} onStyles={(list) => setSettings((s) => ({ ...s, styles: list }))}
               onApplyStyle={(style, scope) => setProject((p) => applyStyle(p, style, scope, selectedId ? [selectedId] : []))} />
           )}
+          {tool === 'propiedades' && selectedGeo && (
+            <GeometryPanel g={selectedGeo} onBack={() => setSelection(null)}
+              onChange={(patch) => setProject((p) => updateGeometry(p, selectedGeo.id, patch))}
+              onResize={(key, v, scale) => setProject((p) => updateGeometry(p, selectedGeo.id, resizeGeometry(selectedGeo, key, v, scale)))}
+              onDelete={() => { setProject((p) => removeGeometry(p, selectedGeo.id)); setSelection(null); }}
+              onConvert={(type) => {
+                const r = convertGeometry(selectedGeo, type);
+                if (r.error) { setGeoMsg(r.error); return; }
+                setProject((p) => removeGeometry(p, selectedGeo.id));
+                insertModules([{ ...r.module, params: { ...(MODULE_TYPES[r.module.type]?.defaults || {}), ...r.module.params } }]);
+              }} />
+          )}
           {tool === 'propiedades' && multiSel && (
             <MultiSelectionPanel count={selectedIds.length} text={describeMulti(project, selectedIds)} isGroup={!!selectionGroup(project, selectedIds)}
               hasGroups={project.modules.some((m) => selectedIds.includes(m.id) && m.groupId)} onGroup={groupSelected} onUngroup={ungroupSelected}
@@ -991,7 +1128,7 @@ export default function App() {
           )}
           {tool === 'movimiento'
             ? <MovementPanel label={selected ? describeSelection(project, selection) : null} ui={ui} setUi={setUi} onNudge={nudgeSelected} onRotate={(sign) => rotateBy(sign * (ui.rotStep ?? 90))} />
-            : tool === 'propiedades' && !multiSel && <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
+            : tool === 'propiedades' && !multiSel && !selectedGeo && <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
             selectedWallId={selectedWallId} onSelectWall={selectWall} onDrawWalls={startDrawWalls}
             onDeleteWall={(id) => setDeleteDlg({ wallId: id })} onSplitWall={doSplit}
             selectedOpeningId={selectedOpeningId} selectedColumnId={selectedColumnId} onSelectItem={setSelection} onScaleImage={startScale}

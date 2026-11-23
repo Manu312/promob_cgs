@@ -368,3 +368,7 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .draw-hud .dh-ref select { width: auto; }
 .dlg-304-ang { font-weight: 600; }
 .join-hud { border-left-color: #2563eb; }
+.fe-wall { stroke: #9ca3af; stroke-width: 6; }
+.fe-floor { fill: rgba(216,209,196,.7); stroke: #2563eb; stroke-width: 1.5; }
+.fe-add circle { fill: #fff; stroke: #16a34a; } .fe-add text { font-size: 12px; fill: #16a34a; pointer-events: none; } .fe-add { cursor: copy; }
+.fe-vertex { cursor: move; }

@@ -439,7 +439,7 @@ export default function App() {
     if (!renderRef.current) return;
     setSelectedId(null);
     setRenderDlg(false);
-    setRenderJob({ size: renderOut, quality: qualityOf(renderCfg), rig: lightRig(renderCfg.clima) });
+    setRenderJob({ size: renderOut, quality: qualityOf(renderCfg), rig: lightRig(renderCfg.clima), background: renderCfg.background });
   };
 
   const exportImage = () => {
@@ -568,7 +568,7 @@ export default function App() {
                 onChange={(fn) => setProject((p) => ({ ...p, render: normalizeRender(fn(normalizeRender(p.render))) }))}
                 onRender={startRender} onBegin={history.begin} onEnd={history.commit} />
             )}
-            {renderJob && <RenderWindow bridge={renderRef.current} size={renderJob.size} quality={renderJob.quality} rig={renderJob.rig}
+            {renderJob && <RenderWindow bridge={renderRef.current} size={renderJob.size} quality={renderJob.quality} rig={renderJob.rig} background={renderJob.background}
               fileName={`${project.name || 'render'}.png`} onClose={() => setRenderJob(null)} />}
             {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}

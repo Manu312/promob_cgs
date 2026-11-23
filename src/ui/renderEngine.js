@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { WebGLPathTracer, GradientEquirectTexture } from 'three-gpu-pathtracer';
-import { fitRect, renderFov } from '../domain/render.js';
+import { fitRect, renderFov, coverRect } from '../domain/render.js';
+import { loadImage } from './imageFile.js';
 
 // Motor de la ventana de render: un WebGLRenderer aparte, fuera de pantalla, al tamaño pedido.
 // Usa la misma escena del visor (three guarda los recursos de GPU por renderer) y una copia de la
@@ -36,7 +37,22 @@ function skyTexture(sky) {
 }
 
 // Crea un trabajo de render. `quality` = qualityOf(config); `onProgress(muestras)` se llama al avanzar.
-export function createRenderJob({ gl, scene, camera, view, size, quality, rig, background = '#e7e3dc', onProgress, onDone }) {
+// Fondo de la imagen: color, degradé vertical (principal → gradual) o imagen que cubre el cuadro.
+export function drawBackground(ctx, bg, W, H, img) {
+  if (bg?.mode === 'degrade') {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, bg.color);
+    g.addColorStop(1, bg.color2);
+    ctx.fillStyle = g;
+  } else ctx.fillStyle = bg?.color || '#e7e3dc';
+  ctx.fillRect(0, 0, W, H);
+  if (bg?.mode === 'imagen' && img) {
+    const r = coverRect(img.naturalWidth, img.naturalHeight, W, H);
+    ctx.drawImage(img, r.x, r.y, r.w, r.h);
+  }
+}
+
+export function createRenderJob({ gl, scene, camera, view, size, quality, rig, background, onProgress, onDone }) {
   const { width: W, height: H } = size;
   const glCanvas = document.createElement('canvas');
   const off = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -79,12 +95,17 @@ export function createRenderJob({ gl, scene, camera, view, size, quality, rig, b
     }
   };
 
+  let bgImg = null;
+  let pending = 0; // cargas de imágenes en curso (fondo); la imagen final espera a que terminen
   const compose = () => {
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = background;
-    ctx.fillRect(0, 0, W, H);
+    drawBackground(ctx, background, W, H, bgImg);
     ctx.drawImage(glCanvas, 0, 0, W, H);
   };
+  if (background?.mode === 'imagen' && background.image) {
+    pending += 1;
+    loadImage(background.image).then((img) => { bgImg = img; }).catch(() => {}).finally(() => { pending -= 1; compose(); });
+  }
 
   let pt = null;
   let raf = 0;
@@ -112,6 +133,7 @@ export function createRenderJob({ gl, scene, camera, view, size, quality, rig, b
     get running() { return running; },
     get samples() { return quality.pathTrace ? samples() : (running ? 0 : 1); },
     target,
+    get loading() { return pending > 0; },
     start() {
       if (disposed) return;
       if (!quality.pathTrace) {

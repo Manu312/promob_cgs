@@ -379,3 +379,10 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .rl-table input { width: 100%; }
 .rl-table td, .rl-table th { padding: 2px 4px; font-size: 12px; }
 .ruler-label span { font-size: 10px; color: #b91c1c; background: rgba(255,255,255,.8); padding: 0 3px; border-radius: 2px; white-space: nowrap; }
+.fav-preview { display: block; max-width: 200px; border: 1px solid var(--border, #ddd); border-radius: 4px; margin: 6px 0; }
+.fav-thumb { width: 96px; height: 64px; object-fit: cover; border-radius: 3px; }
+.mod-btn { position: relative; }
+.fav-del { position: absolute; top: 2px; right: 2px; padding: 0 4px; font-size: 10px; line-height: 14px; opacity: .6; }
+.fav-del:hover { opacity: 1; }
+.cb-fav-io { margin-left: auto; display: inline-flex; gap: 4px; }
+.cb-import { cursor: pointer; display: inline-flex; align-items: center; }

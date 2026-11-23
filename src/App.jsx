@@ -50,6 +50,7 @@ import { download, money } from './ui/fields.jsx';
 import { useHistoryState } from './ui/useHistoryState.js';
 import { describeSelection } from './domain/selection.js';
 import { toggleId, selectAllIds, moveGroup, rotateGroup, describeMulti } from './domain/multiSelect.js';
+import { expandToGroups, groupModules, ungroupModules, selectionGroup, pruneGroups } from './domain/groups.js';
 
 function usePersistent(key, init, migrate = (x) => x) {
   const [v, setV] = useState(() => {
@@ -89,10 +90,19 @@ export default function App() {
   const selectedIds = useMemo(() => (selection?.kind === 'module' ? (selection.ids || [selection.id]) : []), [selection]);
   const multiSel = selectedIds.length > 1;
   const selectIds = useCallback((ids) => setSelection(ids.length ? { kind: 'module', id: ids[ids.length - 1], ids } : null), []);
+  const groupsRef = useRef(null);
   const toggleSelect = useCallback((id) => setSelection((s) => {
-    const ids = toggleId(s?.kind === 'module' ? (s.ids || [s.id]) : [], id);
+    const cur = s?.kind === 'module' ? (s.ids || [s.id]) : [];
+    const members = groupsRef.current ? expandToGroups(groupsRef.current, [id]) : [id];
+    const ids = cur.includes(id) ? cur.filter((x) => !members.includes(x)) : [...cur, ...members.filter((x) => !cur.includes(x))];
     return ids.length ? { kind: 'module', id: ids[ids.length - 1], ids } : null;
   }), []);
+  // Clic en un módulo: si es de un grupo, queda seleccionado el grupo entero (Promob).
+  const selectModule = useCallback((id) => {
+    if (!id) { setSelection(null); return; }
+    const ids = groupsRef.current ? expandToGroups(groupsRef.current, [id]) : [id];
+    setSelection({ kind: 'module', id, ids });
+  }, []);
   const selectedWallId = selection?.kind === 'wall' ? selection.id : null;
   const setSelectedId = useCallback((id) => setSelection(id ? { kind: 'module', id } : null), []);
   const selectWall = useCallback((id) => setSelection(id ? { kind: 'wall', id } : null), []);
@@ -185,6 +195,7 @@ export default function App() {
   // empezar el arrastre (sin acumular errores) y todo el arrastre es un paso de deshacer.
   const projectRef = useRef(project);
   projectRef.current = project;
+  groupsRef.current = project;
   const baseRoomRef = useRef(null), baseModsRef = useRef(null);
   const onDragStart = useCallback(() => { baseRoomRef.current = projectRef.current.room; baseModsRef.current = projectRef.current.modules; history.begin(); }, [history.begin]);
   // Los módulos apoyados en la pared la acompañan.
@@ -332,6 +343,15 @@ export default function App() {
     } else if (action === 'rotate') rotateSelected();
     else if (action === 'duplicate') duplicateSelected();
     else if (action === 'delete') deleteSelected();
+    else if (action === 'group') groupSelected();
+    else if (action === 'ungroup') ungroupSelected();
+  };
+  // Agrupar (U) y Desagrupar (Ctrl+U), como Promob.
+  const groupSelected = () => selectedIds.length > 1 && setProject((p) => groupModules(p, selectedIds));
+  const ungroupSelected = () => {
+    if (!selectedIds.length) return;
+    setProject((p) => ungroupModules(p, selectedIds));
+    setSelectedId(selectedId);
   };
 
   // Insertar desde el catálogo (doble clic): posición siguiente libre; cuenta para "Más usados".
@@ -383,7 +403,7 @@ export default function App() {
   };
   const deleteSelected = () => {
     if (!selectedId) return;
-    setProject((p) => removeModules(p, selectedIds));
+    setProject((p) => pruneGroups(removeModules(p, selectedIds)));
     setSelectedId(null);
   };
   const duplicateSelected = () => {
@@ -414,6 +434,8 @@ export default function App() {
       if (plain && key === 'a') { setTool('agregados'); return; } // Agregados
       if (plain && key === 'o' && selectedId) { setProject((p) => toggleHidden(p, selectedIds)); return; } // visible / oculto
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 't') { e.preventDefault(); selectIds(selectAllIds(project)); return; } // Seleccionar todo
+      if (plain && key === 'u') { groupSelected(); return; } // Agrupar
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'u') { e.preventDefault(); ungroupSelected(); return; } // Desagrupar
       if (plain && key === 'x') { setAxisLock((l) => (l === 'x' ? null : 'x')); return; }
       if (plain && key === 'y') { setAxisLock((l) => (l === 'z' ? null : 'z')); return; }
       if (plain && key === 'm') { stopDrawWalls(); stopAnnotate(); stopScale(); return; } // Seleccionar / Mover
@@ -518,7 +540,7 @@ export default function App() {
               onAmbiente={(cat, ids, on, onlySel) => setProject((p) => applyAuto(p, cat, ids, on, (m) => resolveRules(m, p), onlySel ? (selectedId ? [selectedId] : []) : null))} />
           )}
           {side === 'lista' && (
-            <ModuleList project={project} selectedIds={selectedIds} onSelect={(id, add) => (add ? toggleSelect(id) : setSelectedId(id))}
+            <ModuleList project={project} selectedIds={selectedIds} onSelect={(id, add) => (add ? toggleSelect(id) : selectModule(id))}
               onToggleHidden={(ids) => setProject((p) => toggleHidden(p, ids))}
               onRemove={(ids) => { setProject((p) => removeModules(p, ids)); setSelectedId(null); }} />
           )}
@@ -530,7 +552,7 @@ export default function App() {
               onShow={(path, item) => setUi((u) => ({ ...u, catalogPath: [...path, item.id] }))} />}
             <div className="vp-area" ref={vpRef} {...vpDrag}>
             <ErrorBoundary onReset={() => { setRenderJob(null); setRenderDlg(false); setRenderMode(false); }}>
-              <Scene3D project={project} builtById={builtById} selectedId={selectedId} selectedIds={selectedIds} onSelect={setSelectedId} onToggleSelect={toggleSelect} onMove={onMove}
+              <Scene3D project={project} builtById={builtById} selectedId={selectedId} selectedIds={selectedIds} onSelect={selectModule} onToggleSelect={toggleSelect} onMove={onMove}
                 selectedWallId={selectedWallId} onSelectWall={selectWall}
                 onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
                 onDimEdit={onDimEdit} onWallLength={onWallLength} onWallAngle={onWallAngle}
@@ -603,11 +625,12 @@ export default function App() {
             )}
             {renderJob && <RenderWindow bridge={renderRef.current} size={renderJob.size} quality={renderJob.quality} rig={renderJob.rig} background={renderJob.background} watermark={renderJob.watermark} panorama={renderJob.panorama}
               fileName={`${project.name || 'render'}${renderJob.panorama ? '-360' : ''}.png`} onClose={() => setRenderJob(null)} />}
-            {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)} />}
+            {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)}
+              canGroup={multiSel && !selectionGroup(project, selectedIds)} canUngroup={project.modules.some((m) => selectedIds.includes(m.id) && m.groupId)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}
             {deleteDlg && <WallDeleteDialog label={`Pared ${project.room.walls.findIndex((w) => w.id === deleteDlg.wallId) + 1}`} onConfirm={confirmDelete} onCancel={() => setDeleteDlg(null)} />}
             <div className="statusbar">
-              <span className="sb-sel">{(multiSel ? describeMulti(project, selectedIds) : describeSelection(project, selection)) || 'Sin selección'}</span>
+              <span className="sb-sel">{(multiSel ? describeMulti(project, selectedIds, !!selectionGroup(project, selectedIds)) : describeSelection(project, selection)) || 'Sin selección'}</span>
               {axisLock && <span className="sb-lock" title="X / Y cambian la traba">Movimiento trabado: solo {axisLock === 'x' ? 'ancho (X)' : 'profundidad (Y)'}</span>}
               <span className="sb-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</span>
               <StatusToggles ui={ui} onToggle={toggleUi} showDims={showDims} onShowDims={setShowDims}
@@ -639,7 +662,8 @@ export default function App() {
               onApplyStyle={(style, scope) => setProject((p) => applyStyle(p, style, scope, selectedId ? [selectedId] : []))} />
           )}
           {tool === 'propiedades' && multiSel && (
-            <MultiSelectionPanel count={selectedIds.length} text={describeMulti(project, selectedIds)}
+            <MultiSelectionPanel count={selectedIds.length} text={describeMulti(project, selectedIds)} isGroup={!!selectionGroup(project, selectedIds)}
+              hasGroups={project.modules.some((m) => selectedIds.includes(m.id) && m.groupId)} onGroup={groupSelected} onUngroup={ungroupSelected}
               onDelete={deleteSelected} onHide={() => setProject((p) => toggleHidden(p, selectedIds))}
               onRotate={() => rotateBy(90)} onClear={() => setSelectedId(null)} />
           )}

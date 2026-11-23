@@ -89,9 +89,10 @@ export function rotateGroup(project, ids, deg) {
 }
 
 // Texto de la barra de estado para varios módulos.
-export function describeMulti(project, ids) {
+export function describeMulti(project, ids, isGroup = false) {
   const mods = project.modules.filter((m) => ids.includes(m.id));
   if (mods.length < 2) return '';
   const b = groupBounds(mods);
-  return `${mods.length} módulos seleccionados · ${Math.round(b.w)} × ${Math.round(b.h)} × ${Math.round(b.d)}`;
+  const what = isGroup ? `Grupo de ${mods.length} módulos` : `${mods.length} módulos seleccionados`;
+  return `${what} · ${Math.round(b.w)} × ${Math.round(b.h)} × ${Math.round(b.d)}`;
 }

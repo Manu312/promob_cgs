@@ -9,6 +9,7 @@ import { frontTransforms } from '../domain/fronts.js';
 import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
 import { viewPose, wallViewPose, orthoZoom } from '../domain/views.js';
+import { fitBoxPose, zoomWindowPose, walkPose } from '../domain/navigation.js';
 import { mat3d, metal, stone, finishMat } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
 import { ModuleDistances, OpeningDims, HeightRuler, Annotations } from './Cotas.jsx';
@@ -21,6 +22,69 @@ const ROTATE_BUTTONS = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RI
 const PLAN_BUTTONS = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 // Dibujando paredes: el clic izquierdo y el derecho son de la herramienta; la ruedita hace zoom y el botón del medio mueve la vista.
 const DRAW_BUTTONS = { LEFT: -1, MIDDLE: THREE.MOUSE.PAN, RIGHT: -1 };
+// Herramientas Pan (P) y Zoom (Z) de Promob: el botón izquierdo hace eso.
+const PAN_BUTTONS = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+const ZOOM_BUTTONS = { LEFT: THREE.MOUSE.DOLLY, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+const NAV_BUTTONS = { pan: PAN_BUTTONS, zoom: ZOOM_BUTTONS, zoomWin: { LEFT: -1, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }, walk: { LEFT: -1, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: -1 } };
+
+// Navegación (Zoom Total, Zoom Entidad, Zoom Ventana, Caminar): mueve la cámara y los controles.
+function NavBridge({ navRef, controlsRef, project, origin }) {
+  const { camera, size } = useThree();
+  useEffect(() => {
+    const apply = (pose, zoomFactor) => {
+      camera.position.set(...pose.pos);
+      if (camera.isOrthographicCamera && zoomFactor) { camera.zoom *= zoomFactor; camera.updateProjectionMatrix(); }
+      const c = controlsRef.current;
+      if (c) { c.target.set(...pose.target); c.update(); } else camera.lookAt(...pose.target);
+    };
+    const target = () => (controlsRef.current ? controlsRef.current.target.toArray() : [0, 0, 0]);
+    const aspect = () => size.width / Math.max(1, size.height);
+    const boxOf = (mods) => {
+      let mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+      for (const m of mods) {
+        const { fw, fd } = footprint(m);
+        const a = [(m.x - origin.x) * S, (m.y || 0) * S, (m.z - origin.z) * S];
+        const b = [(m.x + fw - origin.x) * S, ((m.y || 0) + m.params.height) * S, (m.z + fd - origin.z) * S];
+        mn = mn.map((v, i) => Math.min(v, a[i])); mx = mx.map((v, i) => Math.max(v, b[i]));
+      }
+      return [mn, mx];
+    };
+    const fit = (mn, mx) => {
+      if (camera.isOrthographicCamera) {
+        const t = mn.map((v, i) => (v + mx[i]) / 2);
+        const dir = camera.position.toArray().map((v, i) => v - target()[i]);
+        const span = Math.max(Math.hypot(mx[0] - mn[0], mx[2] - mn[2]), mx[1] - mn[1], 0.3) * 1.15;
+        camera.zoom = Math.min(size.width, size.height) / span;
+        camera.updateProjectionMatrix();
+        apply({ pos: t.map((v, i) => v + dir[i]), target: t });
+        return;
+      }
+      apply(fitBoxPose(mn, mx, camera.position.toArray(), target(), camera.fov, aspect()));
+    };
+    navRef.current = {
+      fitAll() {
+        const b = bounds(project.room);
+        const mods = project.modules.filter((m) => !m.hidden);
+        let [mn, mx] = [[(b.minX - origin.x) * S, 0, (b.minZ - origin.z) * S], [(b.maxX - origin.x) * S, project.room.h * S, (b.maxZ - origin.z) * S]];
+        if (mods.length) { const [a, c] = boxOf(mods); mn = mn.map((v, i) => Math.min(v, a[i])); mx = mx.map((v, i) => Math.max(v, c[i])); }
+        fit(mn, mx);
+      },
+      fitModules(ids) {
+        const mods = project.modules.filter((m) => ids.includes(m.id));
+        if (mods.length) fit(...boxOf(mods));
+      },
+      zoomWindow(rect) {
+        const p = zoomWindowPose(camera.position.toArray(), target(), rect, { fovDeg: camera.fov || 45, aspect: aspect(), ortho: !!camera.isOrthographicCamera, zoom: camera.zoom, viewH: size.height });
+        apply(p, p.zoomFactor);
+      },
+      walk(forward, yaw) {
+        if (camera.isOrthographicCamera) return;
+        apply(walkPose(camera.position.toArray(), target(), forward, yaw));
+      },
+    };
+  }, [camera, size, controlsRef, project, origin, navRef]);
+  return null;
+}
 
 const S = 0.001; // mm → m
 const MAX_DRAG_DIST = 25; // m: más lejos, el plano de arrastre está casi de canto a la cámara
@@ -376,7 +440,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, navTool = 'select', navRef, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -385,6 +449,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
   const dragRef = useRef(null);
   const { room } = project;
   const planta = view.name === 'planta';
+  const navLock = navTool !== 'select';
   const selectedMod = project.modules.find((m) => m.id === selectedId) || null;
   // Origen del visor (mm del ambiente en el centro de la escena). Se fija al cambiar de
   // vista, no en cada cambio: si se recentrara mientras se arrastra una pared, la escena
@@ -410,7 +475,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
     return true;
   };
   const onDown = (e, mod) => {
-    if (renderMode) return;
+    if (renderMode || navLock) return;
     e.stopPropagation();
     if (handleHit(e)) return;
     // Ctrl+clic (como Promob): suma o quita el módulo de la selección, sin arrastrar.
@@ -429,7 +494,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
   };
   // Abertura: se selecciona y se arrastra solo a lo largo de su pared.
   const onOpeningDown = (e, o, g) => {
-    if (renderMode || handleHit(e)) return;
+    if (renderMode || navLock || handleHit(e)) return;
     onSelectOpening(o.id);
     if (!leftButton(e)) return;
     const [rx, rz] = toRoom(e.point);
@@ -437,7 +502,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
   };
   // Columna: se selecciona y se arrastra (imán a paredes y grilla).
   const onColumnDown = (e, c) => {
-    if (renderMode || handleHit(e)) return;
+    if (renderMode || navLock || handleHit(e)) return;
     onSelectColumn(c.id);
     if (!leftButton(e)) return;
     const [rx, rz] = toRoom(e.point);
@@ -450,7 +515,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
   };
   // Pared: se selecciona siempre; se arrastra en Planta, o en 3D si es movible.
   const onWallDown = (e, g) => {
-    if (renderMode) return;
+    if (renderMode || navLock) return;
     if (handleHit(e)) return;
     // En Planta el dintel tapa la abertura desde arriba: si el rayo pasa por una abertura de esta pared, es de la abertura.
     const op = e.intersections?.find((i) => i.object.userData?.openingPick);
@@ -464,7 +529,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
     startDrag({ kind: 'wall', id: g.id, planeY: e.point.y, sx: rx, sz: rz, n: g.n, step });
   };
   const onNodeDown = (e, n) => {
-    if (renderMode || !leftButton(e)) return;
+    if (renderMode || navLock || !leftButton(e)) return;
     e.stopPropagation();
     const [rx, rz] = toRoom(e.point);
     startDrag({ kind: 'node', id: n.id, planeY: e.point.y, offX: n.x - rx, offZ: n.z - rz, step });
@@ -472,7 +537,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
   // Flecha de redimensionar: el arrastre se mide sobre el eje de la flecha (en el mundo),
   // siempre desde el módulo como estaba al empezar.
   function onResizeDown(e, mod, handle, point = e.point) {
-    if (renderMode || !leftButton(e)) return;
+    if (renderMode || navLock || !leftButton(e)) return;
     e.stopPropagation();
     const h = RESIZE_HANDLES[handle];
     if (h.axis === 'y') return startDrag({ kind: 'resize', id: mod.id, handle, start: mod, vertical: true, sign: h.sign, p0: point.clone(), planeY: 0, step });
@@ -547,8 +612,9 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
       {renderMode && <group userData={{ noOffscreen: true }}><ContactShadows position={[0, 0.002, 0]} scale={12} blur={2.2} opacity={0.45} far={2.5} /></group>}
       {(planta || view.ortho) && <OrthographicCamera makeDefault near={0.1} far={200} position={[0, 40, 0.001]} />}
       <OrbitControls ref={controlsRef} makeDefault maxPolarAngle={planta ? Math.PI : Math.PI / 2 - 0.02} minDistance={0.5} maxDistance={20}
-        enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={planta ? (drawing || annotating ? DRAW_BUTTONS : PLAN_BUTTONS) : ROTATE_BUTTONS} />
+        enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={NAV_BUTTONS[navTool] || (planta ? (drawing || annotating ? DRAW_BUTTONS : PLAN_BUTTONS) : ROTATE_BUTTONS)} />
       <CameraRig view={view} room={room} controlsRef={controlsRef} origin={origin} />
+      {navRef && <NavBridge navRef={navRef} controlsRef={controlsRef} project={project} origin={origin} />}
       <Capturer captureRef={captureRef} />
       {renderRef && <RenderBridge renderRef={renderRef} room={room} origin={origin} />}
       <DevProbe project={project} origin={origin} openFronts={openFronts} />

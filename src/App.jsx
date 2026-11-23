@@ -49,6 +49,7 @@ import ErrorBoundary from './ui/ErrorBoundary.jsx';
 import { download, money } from './ui/fields.jsx';
 import { useHistoryState, saveAndReport } from './ui/useHistoryState.js';
 import { mb } from './domain/storage.js';
+import { syncGuests, linkedIds, guestKind, findHost, canHost, snapGuest } from './domain/encastre.js';
 import { useAuth } from './ui/AuthGate.jsx';
 import { describeSelection } from './domain/selection.js';
 import { toggleId, selectAllIds, moveGroup, rotateGroup, describeMulti } from './domain/multiSelect.js';
@@ -121,7 +122,12 @@ function useStorageAlert() {
 const TABS = [['diseno', 'Diseño 3D'], ['corte', 'Plan de corte'], ['presupuesto', 'Presupuesto'], ['precios', 'Precios']];
 
 export default function App() {
-  const [project, setProject, history] = useHistoryState('mueblesapp.project', sampleProject, normalizeProject);
+  const [project, setProjectRaw, history] = useHistoryState('mueblesapp.project', sampleProject, normalizeProject);
+  // Todo cambio del proyecto pasa por acá: los artefactos encastrados acompañan a su mueble.
+  const setProject = useCallback((u) => setProjectRaw((p) => {
+    const n = typeof u === 'function' ? u(p) : u;
+    return n === p ? p : syncGuests(p, n);
+  }), [setProjectRaw]);
   const [showDims, setShowDims] = useState(false);
   // Interruptores de la barra inferior (como Promob): Colisión, Acoplamientos, Auto Rebajar.
   const [ui, setUi] = usePersistent('mueblesapp.ui', { collision: true, magnets: true, autoLower: true });
@@ -211,7 +217,8 @@ export default function App() {
     const m = p.modules.find((o) => o.id === id);
     if (!m) return p;
     const { x, z } = lockAxis(m, x0, z0, lock);
-    let pos = magnet && !m.detached ? snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id), p.room, 40, gridStep) : { x: Math.round(x), z: Math.round(z) };
+    const linked = linkedIds(p.modules, id); // su mueble o sus artefactos encastrados: no se atraen
+    let pos = magnet && !m.detached ? snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id && !linked.includes(o.id)), p.room, 40, gridStep) : { x: Math.round(x), z: Math.round(z) };
     // Grilla del piso con "Atraer": los bordes del módulo se pegan a sus líneas
     const fg = floorGridOf(p.room);
     if (fg.attract) { const { fw, fd } = footprint(m); pos = snapToFloorGrid(pos.x, pos.z, fw, fd, fg); }
@@ -812,7 +819,9 @@ export default function App() {
       if (!m) return;
       if (d.item.compose) { countUse(d.item); insertModules(composeAt(d.item, m)); return; }
       if (d.item.favorite) { countUse(d.item); insertModules(placeFavorite(d.item.favorite, { x: m.x, z: m.z, y: m.y, rot: m.rot }, uid)); return; }
-      const mod = withAutoInsert(withItem({ ...m, id: uid() }, d.item, project.modules), project, (x) => resolveRules(x, project));
+      const under = surfaceRef.current?.(e.clientX, e.clientY);
+      const host = under?.kind === 'module' ? project.modules.find((o) => o.id === under.id) : null;
+      const mod = encastrar(withAutoInsert(withItem({ ...m, id: uid() }, d.item, project.modules), project, (x) => resolveRules(x, project)), project, host);
       countUse(d.item);
       setProject((p) => ({ ...p, modules: [...p.modules, mod] }));
       setSelectedId(mod.id);
@@ -876,10 +885,28 @@ export default function App() {
     if (item.compose) { countUse(item); const base = newModule(item.compose[0].type, project, item.compose[0].params); insertModules(composeAt(item, base)); setTab('diseno'); return; }
     countUse(item);
     const o = oriented(item, variant);
-    const m = withAutoInsert(withItem(newModule(o.type, project, o.params, o.y), item, project.modules), project, (x) => resolveRules(x, project));
+    // con un bajo bacha o una torre seleccionados, la bacha / el horno se encastran en ellos
+    const m = encastrar(withAutoInsert(withItem(newModule(o.type, project, o.params, o.y), item, project.modules), project, (x) => resolveRules(x, project)), project, project.modules.find((x) => x.id === selectedId));
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));
     setSelectedId(m.id);
     setTab('diseno');
+  };
+  // Encastre: el artefacto (bacha, anafe, horno, microondas) se acomoda en el mueble indicado o en
+  // el que tiene debajo, y queda enganchado.
+  function encastrar(mod, p, hostPref = null) {
+    if (!guestKind(mod)) return mod;
+    const host = hostPref && canHost(hostPref, mod, builtById.get(hostPref.id)) ? hostPref : findHost(mod, p.modules, builtById);
+    return host ? snapGuest(mod, host, builtById.get(host.id), p.modules) : mod;
+  }
+  // Al soltar un artefacto que se arrastraba: si quedó sobre un mueble que lo recibe, se encastra.
+  const onDragEnd = () => {
+    setProject((p) => {
+      const g = p.modules.find((o) => o.id === selectedId);
+      if (!g || g.hostId || !guestKind(g)) return p;
+      const e = encastrar(g, p);
+      return e === g ? p : { ...p, modules: p.modules.map((o) => (o.id === g.id ? e : o)) };
+    });
+    history.commit();
   };
   const deleteSelected = () => {
     if (!selectedId) return;
@@ -1227,7 +1254,7 @@ export default function App() {
                 }}
                 onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
                 onDimEdit={onDimEdit} onWallLength={onWallLength} onWallAngle={onWallAngle}
-                onDragStart={onDragStart} onDragEnd={history.commit}
+                onDragStart={onDragStart} onDragEnd={onDragEnd}
                 drawing={drawing} drawCursorRef={drawCursorRef} onDrawPoint={onDrawPoint} onDrawFinish={stopDrawWalls}
                 onWallContext={onWallContext} onModuleContext={(m) => setModMenu({ ...m, detached: !!project.modules.find((o) => o.id === m.id)?.detached })}
                 annotating={annTool} onAnnotatePoint={annotating ? onAnnotatePoint : onScalePoint} onAnnotateFinish={annotating ? stopAnnotate : stopScale}
@@ -1418,10 +1445,10 @@ export default function App() {
               onInvert={(k) => selected && setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === selected.id ? invertHinge(m, builtById.get(m.id), k) : m)) }))} />
           )}
           {tool === 'modelos' && (
-            <ModelsPanel project={project} settings={settings} selected={selected}
-              onApply={(slot, id, scope) => setProject((p) => applyModel(p, slot, id, scope, selectedId ? [selectedId] : []))}
+            <ModelsPanel project={project} settings={settings} selected={selected} selectedCount={selectedIds.length}
+              onApply={(slot, id, scope) => setProject((p) => applyModel(p, slot, id, scope, selectedIds))}
               styles={stylesOf(settings)} onStyles={(list) => setSettings((s) => ({ ...s, styles: list }))}
-              onApplyStyle={(style, scope) => setProject((p) => applyStyle(p, style, scope, selectedId ? [selectedId] : []))} />
+              onApplyStyle={(style, scope) => setProject((p) => applyStyle(p, style, scope, selectedIds))} />
           )}
           {tool === 'propiedades' && selectedGeo && (
             <GeometryPanel g={selectedGeo} onBack={() => setSelection(null)}

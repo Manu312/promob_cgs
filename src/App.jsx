@@ -56,6 +56,8 @@ import { replaceModule, findItemForModule } from './domain/replace.js';
 import { toExtreme, centerX, invertModule, shiftRotation } from './domain/moveExtras.js';
 import { VIEWS, pushView, backView, fwdView } from './domain/views.js';
 import { FILL_MODES, fillMode, nextFillMode } from './domain/fillModes.js';
+import { applyRoomMaterial, copyFinish, setFinishProps, finishesOf } from './domain/roomMaterials.js';
+import MaterialsPanel from './ui/MaterialsPanel.jsx';
 import ReposicionarDialog from './ui/ReposicionarDialog.jsx';
 
 function usePersistent(key, init, migrate = (x) => x) {
@@ -427,8 +429,34 @@ export default function App() {
     if (ui.magnets !== false && isSquare(m.rot)) m = { ...m, ...snapPosition(m, project.modules, project.room, 40, gridStep) };
     return m;
   };
+  // Materiales del ambiente (Promob): soltar sobre el piso lo aplica; sobre una pared pregunta Cara / Todo.
+  const surfaceRef = useRef(null);
+  const [matMenu, setMatMenu] = useState(null); // { matId, wallId, x, y }
+  const [roomTool, setRoomTool] = useState(null); // { kind: 'copy', source } | { kind: 'tint' }
+  const [tint, setTint] = useState('#d9c7a7');
+  const applyMat = (target, matId, scope = 'cara') => setProject((p) => ({ ...p, room: applyRoomMaterial(p.room, target, matId, scope) }));
+  const roomTarget = selectedWallId ? { kind: 'wall', wallId: selectedWallId } : selection?.kind === 'floor' ? { kind: 'floor' } : null;
+  // Con Copiar material o Cambiar tonalidad activos, el clic en una superficie o módulo es de la herramienta.
+  const roomToolClick = (t) => {
+    if (!roomTool) return false;
+    if (roomTool.kind === 'tint') {
+      if (t.kind !== 'module') setProject((p) => {
+        const has = t.kind === 'floor' ? finishesOf(p.room).floor : finishesOf(p.room).walls[t.wallId];
+        const room = has ? p.room : applyRoomMaterial(p.room, t, 'pint-blanco');
+        return { ...p, room: setFinishProps(room, t, { tint }) };
+      });
+      return true;
+    }
+    if (!roomTool.source) { setRoomTool({ kind: 'copy', source: t }); return true; }
+    const s = roomTool.source;
+    if (s.kind === 'module' && t.kind === 'module') {
+      setProject((p) => { const src = p.modules.find((m) => m.id === s.id); return src ? { ...p, modules: p.modules.map((m) => (m.id === t.id ? { ...m, mats: { ...src.mats } } : m)) } : p; });
+    } else if (s.kind !== 'module' && t.kind !== 'module') setProject((p) => ({ ...p, room: copyFinish(p.room, s, t) }));
+    return true;
+  };
   const vpDrag = {
     onDragOver: (e) => {
+      if (e.dataTransfer?.types?.includes('text/x-room-mat')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; return; }
       if (!dragItemRef.current) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
@@ -437,6 +465,14 @@ export default function App() {
     },
     onDragLeave: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setGhost(null); },
     onDrop: (e) => {
+      const matId = e.dataTransfer?.getData?.('text/x-room-mat');
+      if (matId) {
+        e.preventDefault();
+        const t = surfaceRef.current?.(e.clientX, e.clientY);
+        if (t?.kind === 'floor') applyMat(t, matId);
+        else if (t?.kind === 'wall') setMatMenu({ matId, wallId: t.wallId, x: e.clientX, y: e.clientY });
+        return;
+      }
       const d = dragItemRef.current;
       if (!d) return;
       e.preventDefault();
@@ -552,7 +588,7 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'u') { e.preventDefault(); ungroupSelected(); return; } // Desagrupar
       if (plain && key === 'x') { setAxisLock((l) => (l === 'x' ? null : 'x')); return; }
       if (plain && key === 'y') { setAxisLock((l) => (l === 'z' ? null : 'z')); return; }
-      if (plain && key === 'm') { stopDrawWalls(); stopAnnotate(); stopScale(); setNavTool('select'); return; } // Seleccionar / Mover
+      if (plain && key === 'm') { stopDrawWalls(); stopAnnotate(); stopScale(); setNavTool('select'); setRoomTool(null); return; } // Seleccionar / Mover
       if (plain && key === 'p') { navToggle('pan'); return; } // Pan
       if (plain && key === 'z') { navToggle('zoom'); return; } // Zoom
       if (plain && key === 'w') { navToggle('zoomWin'); return; } // Zoom Ventana
@@ -572,7 +608,7 @@ export default function App() {
         else if (e.key === 'Enter') commitTyped();
         return;
       }
-      if (e.key === 'Escape') { setSelectedId(null); setNavTool('select'); }
+      if (e.key === 'Escape') { setSelectedId(null); setNavTool('select'); setRoomTool(null); }
       if (selectedWallId && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); setDeleteDlg({ wallId: selectedWallId }); return; }
       if ((selectedOpeningId || selectedColumnId) && (e.key === 'Delete' || e.key === 'Backspace')) {
         e.preventDefault();
@@ -693,11 +729,16 @@ export default function App() {
           <div className="side-tabs">
             <button className={`side-tab${side === 'lista' ? ' on' : ''}`} onClick={() => setSide('lista')}>Lista de Módulos</button>
             <button className={`side-tab${side === 'auto' ? ' on' : ''}`} onClick={() => setSide('auto')}>Inserción Automática</button>
+            <button className={`side-tab${side === 'materiales' ? ' on' : ''}`} onClick={() => setSide('materiales')}>Materiales</button>
           </div>
           {side === 'auto' && (
             <AutoInsertPanel autoInsert={project.autoInsert} hasSelection={!!selectedId}
               onAutoInsert={(ai) => setProject((p) => ({ ...p, autoInsert: ai }))}
               onAmbiente={(cat, ids, on, onlySel) => setProject((p) => applyAuto(p, cat, ids, on, (m) => resolveRules(m, p), onlySel ? (selectedId ? [selectedId] : []) : null))} />
+          )}
+          {side === 'materiales' && (
+            <MaterialsPanel favs={ui.matFavs || []} onFav={(id) => setUi((u) => ({ ...u, matFavs: (u.matFavs || []).includes(id) ? u.matFavs.filter((x) => x !== id) : [...(u.matFavs || []), id] }))}
+              target={roomTarget} onApply={(id) => roomTarget && applyMat(roomTarget, id)} tool={roomTool} onTool={setRoomTool} tint={tint} onTint={setTint} />
           )}
           {side === 'lista' && (
             <ModuleList project={project} selectedIds={selectedIds} onSelect={(id, add) => (add ? toggleSelect(id) : selectModule(id))}
@@ -755,8 +796,8 @@ export default function App() {
             </div>
             <div className="vp-area" ref={vpRef} {...vpDrag}>
             <ErrorBoundary onReset={() => { setRenderJob(null); setRenderDlg(false); setRenderMode(false); }}>
-              <Scene3D project={project} builtById={builtById} selectedId={selectedId} selectedIds={selectedIds} onSelect={selectModule} onToggleSelect={toggleSelect} onMove={onMove}
-                selectedWallId={selectedWallId} onSelectWall={selectWall}
+              <Scene3D project={project} builtById={builtById} selectedId={selectedId} selectedIds={selectedIds} onSelect={(id) => { if (!(id && roomToolClick({ kind: 'module', id }))) selectModule(id); }} onToggleSelect={toggleSelect} onMove={onMove}
+                selectedWallId={selectedWallId} onSelectWall={(id) => { if (!(id && roomToolClick({ kind: 'wall', wallId: id }))) selectWall(id); }}
                 onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
                 onDimEdit={onDimEdit} onWallLength={onWallLength} onWallAngle={onWallAngle}
                 onDragStart={onDragStart} onDragEnd={history.commit}
@@ -768,7 +809,8 @@ export default function App() {
                 selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
                 onWallDouble={(id) => goView({ name: 'pared', wallId: id })} onFloorDouble={() => goView({ name: 'planta' })}
-                navTool={navTool} navRef={navRef}
+                navTool={navTool} navRef={navRef} surfaceRef={surfaceRef}
+                onFloorDown={side === 'materiales' || roomTool ? () => { if (!roomToolClick({ kind: 'floor' })) setSelection({ kind: 'floor' }); } : null}
                 renderMode={renderMode || renderDlg || !!renderJob || fill === 'presentacion'} renderRef={renderRef} fill={fill === 'presentacion' ? 'texturas' : fill}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower && !renderJob?.panorama} pickRef={pickRef} ghost={ghost}
                 openFronts={openFronts} onToggleFront={toggleFront} />
@@ -811,6 +853,14 @@ export default function App() {
             {navOverlay && <div className={`nav-overlay ${navTool}`} {...navOverlay}>
               {zoomBox && <div className="zoom-box" style={{ left: Math.min(zoomBox.x0, zoomBox.x1), top: Math.min(zoomBox.y0, zoomBox.y1), width: Math.abs(zoomBox.x1 - zoomBox.x0), height: Math.abs(zoomBox.y1 - zoomBox.y0) }} />}
             </div>}
+            {matMenu && (
+              <div className="menu-backdrop" onPointerDown={() => setMatMenu(null)}>
+                <div className="wall-menu mat-scope" style={{ left: matMenu.x, top: matMenu.y }} onPointerDown={(e) => e.stopPropagation()}>
+                  <button onClick={() => { applyMat({ kind: 'wall', wallId: matMenu.wallId }, matMenu.matId, 'cara'); setMatMenu(null); }} title="Solo la cara de esta pared">Cara</button>
+                  <button onClick={() => { applyMat({ kind: 'wall', wallId: matMenu.wallId }, matMenu.matId, 'todo'); setMatMenu(null); }} title="Todas las paredes">Todo</button>
+                </div>
+              </div>
+            )}
             {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)}
               canGroup={multiSel && !selectionGroup(project, selectedIds)} canUngroup={project.modules.some((m) => selectedIds.includes(m.id) && m.groupId)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}

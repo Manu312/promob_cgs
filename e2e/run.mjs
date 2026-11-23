@@ -1635,6 +1635,52 @@ try {
     check('Sin errores al importar', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Seguridad: un proyecto importado no hace que la app vaya a buscar nada afuera; y si el
+  // almacenamiento del navegador se llena, se avisa en vez de perder cambios en silencio.
+  {
+    const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'muebles-e2e-'));
+    const backup = await project();
+    const evil = { ...backup, name: 'Importado', planImage: { src: 'https://evil.example/plano.png', x: 0, z: 0, wPx: 100, hPx: 100, mmPerPx: 10, visible: true },
+      render: { ...(backup.render || {}), background: { mode: 'imagen', image: 'data:image/png,")}body{background:red' } } };
+    fs.writeFileSync(path.join(dir, 'evil.mueble.json'), JSON.stringify(evil));
+    const outside = [];
+    const onReq = (r) => { if (/evil\.example/.test(r.url())) outside.push(r.url()); };
+    page.on('request', onReq);
+    const projIn = await page.$('.top-actions input[type=file][accept=".json"]');
+    await projIn.uploadFile(path.join(dir, 'evil.mueble.json')); await sleep(1200);
+    const imp = await project();
+    check('Proyecto importado: el plano con dirección externa se descarta', imp.name === 'Importado' && imp.planImage == null);
+    check('Proyecto importado: el fondo del render con CSS inyectado se descarta', !imp.render?.background?.image);
+    await clickText('.vp-toolbar button', 'Planta'); await sleep(1200);
+    check('La app no pidió nada a la dirección externa', outside.length === 0, outside.join(' '));
+    page.off('request', onReq);
+    await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(800);
+    // almacenamiento lleno: un cambio no entra → aviso con "Guardar archivo"
+    // el navegador tira QuotaExceededError cuando no entra: lo simulamos para el proyecto
+    await page.evaluate(() => {
+      window.__origSet = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) { if (k === 'mueblesapp.project') throw new DOMException('quota', 'QuotaExceededError'); return window.__origSet.call(this, k, v); };
+    });
+    await clickText('.side-tab', 'Lista de Módulos'); await sleep(300);
+    await page.click('.ml-row'); await sleep(200);
+    await clickText('.side-tab', 'Lista de Módulos'); await sleep(300);
+    await page.keyboard.press('KeyO'); await sleep(500); // ocultar el módulo: un cambio seguro
+    const alertTxt = await page.$eval('.storage-alert', (e) => e.textContent).catch(() => '');
+    check('Almacenamiento lleno: aparece el aviso con "Guardar archivo"', /No se pudo guardar|casi lleno/.test(alertTxt) && alertTxt.includes('Guardar archivo'), alertTxt.slice(0, 80));
+    await shot('09a-aviso-guardado');
+    await page.evaluate(() => { Storage.prototype.setItem = window.__origSet; });
+    await page.keyboard.press('KeyO'); await sleep(500); // volver a mostrarlo
+    check('Con lugar de nuevo, el aviso se va y se guarda', !(await page.$('.storage-alert.error')));
+    await page.keyboard.press('Escape');
+    // volver al proyecto de antes
+    fs.writeFileSync(path.join(dir, 'antes.mueble.json'), JSON.stringify(backup));
+    await projIn.uploadFile(path.join(dir, 'antes.mueble.json')); await sleep(1200);
+    check('Se recupera el proyecto de antes', (await project()).name === backup.name && (await project()).modules.length === backup.modules.length);
+    fs.rmSync(dir, { recursive: true, force: true });
+    check('Sin errores en las pruebas de seguridad', errors.filter((e) => !/QuotaExceeded|quota/i.test(e)).length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

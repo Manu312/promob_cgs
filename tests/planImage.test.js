@@ -39,7 +39,7 @@ test('aviso de imagen pesada (> 2 MB)', () => {
 });
 
 test('el plano de referencia se guarda en el proyecto', () => {
-  const planImage = placePlanImage('data:x', 100, 100, bounds);
+  const planImage = placePlanImage('data:image/png;base64,iVBORw0KGgo=', 100, 100, bounds);
   const p = normalizeProject({ name: 'x', room: normalizeRoom({ w: 3600, d: 3000 }), modules: [], defaults: {}, planImage });
   assert.deepEqual(p.planImage, planImage);
   assert.equal(normalizeProject({ name: 'x', room: normalizeRoom({}), modules: [], defaults: {} }).planImage, null);

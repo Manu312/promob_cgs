@@ -4,12 +4,21 @@ import { MODULE_TYPES, DEFAULT_RULES, uid } from './modules.js';
 import { slotIds } from './catalog.js';
 import { normalizeRoom, rid } from './room.js';
 import { roomTemplate } from './drawWalls.js';
+import { isSafeImageDataUrl } from './safeData.js';
+
+// Plano de referencia de un proyecto (puede venir de un archivo importado): solo una imagen
+// embebida (data URL) y medidas numéricas; una dirección de internet se descarta.
+function safePlanImage(pi) {
+  if (!pi || !isSafeImageDataUrl(pi.src)) return null;
+  if (!['x', 'z', 'wPx', 'hPx', 'mmPerPx'].every((k) => Number.isFinite(pi[k]))) return null;
+  return pi;
+}
 
 export function normalizeProject(p) {
   // materiales por tipo de pieza (los proyectos viejos tenían cuerpo / frente / fondo / cajon)
   const defaults = slotIds(p.defaults, { fill: true });
   const modules = (p.modules || []).map((m) => (m.mats && Object.keys(m.mats).length ? { ...m, mats: slotIds(m.mats) } : m));
-  return { ...p, defaults, modules, room: normalizeRoom(p.room), rules: { ...DEFAULT_RULES, ...(p.rules || {}) }, annotations: Array.isArray(p.annotations) ? p.annotations : [], planImage: p.planImage?.src ? p.planImage : null, externals: normalizeExternals(p.externals), planDxf: p.planDxf && Array.isArray(p.planDxf.segments) ? { ...p.planDxf, segments: p.planDxf.segments.filter((s) => Array.isArray(s?.a) && Array.isArray(s?.b)).slice(0, 20000) } : null, render: normalizeRender(p.render) };
+  return { ...p, defaults, modules, room: normalizeRoom(p.room), rules: { ...DEFAULT_RULES, ...(p.rules || {}) }, annotations: Array.isArray(p.annotations) ? p.annotations : [], planImage: safePlanImage(p.planImage), externals: normalizeExternals(p.externals), planDxf: p.planDxf && Array.isArray(p.planDxf.segments) ? { ...p.planDxf, segments: p.planDxf.segments.filter((s) => Array.isArray(s?.a) && Array.isArray(s?.b)).slice(0, 20000) } : null, render: normalizeRender(p.render) };
 }
 
 const mk = (type, x, extra = {}) => ({ id: uid(), type, params: { ...MODULE_TYPES[type].defaults, ...(extra.params || {}) }, x, z: 0, y: extra.y ?? MODULE_TYPES[type].y ?? 0, rot: 0, mats: {} });

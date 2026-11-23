@@ -47,7 +47,8 @@ import Budget from './ui/Budget.jsx';
 import Settings from './ui/Settings.jsx';
 import ErrorBoundary from './ui/ErrorBoundary.jsx';
 import { download, money } from './ui/fields.jsx';
-import { useHistoryState } from './ui/useHistoryState.js';
+import { useHistoryState, saveAndReport } from './ui/useHistoryState.js';
+import { mb } from './domain/storage.js';
 import { describeSelection } from './domain/selection.js';
 import { toggleId, selectAllIds, moveGroup, rotateGroup, describeMulti } from './domain/multiSelect.js';
 import { expandToGroups, groupModules, ungroupModules, selectionGroup, pruneGroups } from './domain/groups.js';
@@ -92,8 +93,28 @@ function usePersistent(key, init, migrate = (x) => x) {
     try { const s = localStorage.getItem(key); if (s) return migrate(JSON.parse(s)); } catch { /* sin storage */ }
     return typeof init === 'function' ? init() : init;
   });
-  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* sin storage */ } }, [key, v]);
+  useEffect(() => { saveAndReport(key, v); }, [key, v]);
   return [v, setV];
+}
+
+// Aviso de guardado: si el proyecto no se pudo guardar en el navegador (o se está por llenar el
+// espacio), se muestra arriba con un botón para guardar una copia en archivo.
+function useStorageAlert() {
+  const [alert, setAlert] = useState(null);
+  useEffect(() => {
+    const on = (e) => {
+      const d = e.detail || {};
+      setAlert((cur) => {
+        if (!d.ok) return { kind: 'error', key: d.key, mb: mb(d.chars), reason: d.error };
+        if (cur?.kind === 'error' && cur.key !== d.key) return cur; // otro dato se guardó bien: sigue el error
+        if (d.warn) return { kind: 'warn', mb: mb(d.used) };
+        return null;
+      });
+    };
+    window.addEventListener('muebles-storage', on);
+    return () => window.removeEventListener('muebles-storage', on);
+  }, []);
+  return [alert, setAlert];
 }
 
 const TABS = [['diseno', 'Diseño 3D'], ['corte', 'Plan de corte'], ['presupuesto', 'Presupuesto'], ['precios', 'Precios']];
@@ -105,6 +126,7 @@ export default function App() {
   const [ui, setUi] = usePersistent('mueblesapp.ui', { collision: true, magnets: true, autoLower: true });
   const autoLower = ui.autoLower !== false;
   const toggleUi = (k) => setUi((u) => ({ ...u, [k]: u[k] === false }));
+  const [storageAlert, setStorageAlert] = useStorageAlert(); // guardado que no entra: se avisa
   // Paneles laterales (pestañas verticales a la izquierda): Lista de Módulos o Inserción Automática.
   const side = ui.side ?? (ui.listOpen ? 'lista' : null);
   const setSide = (s) => setUi((u) => ({ ...u, listOpen: undefined, side: (u.side ?? (u.listOpen ? 'lista' : null)) === s ? null : s }));
@@ -1084,6 +1106,15 @@ export default function App() {
           <input ref={fileRef} type="file" accept=".json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) importProject(f); e.target.value = ''; }} />
         </div>
       </header>
+      {storageAlert && (
+        <div className={`storage-alert ${storageAlert.kind}`} role="alert">
+          {storageAlert.kind === 'error'
+            ? <span>⚠ No se pudo guardar en el navegador ({storageAlert.reason === 'cupo' ? 'el espacio del navegador está lleno' : 'sin acceso al almacenamiento'}). Los cambios nuevos se pierden si cerrás la página: guardá una copia en archivo.</span>
+            : <span>El almacenamiento del navegador está casi lleno ({storageAlert.mb} MB de ~10 MB). Guardá una copia en archivo y alivianá el proyecto (imágenes, modelos 3D, capturas de impresión).</span>}
+          <button className="active" onClick={exportProject}>Guardar archivo</button>
+          {storageAlert.kind === 'warn' && <button onClick={() => setStorageAlert(null)}>Cerrar</button>}
+        </div>
+      )}
 
       {tab === 'diseno' && (
         <main className={`design${side ? ' with-list' : ''}`}>

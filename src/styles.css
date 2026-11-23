@@ -364,3 +364,7 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 /* La barra de la vista va arriba del 3D, no encima (antes tapaba las paredes del fondo en Planta). */
 .vp-toolbar { position: static; padding: 4px 8px; border-bottom: 1px solid var(--line); background: #fafafa; pointer-events: auto; }
 .lights-editor .le-item legend .link { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; font-weight: 600; }
+.draw-hud .dh-ref { display: inline-flex; align-items: center; gap: 4px; }
+.draw-hud .dh-ref select { width: auto; }
+.dlg-304-ang { font-weight: 600; }
+.join-hud { border-left-color: #2563eb; }

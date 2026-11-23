@@ -38,6 +38,9 @@ export default function WallPanel({ room, wallId, onRoom, onBack, onDelete, onSp
       <NumField label="Ángulo del arco" unit="°" value={arcAngleFromSagitta(g.len, w.flecha || 0)} min={-180} max={180} step={5} onChange={(v) => set({ flecha: sagittaFromArcAngle(g.len, v) })} />
       {!!w.flecha && <p className="hint">Largo del arco: {arcLength(g.len, w.flecha)} mm (el largo de arriba es la cuerda). Con H (Mover HotPoint) se curva arrastrando el punto verde.</p>}
       <NumField label="Alto inicial" unit="mm" value={w.h0} min={100} max={6000} step={10} onChange={(v) => set({ h0: v })} />
+      <NumField label="Extremo inicial (prolongar)" unit="mm" value={w.extIni || 0} min={0} max={2000} step={10} onChange={(v) => set({ extIni: v })} />
+      <NumField label="Extremo final (prolongar)" unit="mm" value={w.extFin || 0} min={0} max={2000} step={10} onChange={(v) => set({ extFin: v })} />
+      <SelField label="Tipo de pared" value={w.tipo || 'normal'} options={[['normal', 'Normal'], ['drywall', 'Dry Wall']]} onChange={(v) => set({ tipo: v, ...(v === 'drywall' && w.t > 120 ? { t: 100 } : {}) })} />
       <NumField label="Alto final" unit="mm" value={w.h1} min={100} max={6000} step={10} onChange={(v) => set({ h1: v })} />
       <NumField label="Separación del piso" unit="mm" value={w.floorGap || 0} min={0} max={3000} step={10} onChange={(v) => set({ floorGap: v })} />
       <h4>Opciones</h4>

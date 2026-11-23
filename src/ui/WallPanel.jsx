@@ -1,3 +1,4 @@
+import { arcAngleFromSagitta, sagittaFromArcAngle, arcLength } from '../domain/curvedWalls.js';
 import FinishFields from './FinishFields.jsx';
 import { finishesOf, setFinishProps, clearFinish } from '../domain/roomMaterials.js';
 import { roomWalls } from '../domain/room.js';
@@ -33,6 +34,9 @@ export default function WallPanel({ room, wallId, onRoom, onBack, onDelete, onSp
         ? <NumField label="Ángulo relativo" unit="°" value={ang.rel} min={1} max={359} step={0.5} onChange={(v) => onRoom((r) => setWallAngle(r, wallId, v, 'rel'))} />
         : <p className="hint">Ángulo relativo: no tiene, es la primera pared de la cadena.</p>}
       <NumField label="Espesor" unit="mm" value={w.t} min={50} max={600} step={10} onChange={(v) => set({ t: v })} />
+      <NumField label="Flecha (curva)" unit="mm" value={w.flecha || 0} min={-Math.round(g.len / 2)} max={Math.round(g.len / 2)} step={10} onChange={(v) => set({ flecha: v })} />
+      <NumField label="Ángulo del arco" unit="°" value={arcAngleFromSagitta(g.len, w.flecha || 0)} min={-180} max={180} step={5} onChange={(v) => set({ flecha: sagittaFromArcAngle(g.len, v) })} />
+      {!!w.flecha && <p className="hint">Largo del arco: {arcLength(g.len, w.flecha)} mm (el largo de arriba es la cuerda). Con H (Mover HotPoint) se curva arrastrando el punto verde.</p>}
       <NumField label="Alto inicial" unit="mm" value={w.h0} min={100} max={6000} step={10} onChange={(v) => set({ h0: v })} />
       <NumField label="Alto final" unit="mm" value={w.h1} min={100} max={6000} step={10} onChange={(v) => set({ h1: v })} />
       <NumField label="Separación del piso" unit="mm" value={w.floorGap || 0} min={0} max={3000} step={10} onChange={(v) => set({ floorGap: v })} />

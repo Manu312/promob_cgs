@@ -15,6 +15,7 @@ import { FillContext, FillGroup, useFill, NONE_MATERIAL } from './fill3d.jsx';
 import { GeometryMesh } from './Geometry3D.jsx';
 import Lights3D from './Lights3D.jsx';
 import { outlineOf, boundsOf, holesOn, holesInGeometry } from '../domain/geometry.js';
+import { arcMid } from '../domain/curvedWalls.js';
 import { mat3d, metal, stone, finishMat } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
 import { ModuleDistances, OpeningDims, HeightRuler, Annotations } from './Cotas.jsx';
@@ -411,6 +412,20 @@ function DevProbe({ project, origin, openFronts }) {
 }
 
 // Manijas de los vértices (solo en Planta): se arrastran para mover esquinas.
+// Mover HotPoint (H): un punto verde en el medio de cada pared; arrastrarlo la curva.
+function HotpointHandles({ room, onDown }) {
+  const top = Math.max(room.h, ...room.walls.map((w) => Math.max(w.h0, w.h1))) + 30;
+  return roomWalls(room).map((g) => {
+    const [x, z] = arcMid(g.a, g.b, g.n, g.wall.flecha || 0);
+    return (
+      <mesh key={g.id} position={[x * S, top * S, z * S]} renderOrder={3} userData={{ hotpoint: g.id }} onPointerDown={(e) => onDown(e, g)}>
+        <boxGeometry args={[0.12, 0.012, 0.12]} />
+        <meshBasicMaterial color="#16a34a" />
+      </mesh>
+    );
+  });
+}
+
 function NodeHandles({ room, onNodeDown }) {
   const top = Math.max(room.h, ...room.walls.map((w) => Math.max(w.h0, w.h1))) + 20;
   return room.nodes.map((n) => (
@@ -428,10 +443,10 @@ function NodeHandles({ room, onNodeDown }) {
 // flechas de redimensionar. Los listeners están siempre registrados y el arrastre vive en
 // una ref que se carga en el mismo pointerdown: si se registraran al empezar (en un efecto),
 // un clic rápido soltaría el botón antes y el arrastre quedaría "pegado" al mouse.
-function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onMoveGeometry, onDragEnd, controlsRef, origin }) {
+function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onMoveGeometry, onMoveHotpoint, onDragEnd, controlsRef, origin }) {
   const { camera, gl } = useThree();
   const live = useRef();
-  live.current = { camera, gl, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onMoveGeometry, onDragEnd, origin };
+  live.current = { camera, gl, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onMoveGeometry, onMoveHotpoint, onDragEnd, origin };
   useEffect(() => {
     const ray = new THREE.Raycaster();
     const v = new THREE.Vector2();
@@ -467,6 +482,8 @@ function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onRe
         cb.onResize(drag.start, drag.handle, snap(delta));
       } else if (drag.kind === 'opening') {
         cb.onMoveOpening(drag.id, drag.offset0 + snap((rx - drag.sx) * drag.u[0] + (rz - drag.sz) * drag.u[1]));
+      } else if (drag.kind === 'hotpoint') {
+        cb.onMoveHotpoint?.(drag.id, rx, rz);
       } else if (drag.kind === 'geometry') {
         cb.onMoveGeometry?.(drag.id, snap(rx - drag.offX), snap(rz - drag.offZ));
       } else if (drag.kind === 'column') {
@@ -500,7 +517,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, surfaceRef, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, surfaceRef, onMoveHotpoint, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -667,7 +684,12 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
         {selectedOpeningId && !renderMode && <OpeningDims room={room} id={selectedOpeningId} onEdit={onOpeningDim} />}
         {planta && !renderMode && <PlanGrid room={room} />}
         {planta && !renderMode && project.planImage?.visible && <PlanImage img={project.planImage} />}
-        {planta && !renderMode && !drawing && !annotating && <NodeHandles room={room} onNodeDown={onNodeDown} />}
+        {planta && !renderMode && !drawing && !annotating && navTool !== 'hotpoint' && <NodeHandles room={room} onNodeDown={onNodeDown} />}
+        {navTool === 'hotpoint' && !renderMode && <HotpointHandles room={room} onDown={(e, g) => {
+          e.stopPropagation();
+          if (!leftButton(e)) return;
+          startDrag({ kind: 'hotpoint', id: g.id, planeY: e.point.y });
+        }} />}
         {planta && !renderMode && annotating && <AnnotateTool room={room} modules={project.modules} tool={annotating} origin={origin} onPoint={onAnnotatePoint} onFinish={onAnnotateFinish} />}
         {!renderMode && <Annotations annotations={project.annotations || []} selectedId={selectedDimId} onSelect={onSelectDim} />}
         {planta && !renderMode && drawing && <DrawTool room={room} draw={drawing} origin={origin} cursorRef={drawCursorRef} onPoint={onDrawPoint} onFinish={onDrawFinish} />}
@@ -703,7 +725,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
       {renderRef && <RenderBridge renderRef={renderRef} room={room} origin={origin} />}
       <DevProbe project={project} origin={origin} openFronts={openFronts} />
       {pickRef && <Picker pickRef={pickRef} origin={origin} />}
-      <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onMoveGeometry={onMoveGeometry} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
+      <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onMoveGeometry={onMoveGeometry} onMoveHotpoint={onMoveHotpoint} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
       </FillContext.Provider>
     </Canvas>
   );

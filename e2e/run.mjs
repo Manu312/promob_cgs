@@ -1377,6 +1377,30 @@ try {
     await clickText('.cb-libs .cb-tab', 'Cocinas'); await sleep(200);
   }
 
+  // Fase 7b S18: paredes curvas (Flecha en Propiedades y Mover HotPoint con H)
+  {
+    await clickText('.vp-toolbar button', 'Planta'); await sleep(1200);
+    let pm = await project();
+    const nx = (id) => pm.room.nodes.find((n) => n.id === id).x;
+    const right = [...pm.room.walls].sort((a, b) => (nx(b.n0) + nx(b.n1)) - (nx(a.n0) + nx(a.n1)))[0];
+    const A = pm.room.nodes.find((n) => n.id === right.n0), B = pm.room.nodes.find((n) => n.id === right.n1);
+    await page.keyboard.press('KeyH'); await sleep(300);
+    check('H activa Mover HotPoint', (await page.$eval('.vp-toolbar .nav-tool.active', (e) => e.textContent).catch(() => '')) === 'HotPoint');
+    const mid = await page.evaluate((x, z, y) => window.__muebles.screenOfPoint(x, z, y), (A.x + B.x) / 2, (A.z + B.z) / 2, pm.room.h + 30);
+    await page.mouse.move(mid.x, mid.y); await page.mouse.down();
+    for (let i = 1; i <= 10; i++) { await page.mouse.move(mid.x + 6 * i, mid.y); await sleep(30); }
+    await page.mouse.up(); await sleep(500);
+    pm = await project();
+    const fl = pm.room.walls.find((w) => w.id === right.id).flecha;
+    check('Arrastrar el hotpoint curva la pared (flecha hacia afuera)', fl > 100, String(fl));
+    await shot('07r-pared-curva');
+    await page.keyboard.press('KeyM'); await sleep(200);
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+    check('Deshacer endereza la pared', !(await project()).room.walls.find((w) => w.id === right.id).flecha);
+    await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(800);
+    check('Sin errores con paredes curvas', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

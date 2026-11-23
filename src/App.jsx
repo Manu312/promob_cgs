@@ -55,6 +55,7 @@ import { pasteModules, sideOffset } from './domain/clipboard.js';
 import { replaceModule, findItemForModule } from './domain/replace.js';
 import { toExtreme, centerX, invertModule, shiftRotation } from './domain/moveExtras.js';
 import { VIEWS, pushView, backView, fwdView } from './domain/views.js';
+import { sagittaFromPoint } from './domain/curvedWalls.js';
 import { FILL_MODES, fillMode, nextFillMode } from './domain/fillModes.js';
 import { applyRoomMaterial, copyFinish, setFinishProps, finishesOf } from './domain/roomMaterials.js';
 import MaterialsPanel from './ui/MaterialsPanel.jsx';
@@ -784,6 +785,7 @@ export default function App() {
       if (plain && key === 'z') { navToggle('zoom'); return; } // Zoom
       if (plain && key === 'w') { navToggle('zoomWin'); return; } // Zoom Ventana
       if (plain && key === 'c' && view.name !== 'planta' && !view.ortho) { navToggle('walk'); return; } // Caminar (solo perspectiva)
+      if (plain && key === 'h') { navToggle('hotpoint'); return; } // Mover HotPoint: curvar paredes
       if (plain && key === 'd' && !drawing && !annotating && !scaling) { startAnnotate(); return; } // calcular distancia
       if (annotating) { if (e.key === 'Escape') stopAnnotate(); return; }
       if (scaling) {
@@ -978,6 +980,7 @@ export default function App() {
               <button className={`nav-tool${navTool === 'zoomWin' ? ' active' : ''}`} onClick={() => navToggle('zoomWin')} title="Zoom Ventana (W): marcá un recuadro">Zoom ventana</button>
               <button onClick={() => navRef.current?.fitAll()} title="Zoom Total (F6)">Zoom total</button>
               <button disabled={!selectedIds.length} onClick={() => navRef.current?.fitModules(selectedIds)} title="Zoom Total Entidad (F7): encuadra lo seleccionado">Zoom selección</button>
+              <button className={`nav-tool${navTool === 'hotpoint' ? ' active' : ''}`} onClick={() => navToggle('hotpoint')} title="Mover HotPoint (H): arrastrá el punto verde de una pared para curvarla">HotPoint</button>
               <button className={`nav-tool${navTool === 'walk' ? ' active' : ''}`} disabled={view.name === 'planta' || view.ortho} onClick={() => navToggle('walk')} title="Caminar (C): arrastrar arriba/abajo avanza o retrocede; a los costados gira. Solo en perspectiva.">Caminar</button>
               <button className={drawing ? 'active' : ''} onClick={() => (drawing ? stopDrawWalls() : startDrawWalls())} title="Construir paredes (Ctrl+Shift+P)">✏ Paredes</button>
               <button className={annotating ? 'active' : ''} onClick={() => (annotating ? stopAnnotate() : startAnnotate())} title="Cota manual: lineal o angular">↔ Cota</button>
@@ -1020,6 +1023,12 @@ export default function App() {
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
                 onWallDouble={(id) => goView({ name: 'pared', wallId: id })} onFloorDouble={() => goView({ name: 'planta' })}
                 navTool={navTool} navRef={navRef} surfaceRef={surfaceRef}
+                onMoveHotpoint={(id, x, z) => setProject((p) => {
+                  const g = roomWalls(p.room).find((w) => w.id === id);
+                  if (!g) return p;
+                  const s = Math.max(-g.len / 2, Math.min(g.len / 2, Math.round(sagittaFromPoint(g.a, g.b, g.n, [x, z]) / 10) * 10));
+                  return Math.abs(s) < 20 && !g.wall.flecha ? p : { ...p, room: updateWall(p.room, id, { flecha: Math.abs(s) < 20 ? 0 : s }) };
+                })}
                 selectedGeoId={selectedGeoId} onSelectGeometry={(id) => setSelection({ kind: 'geometry', id })} onMoveGeometry={onMoveGeometry} geoDraft={geoDraft}
                 onGeometryMenu={(g, ev) => setGeoMenu({ id: g.id, x: ev.clientX, y: ev.clientY })}
                 onFloorDown={side === 'materiales' || roomTool ? () => { if (!roomToolClick({ kind: 'floor' })) setSelection({ kind: 'floor' }); } : null}

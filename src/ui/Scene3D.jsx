@@ -517,7 +517,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, surfaceRef, onMoveHotpoint, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, onFloorMenu, surfaceRef, onMoveHotpoint, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -678,6 +678,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
           onWallDouble={renderMode || drawing || annotating ? null : onWallDouble} onFloorDouble={renderMode || drawing || annotating ? null : onFloorDouble}
           onFloorClick={(e) => { if (e.delta > 2 || dragRef.current || drawing || annotating || onFloorDown) return; onSelect(null); }}
           onFloorDown={renderMode || drawing || annotating ? null : onFloorDown}
+          onFloorMenu={renderMode || drawing || annotating ? null : onFloorMenu}
           wallHoles={Object.fromEntries(room.walls.map((w) => [w.id, holesOn(project, { kind: 'wall', wallId: w.id })]))} floorHoles={holesOn(project, { kind: 'floor' })} />
         </FillGroup>
         {view.name === 'frente' && !renderMode && <HeightRuler room={room} modules={project.modules} />}

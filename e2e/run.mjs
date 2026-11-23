@@ -1443,6 +1443,30 @@ try {
     check('Sin errores con el editor de paredes', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S20: piso (menú del clic derecho, piso padrón, ajustar límites, grilla que atrae)
+  {
+    let pm = await project();
+    const xs = pm.room.nodes.map((n) => n.x), zs = pm.room.nodes.map((n) => n.z);
+    const fp = await page.evaluate((x, z) => window.__muebles.screenOfPoint(x, z, 0), (Math.min(...xs) + Math.max(...xs)) / 2, Math.max(...zs) - 300);
+    await page.mouse.click(fp.x, fp.y, { button: 'right' }); await sleep(300);
+    check('Clic derecho en el piso abre su menú', (await page.$$eval('.floor-menu button', (b) => b.length).catch(() => 0)) === 4);
+    await clickText('.floor-menu button', 'Crear piso padrón'); await sleep(400);
+    pm = await project();
+    check('Piso padrón de 5000 × 5000', pm.room.floor?.auto === false && pm.room.floor.pts[1][0] - pm.room.floor.pts[0][0] === 5000);
+    await page.mouse.click(fp.x, fp.y, { button: 'right' }); await sleep(300);
+    await clickText('.floor-menu button', 'Ajustar límites'); await sleep(400);
+    check('Ajustar límites: el piso vuelve a seguir las paredes', (await project()).room.floor?.auto === true);
+    await page.mouse.click(fp.x, fp.y, { button: 'right' }); await sleep(300);
+    await clickText('.floor-menu button', 'Editar grilla'); await sleep(300);
+    await page.evaluate(() => [...document.querySelectorAll('.floor-grid-editor .check input')].forEach((i) => i.click())); await sleep(300);
+    await shot('07s-grilla-piso');
+    await clickText('.floor-grid-editor button', 'Cerrar'); await sleep(300);
+    pm = await project();
+    check('Grilla del piso: mostrar y atraer', pm.room.floor.grid?.show && pm.room.floor.grid?.attract);
+    for (let i = 0; i < 4; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(200); }
+    check('Sin errores con el piso', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

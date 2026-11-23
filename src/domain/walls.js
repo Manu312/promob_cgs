@@ -106,6 +106,8 @@ export function bounds(room) {
 
 // Piso: el contorno si las paredes cierran; si no, el rectángulo envolvente.
 export function floorPolygon(room) {
+  // forma propia del piso (Alterar formato do piso / piso padrón)
+  if (room.floor?.auto === false && Array.isArray(room.floor.pts) && room.floor.pts.length >= 3) return room.floor.pts;
   const o = outline(room);
   if (o) return o;
   const { minX, minZ, maxX, maxZ } = bounds(room);

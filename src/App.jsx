@@ -57,6 +57,8 @@ import { toExtreme, centerX, invertModule, shiftRotation } from './domain/moveEx
 import { VIEWS, pushView, backView, fwdView } from './domain/views.js';
 import { sagittaFromPoint } from './domain/curvedWalls.js';
 import { joinWalls, angleFrom304050, pointOnWall, projectOnAngle } from './domain/wallJoin.js';
+import { fitFloor, standardFloor, setFloorShape, setFloorGrid, floorGridOf, snapToFloorGrid } from './domain/floor.js';
+import { FloorShapeEditor, FloorGridEditor } from './ui/FloorEditors.jsx';
 import { FILL_MODES, fillMode, nextFillMode } from './domain/fillModes.js';
 import { applyRoomMaterial, copyFinish, setFinishProps, finishesOf } from './domain/roomMaterials.js';
 import MaterialsPanel from './ui/MaterialsPanel.jsx';
@@ -172,6 +174,9 @@ export default function App() {
     if (!m) return p;
     const { x, z } = lockAxis(m, x0, z0, lock);
     let pos = magnet ? snapPosition({ ...m, x, z }, p.modules.filter((o) => o.id !== id), p.room, 40, gridStep) : { x: Math.round(x), z: Math.round(z) };
+    // Grilla del piso con "Atraer": los bordes del módulo se pegan a sus líneas
+    const fg = floorGridOf(p.room);
+    if (fg.attract) { const { fw, fd } = footprint(m); pos = snapToFloorGrid(pos.x, pos.z, fw, fd, fg); }
     // Apoyado: se mueve a la altura de lo que tiene debajo en el destino (sube a la mesada, baja al piso).
     const mm = m.rest ? { ...m, y: restingHeight({ ...m, ...pos }, p.modules) } : m;
     if (ui.collision !== false) pos = collideMove(mm, pos.x, pos.z, p.room, p.modules);
@@ -469,6 +474,15 @@ export default function App() {
   // Editores de franjas y de regiones (Promob: Editar Faixas / Editar Regiões).
   const [stripDlg, setStripDlg] = useState(null);
   const [joinTool, setJoinTool] = useState(null); // Encuentro de paredes: { movingId, mode }
+  // Piso: menú del clic derecho, forma y grilla
+  const [floorMenu, setFloorMenu] = useState(null);
+  const [floorDlg, setFloorDlg] = useState(null); // 'shape' | 'grid'
+  const floorAction = (a) => {
+    setFloorMenu(null);
+    if (a === 'fit') setProject((p) => ({ ...p, room: fitFloor(p.room) }));
+    else if (a === 'std') setProject((p) => { const xs = p.room.nodes.map((n) => n.x), zs = p.room.nodes.map((n) => n.z); return { ...p, room: standardFloor(p.room, Math.min(0, ...xs), Math.min(0, ...zs)) }; });
+    else setFloorDlg(a);
+  };
   const [dlg304, setDlg304] = useState(null); // 30-40-50: { wallId, A, B, C }
   const [regionDlg, setRegionDlg] = useState(null);
   // Cara: el material cubre toda la cara (saca el de las franjas); Todo: todas las paredes.
@@ -1046,6 +1060,7 @@ export default function App() {
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
                 onWallDouble={(id) => goView({ name: 'pared', wallId: id })} onFloorDouble={() => goView({ name: 'planta' })}
                 navTool={navTool} navRef={navRef} surfaceRef={surfaceRef}
+                onFloorMenu={(ev) => setFloorMenu({ x: ev.clientX, y: ev.clientY })}
                 onMoveHotpoint={(id, x, z) => setProject((p) => {
                   const g = roomWalls(p.room).find((w) => w.id === id);
                   if (!g) return p;
@@ -1128,6 +1143,18 @@ export default function App() {
                 </div>
               </div>
             )}
+            {floorMenu && (
+              <div className="menu-backdrop" onPointerDown={() => setFloorMenu(null)} onContextMenu={(e) => { e.preventDefault(); setFloorMenu(null); }}>
+                <div className="wall-menu floor-menu" style={{ left: floorMenu.x, top: floorMenu.y }} onPointerDown={(e) => e.stopPropagation()}>
+                  <button onClick={() => floorAction('fit')}>Ajustar límites del piso</button>
+                  <button onClick={() => floorAction('std')}>Crear piso padrón (5000 × 5000)</button>
+                  <button onClick={() => floorAction('shape')}>Editar forma del piso…</button>
+                  <button onClick={() => floorAction('grid')}>Editar grilla del piso…</button>
+                </div>
+              </div>
+            )}
+            {floorDlg === 'shape' && <FloorShapeEditor room={project.room} onApply={(pts) => setProject((p) => ({ ...p, room: setFloorShape(p.room, pts) }))} onClose={() => setFloorDlg(null)} />}
+            {floorDlg === 'grid' && <FloorGridEditor room={project.room} onChange={(patch) => setProject((p) => ({ ...p, room: setFloorGrid(p.room, patch) }))} onClose={() => setFloorDlg(null)} />}
             {joinTool && (
               <div className="draw-hud join-hud">
                 <b>Encuentro {joinTool.mode === 't' ? 'en T' : 'en esquina'}</b>

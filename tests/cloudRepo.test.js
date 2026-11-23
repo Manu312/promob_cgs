@@ -84,6 +84,46 @@ test('sincronizado: guarda local al instante y en la nube; sin conexión queda p
   assert.ok(states.includes('sin-conexion') && states.at(-1) === 'guardado');
 });
 
+// Storage de mentira
+function fakeFiles() {
+  const m = new Map();
+  const st = { uploads: 0, offline: false };
+  return {
+    m, st,
+    async upload(p, c) { if (st.offline) throw new Error('Failed to fetch'); st.uploads++; if (!m.has(p)) m.set(p, c); },
+    async download(p) { if (st.offline || !m.has(p)) throw new Error('not found'); return m.get(p); },
+    async removeFolder(id) { for (const k of [...m.keys()]) if (k.startsWith(`${id}/`)) m.delete(k); },
+  };
+}
+const bigImg = `data:image/png;base64,${'A'.repeat(6000)}`;
+
+test('Storage: la imagen va como archivo, la fila queda liviana, y vuelve al abrir', async () => {
+  const db = fakeDb();
+  const files = fakeFiles();
+  const repo = createSupabaseRepo(db, { now, files });
+  const a = await repo.save(normalizeMeta({ name: 'Con plano' }), { name: 'x', planImage: { src: bigImg, x: 0 } });
+  const row = db.rows.get(a.id);
+  assert.ok(row.data.planImage.src.startsWith('asset:'), 'la fila guarda la ruta');
+  assert.ok(JSON.stringify(row.data).length < 500, 'fila liviana');
+  assert.equal(files.m.size, 1);
+  await repo.save(a, { name: 'x', planImage: { src: bigImg, x: 10 } });
+  assert.equal(files.st.uploads, 1, 'el mismo archivo no se sube de nuevo');
+  assert.equal((await repo.get(a.id)).data.planImage.src, bigImg, 'al abrir vuelve la imagen');
+  await repo.remove(a.id);
+  assert.equal(files.m.size, 0, 'al borrar el proyecto se borran sus archivos');
+});
+
+test('Storage sin conexión: abrir usa la copia local completa', async () => {
+  const db = fakeDb();
+  const files = fakeFiles();
+  const remote = createSupabaseRepo(db, { now, files });
+  const local = createLocalRepo(memStorage(), { now });
+  const repo = createSyncedRepo(remote, local, memStorage());
+  const a = await repo.save(normalizeMeta({ name: 'Con plano' }), { planImage: { src: bigImg } });
+  files.st.offline = true; // la tabla responde pero los archivos no bajan
+  assert.equal((await repo.get(a.id)).data.planImage.src, bigImg);
+});
+
 test('primera vez con la nube: sube los proyectos que estaban solo en esta compu', async () => {
   const db = fakeDb();
   const remote = createSupabaseRepo(db, { now });

@@ -6,6 +6,7 @@
 //   'sin-conexion'. Si dos personas editan el mismo proyecto, gana el último guardado.
 
 import { normalizeMeta, queryProjects, duplicateMeta } from './projectsRepo.js';
+import { extractAssets, injectAssets, assetRefs } from './assets.js';
 
 export function metaToRow(m) {
   return {
@@ -23,26 +24,52 @@ export function rowToMeta(r) {
 }
 const META_COLS = 'id,name,client,type,status,stage,close_by,delivery,notes,tags,created_at,updated_at,updated_by';
 
-export function createSupabaseRepo(db, { now = () => new Date().toISOString(), user = '' } = {}) {
+// `files` (opcional, S3): { upload(ruta, contenido), download(ruta), removeFolder(id) } sobre Storage.
+// Con él, las imágenes y modelos pesados viajan como archivos aparte y el proyecto guarda la ruta.
+export function createSupabaseRepo(db, { now = () => new Date().toISOString(), user = '', files = null } = {}) {
   const table = () => db.from('projects');
   const ok = ({ data, error }) => { if (error) throw error; return data; };
+  const uploaded = new Set(); // en esta sesión: no se vuelve a subir lo mismo en cada guardado
   return {
     kind: 'supabase',
     async all() { return ok(await table().select(META_COLS)).map(rowToMeta); },
     async list(q = {}) { return queryProjects(await this.all(), q); },
     async get(id) {
       const rows = ok(await table().select('*').eq('id', id).limit(1));
-      return rows[0] ? { meta: rowToMeta(rows[0]), data: rows[0].data } : null;
+      if (!rows[0]) return null;
+      let data = rows[0].data;
+      const refs = data && files ? assetRefs(data) : [];
+      if (refs.length) { // si un archivo no baja, falla todo y el sincronizado usa la copia local
+        const got = await Promise.all(refs.map(async (p) => [p, await files.download(p)]));
+        got.forEach(([p]) => uploaded.add(p));
+        data = injectAssets(data, new Map(got));
+      }
+      return { meta: rowToMeta(rows[0]), data };
     },
     async save(meta0, data) {
       const t = now();
       const meta = normalizeMeta({ ...meta0, updatedAt: t, updatedBy: user || meta0.updatedBy }, t);
       const row = metaToRow(meta);
-      if (data !== undefined) row.data = { ...data, name: meta.name };
+      if (data !== undefined) {
+        let body = { ...data, name: meta.name };
+        if (files) {
+          const ex = extractAssets(body, meta.id);
+          for (const f of ex.files) {
+            if (uploaded.has(f.path)) continue;
+            await files.upload(f.path, f.content);
+            uploaded.add(f.path);
+          }
+          body = ex.project;
+        }
+        row.data = body;
+      }
       ok(await table().upsert(row, { onConflict: 'id' }));
       return meta;
     },
-    async remove(id) { ok(await table().delete().eq('id', id)); },
+    async remove(id) {
+      ok(await table().delete().eq('id', id));
+      if (files?.removeFolder) await files.removeFolder(id).catch(() => {});
+    },
     async duplicate(id) {
       const src = await this.get(id);
       if (!src) return null;

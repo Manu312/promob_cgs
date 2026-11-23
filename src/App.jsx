@@ -56,6 +56,7 @@ import { replaceModule, findItemForModule } from './domain/replace.js';
 import { toExtreme, centerX, invertModule, shiftRotation } from './domain/moveExtras.js';
 import { VIEWS, pushView, backView, fwdView } from './domain/views.js';
 import { sagittaFromPoint } from './domain/curvedWalls.js';
+import { joinWalls, angleFrom304050, pointOnWall, projectOnAngle } from './domain/wallJoin.js';
 import { FILL_MODES, fillMode, nextFillMode } from './domain/fillModes.js';
 import { applyRoomMaterial, copyFinish, setFinishProps, finishesOf } from './domain/roomMaterials.js';
 import MaterialsPanel from './ui/MaterialsPanel.jsx';
@@ -332,6 +333,7 @@ export default function App() {
     setTimeout(() => lenRef.current?.focus(), 50);
   };
   const stopDrawWalls = () => { setDrawing(null); drawCursorRef.current = null; };
+  const [drawLock, setDrawLock] = useState(false); // Bloquear ángulo (Promob, Editor de Paredes)
   // Si se deshace un tramo mientras se dibuja, la esquina de partida puede desaparecer.
   useEffect(() => {
     if (drawing?.fromNodeId && !project.room.nodes.some((n) => n.id === drawing.fromNodeId)) setDrawing(freshDraw);
@@ -347,7 +349,7 @@ export default function App() {
     setProject((p) => normalizeProject({ ...p, room: res.room }));
     const a = res.room.nodes.find((n) => n.id === res.startNodeId), b = res.room.nodes.find((n) => n.id === res.endNodeId);
     const len = Math.hypot(b.x - a.x, b.z - a.z);
-    setDrawLen(''); setDrawAng('');
+    setDrawLen(''); if (!drawLock) setDrawAng('');
     if (res.closed) { stopDrawWalls(); return; }
     setDrawing({ ...freshDraw, fromNodeId: res.endNodeId, chainStartId: drawing.chainStartId ?? res.startNodeId, prevAbs: absAngle([(b.x - a.x) / len, (b.z - a.z) / len]), segs: drawing.segs + 1 });
     setTimeout(() => lenRef.current?.focus(), 0);
@@ -360,7 +362,21 @@ export default function App() {
       return;
     }
     if (c.nodeId && c.nodeId === drawing.chainStartId && drawing.segs >= 2) { setDrawing({ ...drawing, confirmClose: true }); return; }
+    const lockedAbs = drawLockAbs();
+    if (lockedAbs != null && !c.nodeId) { commitWall({ point: projectOnAngle(drawFrom(), c.end, lockedAbs).point }); return; }
     commitWall(c.nodeId ? { nodeId: c.nodeId } : { point: c.end });
+  };
+  // Ángulo trabado (absoluto en planta) a partir del ángulo escrito, si "Bloquear ángulo" está tildado.
+  const drawLockAbs = () => {
+    if (!drawLock) return null;
+    const a = Number(String(drawAng).replace(',', '.'));
+    if (drawAng === '' || !Number.isFinite(a)) return null;
+    return drawing.prevAbs == null ? a : drawing.prevAbs + (a - 180);
+  };
+  // Construir con referencia: empezar a una distancia medida desde el inicio de una pared existente.
+  const startFromReference = (wallId, dist) => {
+    const pt = pointOnWall(project.room, wallId, dist);
+    if (pt) { setDrawing({ ...drawing, start: pt }); setTimeout(() => lenRef.current?.focus(), 0); }
   };
   // Tramo por teclado: largo y ángulo escritos (o los que marca el mouse si quedan vacíos).
   const commitTyped = () => {
@@ -390,6 +406,8 @@ export default function App() {
     if (!w) return;
     if (action === 'lowered' || action === 'transparent') setProject((p) => ({ ...p, room: updateWall(p.room, wallId, { [action]: !w[action] }) }));
     else if (action === 'split') doSplit(wallId, offset);
+    else if (action === 'join-canto' || action === 'join-t') setJoinTool({ movingId: wallId, mode: action === 'join-t' ? 't' : 'canto' });
+    else if (action === '304050') setDlg304({ wallId, A: 300, B: 400, C: 500 });
     else if (action === 'strips') setStripDlg({ wallId });
     else if (action === 'regions') setRegionDlg({ surface: { kind: 'wall', wallId } });
     else if (action === 'delete') setDeleteDlg({ wallId });
@@ -450,6 +468,8 @@ export default function App() {
   const [tint, setTint] = useState('#d9c7a7');
   // Editores de franjas y de regiones (Promob: Editar Faixas / Editar Regiões).
   const [stripDlg, setStripDlg] = useState(null);
+  const [joinTool, setJoinTool] = useState(null); // Encuentro de paredes: { movingId, mode }
+  const [dlg304, setDlg304] = useState(null); // 30-40-50: { wallId, A, B, C }
   const [regionDlg, setRegionDlg] = useState(null);
   // Cara: el material cubre toda la cara (saca el de las franjas); Todo: todas las paredes.
   const applyMat = (target, matId, scope = 'cara') => setProject((p) => {
@@ -813,7 +833,7 @@ export default function App() {
         else if (e.key === 'Enter') commitTyped();
         return;
       }
-      if (e.key === 'Escape') { setSelectedId(null); setNavTool('select'); setRoomTool(null); }
+      if (e.key === 'Escape') { setSelectedId(null); setNavTool('select'); setRoomTool(null); setJoinTool(null); }
       if (selectedWallId && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); setDeleteDlg({ wallId: selectedWallId }); return; }
       if ((selectedOpeningId || selectedColumnId) && (e.key === 'Delete' || e.key === 'Backspace')) {
         e.preventDefault();
@@ -1010,7 +1030,10 @@ export default function App() {
             <div className="vp-area" ref={vpRef} {...vpDrag}>
             <ErrorBoundary onReset={() => { setRenderJob(null); setRenderDlg(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} selectedIds={selectedIds} onSelect={(id) => { if (!(id && roomToolClick({ kind: 'module', id }))) selectModule(id); }} onToggleSelect={toggleSelect} onMove={onMove}
-                selectedWallId={selectedWallId} onSelectWall={(id) => { if (!(id && roomToolClick({ kind: 'wall', wallId: id }))) selectWall(id); }}
+                selectedWallId={selectedWallId} onSelectWall={(id) => {
+                  if (joinTool && id && id !== joinTool.movingId) { setProject((p) => ({ ...p, room: joinWalls(p.room, joinTool.movingId, id, joinTool.mode) })); setJoinTool(null); return; }
+                  if (!(id && roomToolClick({ kind: 'wall', wallId: id }))) selectWall(id);
+                }}
                 onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
                 onDimEdit={onDimEdit} onWallLength={onWallLength} onWallAngle={onWallAngle}
                 onDragStart={onDragStart} onDragEnd={history.commit}
@@ -1038,6 +1061,7 @@ export default function App() {
             </ErrorBoundary>
             {drawing && (
               <DrawHud draw={drawing} len={drawLen} setLen={setDrawLen} ang={drawAng} setAng={setDrawAng} lenRef={lenRef} angRef={angRef}
+                lock={drawLock} onLock={setDrawLock} walls={roomWalls(project.room)} onReference={startFromReference}
                 onCommit={commitTyped} onCancel={stopDrawWalls}
                 onClose={(yes) => (yes ? commitWall({ nodeId: drawing.chainStartId }) : setDrawing({ ...drawing, confirmClose: false }))} />
             )}
@@ -1104,6 +1128,33 @@ export default function App() {
                 </div>
               </div>
             )}
+            {joinTool && (
+              <div className="draw-hud join-hud">
+                <b>Encuentro {joinTool.mode === 't' ? 'en T' : 'en esquina'}</b>
+                <span className="hint-inline">Hacé clic en la otra pared (la primera es la que se mueve) · Esc cancela</span>
+                <button onClick={() => setJoinTool(null)}>Cancelar</button>
+              </div>
+            )}
+            {dlg304 && (() => {
+              const ang = angleFrom304050(dlg304.A, dlg304.B, dlg304.C);
+              const set = (k) => (e) => setDlg304({ ...dlg304, [k]: +e.target.value || 0 });
+              return (
+                <div className="menu-backdrop dim">
+                  <div className="wall-dialog dlg-304050" role="dialog" aria-label="30-40-50">
+                    <h3>30 - 40 - 50 · Pared {project.room.walls.findIndex((w) => w.id === dlg304.wallId) + 1}</h3>
+                    <p className="hint">Medí A sobre la pared anterior y B sobre esta, desde la esquina; C es la distancia entre las dos marcas. La pared se gira hasta ese ángulo.</p>
+                    <label className="field"><span>A</span><input type="number" value={dlg304.A} onChange={set('A')} /></label>
+                    <label className="field"><span>B</span><input type="number" value={dlg304.B} onChange={set('B')} /></label>
+                    <label className="field"><span>C</span><input type="number" value={dlg304.C} onChange={set('C')} /></label>
+                    <p className="dlg-304-ang">{ang == null ? 'Medidas imposibles' : `Ángulo de la esquina: ${ang}°`}</p>
+                    <div className="row-btns">
+                      <button onClick={() => setDlg304(null)}>Cancelar</button>
+                      <button className="active" disabled={ang == null} onClick={() => { setProject((p) => ({ ...p, room: setWallAngle(p.room, dlg304.wallId, ang, 'rel') })); setDlg304(null); }}>Aplicar</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             {stripDlg && <StripEditor room={project.room} wallId={stripDlg.wallId} onRoom={(fn) => setProject((p) => ({ ...p, room: fn(p.room) }))}
               presets={ui.stripPresets || []} onPresets={(list) => setUi((u) => ({ ...u, stripPresets: list }))} onUndo={history.undo} onRedo={history.redo}
               onRegions={() => { setRegionDlg({ surface: { kind: 'wall', wallId: stripDlg.wallId } }); setStripDlg(null); }} onClose={() => setStripDlg(null)} />}

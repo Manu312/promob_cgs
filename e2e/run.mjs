@@ -1401,6 +1401,48 @@ try {
     check('Sin errores con paredes curvas', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S19: 30-40-50, extremos, Dry Wall y Bloquear ángulo
+  {
+    await clickText('.vp-toolbar button', 'Planta'); await sleep(1200);
+    let pm = await project();
+    const w = pm.room.walls[1];
+    // tramo más largo de la pared sin aberturas (una ventana en el punto le gana al clic)
+    const wlen = await page.evaluate((id) => { const p = JSON.parse(localStorage.getItem('mueblesapp.project')); const wl = p.room.walls.find((x) => x.id === id); const a = p.room.nodes.find((n) => n.id === wl.n0), b = p.room.nodes.find((n) => n.id === wl.n1); return Math.hypot(b.x - a.x, b.z - a.z); }, w.id);
+    const cuts = [0, ...pm.room.openings.filter((o) => o.wallId === w.id).sort((a, b) => a.offset - b.offset).flatMap((o) => [o.offset, o.offset + o.width]), wlen];
+    let wu = wlen / 2, bestL = -1;
+    for (let i = 0; i + 1 < cuts.length; i += 2) if (cuts[i + 1] - cuts[i] > bestL) { bestL = cuts[i + 1] - cuts[i]; wu = (cuts[i] + cuts[i + 1]) / 2; }
+    const wp = await page.evaluate((id, u) => {
+      const p = JSON.parse(localStorage.getItem('mueblesapp.project'));
+      const wl = p.room.walls.find((x) => x.id === id);
+      const a = p.room.nodes.find((n) => n.id === wl.n0), b = p.room.nodes.find((n) => n.id === wl.n1);
+      const L = Math.hypot(b.x - a.x, b.z - a.z), d = [(b.x - a.x) / L, (b.z - a.z) / L], nrm = [d[1], -d[0]];
+      return window.__muebles.screenOfPoint(a.x + d[0] * u + nrm[0] * 75, a.z + d[1] * u + nrm[1] * 75, 2000);
+    }, w.id, wu);
+    await page.mouse.click(wp.x, wp.y, { button: 'right' }); await sleep(400);
+    await clickText('.wall-menu button', '30-40-50'); await sleep(300);
+    check('30-40-50 abre su diálogo (300/400/500 → 90°)', (await page.$eval('.dlg-304-ang', (e) => e.textContent)) === 'Ángulo de la esquina: 90°');
+    const cIn = await page.evaluateHandle(() => [...document.querySelectorAll('.dlg-304050 .field')].find((f) => f.textContent.startsWith('C'))?.querySelector('input'));
+    await cIn.click({ clickCount: 3 }); await cIn.type('560'); await sleep(200);
+    const ang = await page.$eval('.dlg-304-ang', (e) => e.textContent);
+    await clickText('.dlg-304050 button', 'Aplicar'); await sleep(400);
+    const pm2 = await project();
+    check('Aplicar gira la pared al ángulo medido', ang.includes('°') && JSON.stringify(pm2.room.nodes) !== JSON.stringify(pm.room.nodes), ang);
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+    await page.mouse.click(wp.x, wp.y); await sleep(400);
+    const ext = await page.evaluateHandle(() => [...document.querySelectorAll('.inspector .field')].find((f) => f.textContent.startsWith('Extremo final'))?.querySelector('input'));
+    await ext.click({ clickCount: 3 }); await ext.type('300'); await page.keyboard.press('Enter'); await sleep(300);
+    check('Extremo final de la pared', (await project()).room.walls[1].extFin === 300);
+    await page.evaluate(() => { const f = [...document.querySelectorAll('.inspector .field')].find((x) => x.textContent.startsWith('Tipo de pared')); const s = f.querySelector('select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'drywall'); s.dispatchEvent(new Event('change', { bubbles: true })); }); await sleep(300);
+    check('Tipo de pared: Dry Wall', (await project()).room.walls[1].tipo === 'drywall');
+    for (let i = 0; i < 2; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(250); }
+    await page.keyboard.press('Escape');
+    await clickText('.vp-toolbar button', '✏ Paredes'); await sleep(500);
+    check('Construir paredes tiene Bloquear ángulo y Referencia', !!(await page.$('.draw-hud .dh-ref')) && (await page.$eval('.draw-hud', (e) => e.textContent)).includes('Bloquear ángulo'));
+    await page.keyboard.press('Escape'); await sleep(300);
+    await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(800);
+    check('Sin errores con el editor de paredes', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

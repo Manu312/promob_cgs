@@ -16,6 +16,10 @@ export function WallContextMenu({ menu, wall, onAction, onClose }) {
         {item('transparent', wall.transparent ? 'Opaca' : 'Transparente')}
         {item('split', 'Dividir aquí')}
         <hr />
+        {item('join-canto', 'Encuentro en esquina…')}
+        {item('join-t', 'Encuentro en T…')}
+        {item('304050', '30-40-50…')}
+        <hr />
         {item('strips', 'Editar franjas…')}
         {item('regions', 'Editar regiones…')}
         <hr />

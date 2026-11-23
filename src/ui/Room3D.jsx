@@ -88,6 +88,7 @@ import { wallDims } from '../domain/dimensions.js';
 
 const S = 0.001;
 const wallMat = new THREE.MeshStandardMaterial({ color: '#eeebe5', roughness: 0.95 });
+const drywallMat = new THREE.MeshStandardMaterial({ color: '#f3f4f6', roughness: 0.9 }); // placa de yeso
 const wallSelMat = new THREE.MeshStandardMaterial({ color: '#bcd3f7', roughness: 0.9, emissive: '#1d4ed8', emissiveIntensity: 0.08 });
 // Pared transparente: se ve translúcida y deja ver los módulos (como "Transparente" en Promob).
 const wallTransMat = new THREE.MeshStandardMaterial({ color: '#eeebe5', roughness: 0.95, transparent: true, opacity: 0.22, depthWrite: false });
@@ -167,7 +168,7 @@ function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onD
   const h0 = (lowered ? Math.min(lowerH, W.h0) : W.h0) - gap, h1 = (lowered ? Math.min(lowerH, W.h1) : W.h1) - gap;
   const H = Math.max(h0, h1);
   const ops = lowered || W.flecha ? [] : openings; // en paredes curvas no se dibujan los vanos (van sobre la cuerda)
-  const mat = W.transparent ? (selected ? wallSelTransMat : wallTransMat) : (selected ? wallSelMat : wallMat);
+  const mat = W.transparent ? (selected ? wallSelTransMat : wallTransMat) : (selected ? wallSelMat : W.tipo === 'drywall' ? drywallMat : wallMat);
   const theta = Math.atan2(-w.u[1], w.u[0]);
   // Eje z local del grupo rotado = (-uz, ux). El espesor va hacia el lado de la normal exterior.
   const outSign = w.n[0] * -w.u[1] + w.n[1] * w.u[0];
@@ -203,6 +204,9 @@ function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onD
           const m = fm ? [mat, mat, mat, mat, zc > 0 ? mat : fm, zc > 0 ? fm : mat] : mat;
           return <Box key={i} c={[((p.u0 + p.u1) / 2) * S, ((p.v0 + p.v1) / 2) * S, zc * S]} s={[(p.u1 - p.u0) * S, (p.v1 - p.v0) * S, T * S]} m={m} />;
         })}
+      {/* Extremos: prolongación de la pared más allá de sus vértices */}
+      {W.extIni > 0 && <Box c={[(-W.extIni / 2) * S, (H / 2) * S, zc * S]} s={[W.extIni * S, H * S, T * S]} m={mat} />}
+      {W.extFin > 0 && <Box c={[(w.len + W.extFin / 2) * S, (H / 2) * S, zc * S]} s={[W.extFin * S, H * S, T * S]} m={mat} />}
       {!lowered && room && <WallOverlays room={room} w={w} H={H} gap={gap} zc={zc} ops={ops} />}
       {ops.map((o) => (
         <Opening key={o.id} o={o} T={T} zc={zc} selected={o.id === selectedOpeningId}

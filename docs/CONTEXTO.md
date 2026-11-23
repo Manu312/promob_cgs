@@ -65,17 +65,23 @@ diseño 3D, renderizado, plan de corte y presupuesto. Se quieren todas las funci
    `docs/MEDIDAS-ELECTRODOMESTICOS.md`, issues #91–#94): aparatos paramétricos propios con medidas de fichas públicas
    (cocinas, anafes, horno, campanas, heladeras, microondas, lavavajillas, lavarropas), bachas y griferías que calan la
    mesada (3D + presupuesto), sanitarios de baño; no van al despiece y tienen precio opcional al presupuesto.
-   Siguiente: Fase 7 (#20) — configuración del render.
+3h. ✅ **Paridad con Promob — Fase 7, configuración del render** (ver `docs/PLAN-FASE-7.md`, issues #99–#103):
+   botón *Renderizar…* → diálogo con calidad (rápido rasterizado / final / profesional con trazado de rayos), dimensión
+   (Ambiente 3D, preconfigurados, personalizada con proporción trabada) y área del render en la vista; ventana de render
+   fuera de pantalla con progreso, Detener y Guardar imagen. Clima (presets, sol y cielo, brújula de azimut y arco de
+   altitud), fondo (color, degradé o imagen), marca de agua (9 posiciones, transparencia, distancia al borde; guardada en
+   el navegador) y panorama 360° con visor arrastrable. El trazado de rayos ya no corre dentro de la vista.
+   Siguiente: Fase 8 (#21) — proyectos, clientes y Supabase.
 4. ⏳ **Esquineros y especiales**: bajo esquinero L, alacena esquinera, horno/anafe, heladera, rebatibles, cajonera interna, alacena sobre heladera.
 5. ⏳ **Corte para taller**: orden de cortes, etiquetas por pieza imprimibles, sobrantes reutilizables.
 6. ⏳ **Módulo libre** a medida (editor por piezas).
-7. ⏳ **Accesorios/decoración** para render: bachas, anafes, griferías, electrodomésticos.
+7. ✅ **Accesorios/decoración** para render: bachas, anafes, griferías, electrodomésticos (Fase 6).
 8. Más adelante: export CNC (DXF con perforaciones), PDF para cliente con logo, Electron.
 
 ## Cómo se prueba
 
 - `npm test` → tests del dominio (20). Cada regla nueva lleva su test.
-- `npm run e2e` con `npm run dev` corriendo → abre Chrome con puppeteer-core y prueba clics, arrastres, teclado, pestañas, render y render final. Capturas en `e2e/screens/`.
+- `npm run e2e` con `npm run dev` corriendo → abre Chrome con puppeteer-core y prueba clics, arrastres, teclado, pestañas y la ventana de render (rápido, final, fondo, marca de agua, 360°). Capturas en `e2e/screens/`.
   - Sin ventana usa GPU por software: el render final puede no avanzar. Usar `HEADFUL=1` (PowerShell: `$env:HEADFUL='1'`).
   - En modo desarrollo la app expone `window.__muebles.screenOf(id)` para ubicar módulos en pantalla desde el test.
 

@@ -302,3 +302,10 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .rd-wm-pos button i { width: 10px; height: 6px; background: #cbd5e1; border-radius: 1px; }
 .rd-wm-pos button.on { border-color: var(--accent); background: var(--accent-weak); }
 .rd-wm-pos button.on i { background: var(--accent); }
+.pano-viewer { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.pv-canvas { height: min(62vh, 620px); cursor: grab; touch-action: none; background: #111; }
+.pv-canvas:active { cursor: grabbing; }
+.pv-canvas canvas { display: block; width: 100%; height: 100%; }
+.pv-bar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 12px; color: #6b7280; }
+.pv-bar span { margin-right: auto; }
+.rw-holder[hidden] { display: none; }

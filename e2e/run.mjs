@@ -755,6 +755,44 @@ try {
   await page.keyboard.press('Escape'); await sleep(300);
   check('Sin errores con la marca de agua', errors.length === 0, errors.slice(-3).join(' | '));
 
+  // Render 360° (Fase 7 S5): panorama 2:1 desde el centro del ambiente y visor arrastrable
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.rd-tabs button', 'Calidad'); await sleep(150);
+  await clickText('.render-dialog .radio', 'Render rápido'); await sleep(150);
+  await clickText('.rd-tabs button', '360'); await sleep(200);
+  await clickText('.render-dialog .check', 'Panorama 360°'); await sleep(300);
+  check('360°: el panorama usa su resolución 2:1', (await project()).render.panorama.on === true);
+  await clickText('.render-dialog footer button', 'Renderizar'); await sleep(2500);
+  const pano = await rwImage();
+  check('Render 360°: imagen equirectangular de 2048 × 1024', pano.w === 2048 && pano.h === 1024, JSON.stringify(pano));
+  const lowered = await page.evaluate(() => Object.values(window.__mueblesLowered || {}).filter(Boolean).length);
+  check('360°: las paredes se ven completas (sin Auto Rebajar) mientras se renderiza', lowered === 0, `${lowered} rebajadas`);
+  await shot('04i-render-360');
+  await page.evaluate(() => {
+    window.__dl = []; window.__aclick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function click() { if (this.download) { window.__dl.push(this.download); return undefined; } return window.__aclick.call(this); };
+  });
+  await clickText('.render-window button', 'Guardar imagen'); await sleep(1200);
+  const dl360 = await page.evaluate(() => window.__dl);
+  check('Guardar el panorama baja un PNG "-360"', dl360.length === 1 && dl360[0].endsWith('-360.png'), dl360.join(','));
+  await page.evaluate(() => { HTMLAnchorElement.prototype.click = window.__aclick; });
+  await clickText('.render-window button', 'Ver 360°'); await sleep(800);
+  check('Ver 360° abre el visor panorámico', !!(await page.$('.pano-viewer canvas')));
+  const pv = await page.$eval('.pv-canvas', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.move(pv.x, pv.y); await page.mouse.down(); await page.mouse.move(pv.x - 300, pv.y + 50, { steps: 8 }); await page.mouse.up(); await sleep(300);
+  const pvView = await page.$eval('.pano-viewer', (e) => ({ yaw: +e.dataset.yaw, pitch: +e.dataset.pitch }));
+  check('Visor 360°: arrastrar a la izquierda gira a la derecha', pvView.yaw === 60 && pvView.pitch === 10, JSON.stringify(pvView));
+  await page.mouse.move(pv.x, pv.y); await page.mouse.wheel({ deltaY: -400 }); await sleep(300);
+  check('Visor 360°: la rueda acerca (FOV menor)', +(await page.$eval('.pano-viewer', (e) => e.dataset.fov)) < 75);
+  await shot('04j-visor-360');
+  await clickText('.pano-viewer button', 'Volver a la imagen'); await sleep(300);
+  await clickText('.render-window button', 'Cerrar'); await sleep(400);
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.rd-tabs button', '360'); await sleep(200);
+  await clickText('.render-dialog .check', 'Panorama 360°'); await sleep(200);
+  await page.keyboard.press('Escape'); await sleep(300);
+  check('Sin errores con el 360°', errors.length === 0, errors.slice(-3).join(' | '));
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

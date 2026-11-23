@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WebGLPathTracer, GradientEquirectTexture } from 'three-gpu-pathtracer';
+import { WebGLPathTracer, GradientEquirectTexture, EquirectCamera } from 'three-gpu-pathtracer';
 import { fitRect, renderFov, coverRect, watermarkRect } from '../domain/render.js';
 import { loadImage } from './imageFile.js';
 
@@ -62,7 +62,39 @@ export function drawWatermark(ctx, wm, W, H, img) {
   ctx.restore();
 }
 
-export function createRenderJob({ gl, scene, camera, view, size, quality, rig, background, watermark, onProgress, onDone }) {
+// Pasa un cubemap (CubeCamera) a panorama equirectangular con la misma convención que equirectDir.
+const EQUIRECT_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+const EQUIRECT_FS = `
+uniform samplerCube cube;
+varying vec2 vUv;
+void main() {
+  float lon = (vUv.x - 0.5) * 6.28318530718;
+  float lat = (vUv.y - 0.5) * 3.14159265359;
+  vec3 d = vec3(sin(lon) * cos(lat), sin(lat), -cos(lon) * cos(lat));
+  gl_FragColor = textureCube(cube, d);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+
+function renderCubeToEquirect(off, scene, center, W, withScene) {
+  const res = Math.min(2048, Math.max(256, 2 ** Math.round(Math.log2(W / 4))));
+  const rt = new THREE.WebGLCubeRenderTarget(res, { type: THREE.HalfFloatType });
+  const cubeCam = new THREE.CubeCamera(0.05, 200, rt);
+  cubeCam.position.set(...center);
+  scene.add(cubeCam);
+  withScene(() => cubeCam.update(off, scene));
+  scene.remove(cubeCam);
+  const mat = new THREE.ShaderMaterial({ uniforms: { cube: { value: rt.texture } }, vertexShader: EQUIRECT_VS, fragmentShader: EQUIRECT_FS, depthTest: false, depthWrite: false, transparent: true });
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+  const qs = new THREE.Scene();
+  qs.add(quad);
+  off.render(qs, new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1));
+  quad.geometry.dispose();
+  mat.dispose();
+  rt.dispose();
+}
+
+export function createRenderJob({ gl, scene, camera, view, size, quality, rig, background, watermark, panorama, onProgress, onDone }) {
   const { width: W, height: H } = size;
   const glCanvas = document.createElement('canvas');
   const off = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -79,7 +111,14 @@ export function createRenderJob({ gl, scene, camera, view, size, quality, rig, b
   output.width = W;
   output.height = H;
   const ctx = output.getContext('2d');
-  const cam = makeRenderCamera(camera, view, size);
+  // Panorama: cámara equirectangular en el centro elegido; si no, la cámara del visor recortada al área.
+  let cam;
+  if (panorama) {
+    cam = new EquirectCamera();
+    cam.position.set(...panorama.center);
+    cam.rotation.y = Math.PI / 2; // el trazador mira a +x en el centro de la imagen: girar para que mire al fondo (−z)
+    cam.updateMatrixWorld();
+  } else cam = makeRenderCamera(camera, view, size);
   const env = skyTexture(rig?.sky);
 
   // La escena es la del visor: durante cada llamada se cambia el entorno por el del render, se saca
@@ -149,11 +188,13 @@ export function createRenderJob({ gl, scene, camera, view, size, quality, rig, b
     get running() { return running; },
     get samples() { return quality.pathTrace ? samples() : (running ? 0 : 1); },
     target,
+    panorama: !!panorama,
     get loading() { return pending > 0; },
     start() {
       if (disposed) return;
       if (!quality.pathTrace) {
-        withScene(() => off.render(scene, cam));
+        if (panorama) renderCubeToEquirect(off, scene, panorama.center, W, withScene);
+        else withScene(() => off.render(scene, cam));
         onProgress?.(1);
         finish();
         return;

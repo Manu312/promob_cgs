@@ -110,6 +110,13 @@ export const MODULE_TYPES = {
   tapa: { label: 'Tapa / mesada', cat: 'Cocina', kind: 'tapa', y: 870, rest: true, defaults: { width: 1200, height: 20, depth: 600, mesadaT: 20, bachas: 0 } },
   vista: { label: 'Vista (panel lateral)', cat: 'Cocina', kind: 'vista', y: 0, defaults: { width: 18, height: 870, depth: 580 } },
   estante: { label: 'Estante', cat: 'Cocina', kind: 'estante', y: 1500, defaults: { width: 800, height: 18, depth: 250 } },
+  // Frentes y paneles sueltos (Puertas/Frentes, Puertas extra, panel de TV): una placa de frente.
+  panel: { label: 'Frente suelto', cat: 'Cocina', kind: 'panel', y: 0, fields: ['width', 'height'], defaults: { width: 600, height: 700, depth: 18 } },
+  panel_tv: { label: 'Panel de TV', cat: 'Salas', kind: 'panel', y: 600, fields: ['width', 'height'], defaults: { width: 1800, height: 1100, depth: 18 } },
+  // Salas (living): racks, aparadores, vajilleros
+  rack_tv: { label: 'Rack de TV', cat: 'Salas', kind: 'caja', y: 0, defaults: caja({ width: 1800, height: 500, depth: 450, plinth: 80, dividers: 3, doorType: 'ninguna', doors: 0, shelves: 1, handlePos: 'none' }) },
+  aparador: { label: 'Aparador', cat: 'Salas', kind: 'caja', y: 0, defaults: caja({ width: 1600, height: 850, depth: 450, plinth: 100, dividers: 2, doors: 4, shelves: 1, handlePos: 'middle' }) },
+  vajillero: { label: 'Vajillero', cat: 'Salas', kind: 'caja', y: 0, defaults: caja({ width: 1000, height: 2000, depth: 400, plinth: 80, dividers: 1, doors: 2, drawers: 0, shelves: 4, handlePos: 'middle' }) },
   // Esquineros: ocupan la esquina (dos brazos contra las dos paredes). "Izquierda" = la esquina
   // queda a la izquierda (atrás-izquierda); "Derecha" = atrás-derecha.
   esq_l: { label: 'Esquinero L', cat: 'Cocina', kind: 'esquinero', y: 0, defaults: { width: 950, depth: 950, height: 870, armD: 560, plinth: 150, doors: 2, side: 'izq', shape: 'l', handlePos: 'top', mesada: 'si', mesadaT: 20, mesadaOver: 20 } },
@@ -576,7 +583,13 @@ function buildEsquinero(raw, { t, tf, tb = 3, rules = {} }) {
   return { parts, decors, hardware: hw };
 }
 
-const BUILDERS = { esquinero: buildEsquinero, escritorio: buildEscritorio, tapa: buildTapa, vista: buildVista, estante: buildEstante };
+// Frente / panel suelto: una placa (ancho × alto, espesor = profundidad) de frente.
+function buildPanel(raw, { tf }) {
+  const p = sanitize(raw);
+  return { parts: [part('Panel', 'frente', 0, 0, 0, p.width, p.height, tf, { x: 2, y: 2 })], decors: [], hardware: {} };
+}
+
+const BUILDERS = { esquinero: buildEsquinero, escritorio: buildEscritorio, tapa: buildTapa, vista: buildVista, estante: buildEstante, panel: buildPanel };
 
 export function buildModule(mod, ctx) {
   const def = MODULE_TYPES[mod.type];

@@ -60,6 +60,42 @@ export const LIBRARY = [
       { id: 'sup-altos', label: 'Superiores Altos', subgroups: [
         { id: 'puertas', label: 'Puertas', items: [it('coc-sa-2p', 'alacena', 'Superior alto 2 puertas', { height: 900, shelves: 2 }, W_ALTO, { y: 1250 })] },
       ] },
+      { id: 'puertas-frentes', label: 'Puertas/Frentes', subgroups: [
+        { id: 'frentes', label: 'Frentes', items: [
+          it('coc-frente', 'panel', 'Frente suelto', null, W(300, 400, 450, 500, 600, 800)),
+          it('coc-frente-cajon', 'panel', 'Frente de cajón suelto', { width: 600, height: 180 }, W(300, 400, 450, 500, 600, 800)),
+        ] },
+      ] },
+      { id: 'puertas-extras', label: 'Puertas Extras', subgroups: [
+        { id: 'puertas', label: 'Puertas', items: [
+          it('coc-puerta-extra', 'panel', 'Puerta extra', { width: 450, height: 720 }, W(300, 350, 400, 450, 500, 600)),
+          it('coc-puerta-alta', 'panel', 'Puerta extra alta (torre)', { width: 600, height: 2000 }, W(400, 450, 500, 600)),
+        ] },
+      ] },
+      { id: 'cajas', label: 'Cajas', subgroups: [
+        { id: 'cajas', label: 'Cajas sin frentes', items: [
+          it('coc-caja-bajo', 'bajo', 'Caja bajo mesada', { doorType: 'ninguna', doors: 0, drawers: 0, handlePos: 'none' }, W_BAJO),
+          it('coc-caja-alta', 'alacena', 'Caja alacena', { doorType: 'ninguna', doors: 0, handlePos: 'none' }, W_ALTO),
+        ] },
+      ] },
+      { id: 'composicion', label: 'Composición', subgroups: [
+        { id: 'conjuntos', label: 'Conjuntos', items: [
+          // Composición: varios módulos que se insertan juntos (quedan agrupados)
+          it('coc-comp-lineal', 'bajo', 'Cocina lineal 2,40 m', null, null, { compose: [
+            { type: 'bajo_cajones', params: { width: 600 }, dx: 0 },
+            { type: 'bajo_bacha', params: { width: 1000 }, dx: 600 },
+            { type: 'bajo', params: { width: 800 }, dx: 1600 },
+            { type: 'alacena', params: { width: 600 }, dx: 0 },
+            { type: 'alacena', params: { width: 1000 }, dx: 600 },
+            { type: 'alacena', params: { width: 800 }, dx: 1600 },
+          ] }),
+          it('coc-comp-isla', 'bajo', 'Isla con cajones 1,80 m', null, null, { compose: [
+            { type: 'bajo_cajones', params: { width: 600 }, dx: 0 },
+            { type: 'bajo', params: { width: 600 }, dx: 600 },
+            { type: 'bajo_cajones', params: { width: 600 }, dx: 1200 },
+          ] }),
+        ] },
+      ] },
       { id: 'tapas', label: 'Tapas/Estantes', subgroups: [
         { id: 'tapas', label: 'Tapas', items: [
           it('coc-tapa', 'tapa', null, null, W(600, 900, 1200, 1500, 1800, 2400)),
@@ -195,6 +231,26 @@ export const LIBRARY = [
           it('ban-lavatorio-colgar', 'lavatorio', 'Lavatorio de colgar', { montaje: 'colgar' }, null, { y: 700 }),
         ] },
         { id: 'griferias', label: 'Griferías', items: [it('ban-grif', 'griferia_bano')] },
+      ] },
+    ],
+  },
+  {
+    id: 'salas', label: 'Salas', groups: [
+      { id: 'racks', label: 'Racks', subgroups: [
+        { id: 'racks', label: 'Racks de TV', items: [
+          it('sal-rack', 'rack_tv', null, null, W(1200, 1500, 1800, 2000, 2400)),
+          it('sal-rack-caj', 'rack_tv', 'Rack de TV con cajones', { dividers: 1, doorType: 'batientes', drawers: 2, shelves: 0, handlePos: 'middle' }, W(1200, 1500, 1800)),
+        ] },
+      ] },
+      { id: 'bibliotecas', label: 'Bibliotecas', subgroups: [
+        { id: 'bibliotecas', label: 'Bibliotecas', items: [it('sal-bib', 'biblioteca', null, null, W(600, 800, 900, 1200)), it('sal-bib-alta', 'biblioteca', 'Biblioteca alta', { height: 2200, shelves: 5 }, W(600, 800, 900, 1200))] },
+      ] },
+      { id: 'aparadores', label: 'Aparadores', subgroups: [
+        { id: 'aparadores', label: 'Aparadores', items: [it('sal-aparador', 'aparador', null, null, W(1200, 1400, 1600, 1800, 2000))] },
+        { id: 'vajilleros', label: 'Vajilleros', items: [it('sal-vajillero', 'vajillero', null, null, W(800, 900, 1000, 1200))] },
+      ] },
+      { id: 'paneles', label: 'Paneles', subgroups: [
+        { id: 'paneles', label: 'Paneles de TV', items: [it('sal-panel', 'panel_tv', null, null, W(1200, 1500, 1800, 2000, 2400))] },
       ] },
     ],
   },

@@ -1305,6 +1305,30 @@ try {
     check('Sin errores con la Línea Gola', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S15: biblioteca Salas y familias Puertas/Frentes, Puertas Extras, Cajas, Composición
+  {
+    const dblItem = (t) => page.evaluate((t) => [...document.querySelectorAll('.mod-btn')].find((b) => b.textContent.includes(t))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })), t);
+    const n0 = (await project()).modules.length;
+    await clickText('.cb-libs .cb-tab', 'Salas'); await sleep(300);
+    check('Biblioteca Salas', (await page.$$eval('.cb-groups .cb-tab', (b) => b.map((x) => x.textContent))).join('|') === 'Racks|Bibliotecas|Aparadores|Paneles');
+    await dblItem('Rack de TV'); await sleep(400);
+    check('Rack de TV insertado', (await project()).modules.at(-1).type === 'rack_tv');
+    await clickText('.cb-libs .cb-tab', 'Cocinas'); await sleep(200);
+    const groups = await page.$$eval('.cb-groups .cb-tab', (b) => b.map((x) => x.textContent));
+    check('Cocinas tiene Puertas/Frentes, Puertas Extras, Cajas y Composición', ['Puertas/Frentes', 'Puertas Extras', 'Cajas', 'Composición'].every((g) => groups.includes(g)), groups.join('|'));
+    await clickText('.cb-groups .cb-tab', 'Composición'); await sleep(300);
+    await dblItem('Cocina lineal 2,40'); await sleep(600);
+    const pm = await project();
+    const comp = pm.modules.slice(n0 + 1);
+    check('Composición: inserta los 6 módulos juntos y agrupados', comp.length === 6 && new Set(comp.map((m) => m.groupId)).size === 1 && !!comp[0].groupId, `${comp.length} módulos`);
+    await shot('07o-composicion');
+    for (let i = 0; i < 2; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(250); }
+    check('Deshacer saca la composición y el rack', (await project()).modules.length === n0);
+    await page.keyboard.press('Escape');
+    await clickText('.cb-groups .cb-tab', 'Inferiores'); await sleep(200);
+    check('Sin errores con Salas y Composición', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

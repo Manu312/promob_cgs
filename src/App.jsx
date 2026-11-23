@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SETTINGS, mergeSettings } from './domain/catalog.js';
-import { newModule, footprint, snapPosition, resizeModule, uid, isSquare, MODULE_TYPES, fieldsFor } from './domain/modules.js';
+import { newModule, footprint, snapPosition, resizeModule, uid, isSquare, MODULE_TYPES, fieldsFor, localAxes } from './domain/modules.js';
 import { insertPose } from './domain/insert.js';
 import { collideMove, collideLift } from './domain/collision.js';
 import { nudgeTarget, rotateAboutCenter, lockAxis, restingHeight } from './domain/movement.js';
@@ -658,6 +658,7 @@ export default function App() {
       dragItemRef.current = null;
       setGhost(null);
       if (!m) return;
+      if (d.item.compose) { countUse(d.item); insertModules(composeAt(d.item, m)); return; }
       const mod = withAutoInsert(withItem({ ...m, id: uid() }, d.item, project.modules), project, (x) => resolveRules(x, project));
       countUse(d.item);
       setProject((p) => ({ ...p, modules: [...p.modules, mod] }));
@@ -685,7 +686,17 @@ export default function App() {
     const hit = m && findItemForModule(m);
     if (hit) setUi((u) => ({ ...u, catalogPath: [...hit.path, hit.item.id] }));
   };
+  // Composición: los módulos del conjunto, corridos a lo ancho desde la posición del primero, agrupados.
+  const composeAt = (item, base) => {
+    const gid = `g${uid()}`;
+    return item.compose.map((c) => {
+      const m = newModule(c.type, project, c.params, c.y ?? MODULE_TYPES[c.type].y);
+      const { ex } = localAxes(base.rot || 0);
+      return { ...m, x: Math.round(base.x + ex[0] * c.dx), z: Math.round(base.z + ex[1] * c.dx), rot: base.rot || 0, groupId: gid };
+    });
+  };
   const insertItem = (item, variant = null) => {
+    if (item.compose) { countUse(item); const base = newModule(item.compose[0].type, project, item.compose[0].params); insertModules(composeAt(item, base)); setTab('diseno'); return; }
     countUse(item);
     const m = withAutoInsert(withItem(newModule(item.type, project, itemParams(item, variant), item.y), item, project.modules), project, (x) => resolveRules(x, project));
     setProject((p) => ({ ...p, modules: [...p.modules, m] }));

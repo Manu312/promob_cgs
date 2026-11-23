@@ -68,6 +68,7 @@ export function ModuleContextMenu({ menu, canMax, onAction, onClose, canGroup, c
         <hr />
         {item('rotate', 'Rotar 90°')}
         {item('duplicate', 'Duplicar')}
+        {item('reposition', 'Duplicar con Reposicionar…')}
         <hr />
         <button disabled={!canGroup} onClick={() => onAction('group')} title="Agrupar los módulos seleccionados (U)">Agrupar</button>
         <button disabled={!canUngroup} onClick={() => onAction('ungroup')} title="Desagrupar (Ctrl+U)">Desagrupar</button>

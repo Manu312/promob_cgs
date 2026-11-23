@@ -329,9 +329,20 @@ try {
   await page.keyboard.press('ArrowDown'); await sleep(300);
   p = await project();
   check('Flecha mueve 10mm', p.modules.find((m) => m.id === target.id).z === Math.min(x0 + 10, p.room.d - p.modules.find((m) => m.id === target.id).params.width));
-  await clickText('.row-btns button', 'Duplicar');
+  await clickText('.row-btns button', 'Duplicar'); await sleep(300);
+  check('Duplicar abre la ventana Reposicionar (Fase 7b S3)', !!(await page.$('.reposicionar')));
+  await clickText('.reposicionar button', 'Aceptar'); await sleep(300);
   p = await project();
   check('Duplicar módulo', p.modules.length === 9);
+  const orig = p.modules.find((m) => m.id === target.id), cp1 = p.modules.at(-1);
+  await page.keyboard.down('Control'); await page.keyboard.press('KeyD'); await page.keyboard.up('Control'); await sleep(300);
+  p = await project();
+  const cp2 = p.modules.at(-1);
+  check('Ctrl+D repite el mismo desplazamiento sin preguntar', p.modules.length === 10 && !(await page.$('.reposicionar')) && cp2.x - cp1.x === cp1.x - orig.x && cp2.z - cp1.z === cp1.z - orig.z, `${orig.x}→${cp1.x}→${cp2.x}`);
+  for (let i = 0; i < 2; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(250); }
+  const tp = await page.evaluate((id) => window.__muebles.screenOf(id, 100), target.id);
+  await page.mouse.click(tp.x, tp.y); await sleep(300);
+  await clickText('.row-btns button', 'Duplicar'); await sleep(300); // ya no pregunta
   await page.keyboard.press('Delete'); await sleep(300);
   p = await project();
   check('Supr borra módulo', p.modules.length === 8);
@@ -862,6 +873,30 @@ try {
     check('Desagrupado, el clic vuelve a elegir un solo módulo', !(await page.$('.multi-sel')));
     await page.keyboard.press('Escape'); await sleep(200);
     check('Sin errores con los grupos', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
+  // Fase 7b S3: Copiar / Cortar / Pegar
+  {
+    let pm = await project();
+    const ma = pm.modules.find((m) => m.type === 'bajo_mixto');
+    const q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), ma.id);
+    await page.mouse.click(q.x, q.y); await sleep(300);
+    const n0 = pm.modules.length;
+    const ctrlKey = async (k) => { await page.keyboard.down('Control'); await page.keyboard.press(k); await page.keyboard.up('Control'); await sleep(300); };
+    await ctrlKey('KeyC'); await ctrlKey('KeyV');
+    pm = await project();
+    const pasted = pm.modules.at(-1);
+    check('Ctrl+C / Ctrl+V pega una copia al lado', pm.modules.length === n0 + 1 && pasted.type === 'bajo_mixto' && pasted.id !== ma.id && pasted.x > ma.x && pasted.z === ma.z, `${ma.x} → ${pasted.x}`);
+    await ctrlKey('KeyV');
+    pm = await project();
+    check('Pegar otra vez la corre otro tanto', pm.modules.length === n0 + 2 && pm.modules.at(-1).x - ma.x === 2 * (pasted.x - ma.x));
+    await ctrlKey('KeyX');
+    pm = await project();
+    check('Ctrl+X corta lo seleccionado', pm.modules.length === n0 + 1);
+    await ctrlKey('KeyZ'); await ctrlKey('KeyZ'); await ctrlKey('KeyZ');
+    check('Deshacer vuelve atrás los pegados', (await project()).modules.length === n0);
+    await page.keyboard.press('Escape'); await sleep(200);
+    check('Sin errores con copiar y pegar', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
   // Pestañas

@@ -51,6 +51,8 @@ import { useHistoryState } from './ui/useHistoryState.js';
 import { describeSelection } from './domain/selection.js';
 import { toggleId, selectAllIds, moveGroup, rotateGroup, describeMulti } from './domain/multiSelect.js';
 import { expandToGroups, groupModules, ungroupModules, selectionGroup, pruneGroups } from './domain/groups.js';
+import { pasteModules, sideOffset } from './domain/clipboard.js';
+import ReposicionarDialog from './ui/ReposicionarDialog.jsx';
 
 function usePersistent(key, init, migrate = (x) => x) {
   const [v, setV] = useState(() => {
@@ -342,6 +344,7 @@ export default function App() {
       setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === id ? maxSize(m, param, p.room, p.modules) : m)) }));
     } else if (action === 'rotate') rotateSelected();
     else if (action === 'duplicate') duplicateSelected();
+    else if (action === 'reposition') duplicateSelected(true);
     else if (action === 'delete') deleteSelected();
     else if (action === 'group') groupSelected();
     else if (action === 'ungroup') ungroupSelected();
@@ -406,11 +409,38 @@ export default function App() {
     setProject((p) => pruneGroups(removeModules(p, selectedIds)));
     setSelectedId(null);
   };
-  const duplicateSelected = () => {
-    if (!selected) return;
-    const copy = { ...selected, id: uid(), x: selected.x + footprint(selected).fw, params: { ...selected.params }, mats: { ...selected.mats } };
-    setProject((p) => ({ ...p, modules: [...p.modules, copy] }));
-    setSelectedId(copy.id);
+  // Duplicar (Ctrl+D): la primera vez pregunta el desplazamiento (ventana Reposicionar) y lo recuerda.
+  const [dupOffset, setDupOffset] = useState(null);
+  const [reposDlg, setReposDlg] = useState(null);
+  const selectedMods = () => project.modules.filter((m) => selectedIds.includes(m.id));
+  const duplicateWith = (offset) => {
+    const mods = selectedMods();
+    if (!mods.length) return;
+    const r = pasteModules(project, mods, offset);
+    setProject(r.project);
+    selectIds(r.ids);
+  };
+  const duplicateSelected = (ask = false) => {
+    if (!selectedIds.length) return;
+    if (dupOffset && !ask) { duplicateWith(dupOffset); return; }
+    setReposDlg({ initial: dupOffset || sideOffset(selectedMods()) });
+  };
+  // Copiar / Cortar / Pegar (Ctrl+C / Ctrl+X / Ctrl+V). Pegar deja la copia al lado de lo copiado
+  // (o en el mismo lugar si se cortó), y cada pegado siguiente se corre otro tanto.
+  const clipRef = useRef(null);
+  const copySelected = (cut = false) => {
+    const mods = selectedMods();
+    if (!mods.length) return;
+    clipRef.current = { mods: JSON.parse(JSON.stringify(mods)), n: cut ? 0 : 1, step: sideOffset(mods) };
+    if (cut) { setProject((p) => pruneGroups(removeModules(p, selectedIds))); setSelectedId(null); }
+  };
+  const pasteClipboard = () => {
+    const c = clipRef.current;
+    if (!c) return;
+    const r = pasteModules(project, c.mods, { dx: c.step.dx * c.n, dz: 0, dy: 0 });
+    c.n += 1;
+    setProject(r.project);
+    selectIds(r.ids);
   };
   const rotateSelected = () => rotateBy(90);
 
@@ -430,6 +460,9 @@ export default function App() {
       if (plain && key === 'b') { toggleUi('collision'); return; }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'm') { e.preventDefault(); setTool('movimiento'); return; }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'd') { e.preventDefault(); duplicateSelected(); return; }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'c') { e.preventDefault(); copySelected(false); return; } // Copiar
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'x') { e.preventDefault(); copySelected(true); return; } // Cortar
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'v') { e.preventDefault(); pasteClipboard(); return; } // Pegar
       if (plain && key === 'e') { setTool('propiedades'); return; }
       if (plain && key === 'a') { setTool('agregados'); return; } // Agregados
       if (plain && key === 'o' && selectedId) { setProject((p) => toggleHidden(p, selectedIds)); return; } // visible / oculto
@@ -625,6 +658,8 @@ export default function App() {
             )}
             {renderJob && <RenderWindow bridge={renderRef.current} size={renderJob.size} quality={renderJob.quality} rig={renderJob.rig} background={renderJob.background} watermark={renderJob.watermark} panorama={renderJob.panorama}
               fileName={`${project.name || 'render'}${renderJob.panorama ? '-360' : ''}.png`} onClose={() => setRenderJob(null)} />}
+            {reposDlg && <ReposicionarDialog initial={reposDlg.initial} onCancel={() => setReposDlg(null)}
+              onOk={(o) => { setReposDlg(null); setDupOffset(o); duplicateWith(o); }} />}
             {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)}
               canGroup={multiSel && !selectionGroup(project, selectedIds)} canUngroup={project.modules.some((m) => selectedIds.includes(m.id) && m.groupId)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}
@@ -675,7 +710,7 @@ export default function App() {
             selectedOpeningId={selectedOpeningId} selectedColumnId={selectedColumnId} onSelectItem={setSelection} onScaleImage={startScale}
             onParams={(patch) => mapModule(selectedId, (m) => ({ ...m, params: { ...m.params, ...patch } }))}
             onUpdate={(patch) => mapModule(selectedId, (m) => ({ ...m, ...patch }))}
-            onDelete={deleteSelected} onDuplicate={duplicateSelected} onRotate={rotateSelected}
+            onDelete={deleteSelected} onDuplicate={() => duplicateSelected()} onRotate={rotateSelected}
             onRotateTo={(deg) => selected && rotateBy(deg - (selected.rot || 0))}
             onRest={(on) => selectedId && setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === selectedId ? { ...m, rest: on, ...(on ? { y: restingHeight(m, p.modules) } : {}) } : m)) }))}
             onProject={(fn) => setProject((p) => normalizeProject(fn(p)))} />}

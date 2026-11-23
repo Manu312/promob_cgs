@@ -137,6 +137,14 @@ const FINISH_MATS = {
   negro: new THREE.MeshStandardMaterial({ color: '#1c1d1f', metalness: 0.2, roughness: 0.45 }),
   vidrio: new THREE.MeshStandardMaterial({ color: '#0f1113', metalness: 0.4, roughness: 0.08 }),
   ceramica: new THREE.MeshStandardMaterial({ color: '#fbfbf9', metalness: 0, roughness: 0.18 }),
+  // Decore
+  madera: new THREE.MeshStandardMaterial({ color: '#b98f5e', metalness: 0, roughness: 0.6 }),
+  madera_osc: new THREE.MeshStandardMaterial({ color: '#5b3a22', metalness: 0, roughness: 0.55 }),
+  tela_gris: new THREE.MeshStandardMaterial({ color: '#8a8d91', metalness: 0, roughness: 0.95 }),
+  tela_beige: new THREE.MeshStandardMaterial({ color: '#d6c8ae', metalness: 0, roughness: 0.95 }),
+  verde: new THREE.MeshStandardMaterial({ color: '#4f7a3a', metalness: 0, roughness: 0.8 }),
+  terracota: new THREE.MeshStandardMaterial({ color: '#b5673f', metalness: 0, roughness: 0.85 }),
+  dorado: new THREE.MeshStandardMaterial({ color: '#c9a227', metalness: 0.6, roughness: 0.3 }),
 };
 export const finishMat = (f) => FINISH_MATS[f] || FINISH_MATS.inox;
 export const stone = new THREE.MeshStandardMaterial({ color: '#5d5f61', roughness: 0.28, metalness: 0.05 });

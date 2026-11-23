@@ -1329,6 +1329,29 @@ try {
     check('Sin errores con Salas y Composición', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S16: Decore (decoración paramétrica propia) y material "en todos de este tipo"
+  {
+    const dblItem = (t) => page.evaluate((t) => [...document.querySelectorAll('.mod-btn')].find((b) => b.textContent.includes(t))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })), t);
+    const n0 = (await project()).modules.length;
+    await clickText('.cb-libs .cb-tab', 'Decore'); await sleep(300);
+    await clickText('.cb-subs .cb-tab', 'Sillas'); await sleep(200);
+    await dblItem('Silla'); await sleep(300); await dblItem('Silla'); await sleep(400);
+    let pm = await project();
+    check('Decore: sillas insertadas', pm.modules.slice(n0).filter((m) => m.type === 'silla').length === 2);
+    const sel = await page.$$eval('.inspector .field', (fs) => { const f = fs.find((x) => x.textContent.startsWith('Material')); return f ? [...f.querySelectorAll('option')].map((o) => o.value) : []; });
+    check('Material elegible en Propiedades', sel.includes('madera_osc'));
+    await page.evaluate(() => { const f = [...document.querySelectorAll('.inspector .field')].find((x) => x.textContent.startsWith('Material')); const s = f.querySelector('select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'negro'); s.dispatchEvent(new Event('change', { bubbles: true })); }); await sleep(300);
+    await clickText('.inspector button', 'Material en todos de este tipo'); await sleep(300);
+    pm = await project();
+    check('"En todos de este tipo": las dos sillas quedan negras', pm.modules.filter((m) => m.type === 'silla').every((m) => m.params.material === 'negro'));
+    await shot('07p-decore');
+    for (let i = 0; i < 4; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(200); }
+    check('Deshacer saca las sillas', (await project()).modules.length === n0, String((await project()).modules.length - n0));
+    await page.keyboard.press('Escape');
+    await clickText('.cb-libs .cb-tab', 'Cocinas'); await sleep(200);
+    check('Sin errores con Decore', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

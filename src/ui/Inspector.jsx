@@ -1,4 +1,5 @@
 import { MODULE_TYPES, PARAM_DEFS, RULE_DEFS, DEFAULT_RULES, fieldsFor, moduleName } from '../domain/modules.js';
+import { applyDecoreMaterialToType } from '../domain/decore.js';
 import { NumField, SelField, TextField, num } from './fields.jsx';
 import RoomEditor from './RoomEditor.jsx';
 import WallPanel from './WallPanel.jsx';
@@ -73,6 +74,12 @@ export default function Inspector({ project, settings, selected, selectedWallId,
           ? <NumField key={k} label={d.label} unit={d.unit} value={p[k]} min={d.min} max={d.max} step={d.step} onChange={(v) => onParams({ [k]: v })} />
           : <SelField key={k} label={d.label} value={p[k]} options={d.options} onChange={(v) => onParams({ [k]: v })} />;
       })}
+      {MODULE_TYPES[selected.type]?.cat === 'Decore' && onProject && (
+        <div className="row-btns">
+          <button onClick={() => onProject((p) => applyDecoreMaterialToType(p, selected.type, selected.params.material))}
+            title="Aplica este material a todos los objetos iguales del proyecto (Promob: En todos de este tipo)">Material en todos de este tipo</button>
+        </div>
+      )}
       <h4>Posición</h4>
       <NumField label="X (desde pared izq.)" unit="mm" value={selected.x} step={10} onChange={(v) => onUpdate({ x: v })} />
       <NumField label="Z (desde pared fondo)" unit="mm" value={selected.z} step={10} onChange={(v) => onUpdate({ z: v })} />

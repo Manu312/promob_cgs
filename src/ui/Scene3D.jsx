@@ -8,6 +8,7 @@ import { bounds } from '../domain/walls.js';
 import { frontTransforms } from '../domain/fronts.js';
 import { roomWalls } from '../domain/room.js';
 import { planFitZoom } from '../domain/grid.js';
+import { viewPose, wallViewPose, orthoZoom } from '../domain/views.js';
 import { mat3d, metal, stone, finishMat } from './materials3d.js';
 import { Room3D, Dimensions } from './Room3D.jsx';
 import { ModuleDistances, OpeningDims, HeightRuler, Annotations } from './Cotas.jsx';
@@ -135,27 +136,31 @@ function ModuleObject({ mod, b, selected, showSel, onDown, onMenu, onResizeDown,
 // Ubica la cámara al cambiar de vista. Al entrar/salir de Planta cambia la cámara
 // (ortográfica ↔ perspectiva) y drei recrea los controles en el render siguiente:
 // se espera a que ambos estén listos antes de aplicar la vista.
-function CameraRig({ view, room, controlsRef }) {
+function CameraRig({ view, room, controlsRef, origin }) {
   const pending = useRef(true);
   const { size } = useThree();
   useEffect(() => { pending.current = true; }, [view.tick]);
   useFrame(({ camera }) => {
     if (!pending.current) return;
     const planta = view.name === 'planta';
+    const ortho = planta || !!view.ortho;
     const c = controlsRef.current;
-    if (!!camera.isOrthographicCamera !== planta || (c && c.object !== camera)) return;
+    if (!!camera.isOrthographicCamera !== ortho || (c && c.object !== camera)) return;
     pending.current = false;
     const b = bounds(room);
-    const depth = (b.maxZ - b.minZ) * S;
-    let pos, tgt;
-    if (planta) {
-      pos = [0, 40, 0.001]; tgt = [0, 0, 0];
-      camera.zoom = planFitZoom(b, size.width, size.height);
+    const box = { w: b.maxX - b.minX, d: b.maxZ - b.minZ, h: room.h };
+    const aspect = size.width / Math.max(1, size.height);
+    const g = view.name === 'pared' ? roomWalls(room).find((w) => w.id === view.wallId) : null;
+    const wh = g ? Math.max(g.wall.h0 ?? room.h, g.wall.h1 ?? room.h) : room.h;
+    const pose = g ? wallViewPose(g, wh, origin, 45, aspect) : viewPose(view.name, box, 45, aspect);
+    camera.position.set(...pose.pos);
+    if (ortho) {
+      camera.zoom = planta ? planFitZoom(b, size.width, size.height)
+        : g ? orthoZoom(g.len / 1000, wh / 1000, size.width, size.height)
+          : orthoZoom(Math.hypot(box.w, box.d) / 1000, Math.hypot(box.w, box.d, box.h) / 1000, size.width, size.height);
       camera.updateProjectionMatrix();
-    } else if (view.name === 'frente') { pos = [0, 1.3, depth / 2 + 2.8]; tgt = [0, 1.1, -depth / 4]; }
-    else { pos = [1.6, 2.3, depth / 2 + 2.6]; tgt = [0, 0.9, -depth / 5]; }
-    camera.position.set(...pos);
-    if (c) { c.target.set(...tgt); c.update(); } else camera.lookAt(...tgt);
+    }
+    if (c) { c.target.set(...pose.target); c.update(); } else camera.lookAt(...pose.target);
   });
   return null;
 }
@@ -262,6 +267,7 @@ function DevProbe({ project, origin, openFronts }) {
         return n ? toScreen(n.x, project.room.h + 20, n.z) : null;
       },
       screenOfPoint(x, z, y = 0) { return toScreen(x, y, z); },
+      camPos() { return camera.position.toArray(); },
       screenOfOpening(id) {
         const o = project.room.openings.find((x) => x.id === id);
         const g = o && roomWalls(project.room).find((w) => w.id === o.wallId);
@@ -370,7 +376,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -514,7 +520,9 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
         <Room3D room={room} origin={origin} autoHide={autoHideWalls} selectedWallId={renderMode ? null : selectedWallId} onWallDown={renderMode ? null : onWallDown}
           onWallMenu={renderMode || drawing || annotating ? null : onWallMenu}
           selectedOpeningId={renderMode ? null : selectedOpeningId} onOpeningDown={renderMode || drawing ? null : onOpeningDown}
-          selectedColumnId={renderMode ? null : selectedColumnId} onColumnDown={renderMode || drawing ? null : onColumnDown} />
+          selectedColumnId={renderMode ? null : selectedColumnId} onColumnDown={renderMode || drawing ? null : onColumnDown}
+          onWallDouble={renderMode || drawing || annotating ? null : onWallDouble} onFloorDouble={renderMode || drawing || annotating ? null : onFloorDouble}
+          onFloorClick={(e) => { if (e.delta > 2 || dragRef.current || drawing || annotating) return; onSelect(null); }} />
         {view.name === 'frente' && !renderMode && <HeightRuler room={room} modules={project.modules} />}
         {selectedOpeningId && !renderMode && <OpeningDims room={room} id={selectedOpeningId} onEdit={onOpeningDim} />}
         {planta && !renderMode && <PlanGrid room={room} />}
@@ -537,10 +545,10 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
       </group>
       {/* sombra de contacto solo del visor: su textura vive en este renderer, no va a la ventana de render */}
       {renderMode && <group userData={{ noOffscreen: true }}><ContactShadows position={[0, 0.002, 0]} scale={12} blur={2.2} opacity={0.45} far={2.5} /></group>}
-      {planta && <OrthographicCamera makeDefault near={0.1} far={200} position={[0, 40, 0.001]} />}
+      {(planta || view.ortho) && <OrthographicCamera makeDefault near={0.1} far={200} position={[0, 40, 0.001]} />}
       <OrbitControls ref={controlsRef} makeDefault maxPolarAngle={planta ? Math.PI : Math.PI / 2 - 0.02} minDistance={0.5} maxDistance={20}
         enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={planta ? (drawing || annotating ? DRAW_BUTTONS : PLAN_BUTTONS) : ROTATE_BUTTONS} />
-      <CameraRig view={view} room={room} controlsRef={controlsRef} />
+      <CameraRig view={view} room={room} controlsRef={controlsRef} origin={origin} />
       <Capturer captureRef={captureRef} />
       {renderRef && <RenderBridge renderRef={renderRef} room={room} origin={origin} />}
       <DevProbe project={project} origin={origin} openFronts={openFronts} />

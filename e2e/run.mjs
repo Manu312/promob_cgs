@@ -956,6 +956,45 @@ try {
     check('Sin errores con los atajos de movimiento', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S6: menú Vistas, Volver/Avanzar vista, F8 y doble clic en pared/piso
+  {
+    await page.select('.vp-views', 'iso-izq'); await sleep(900);
+    let cp = await page.evaluate(() => window.__muebles.camPos());
+    check('Vistas: Isométrica izquierda mira desde la izquierda', cp[0] < 0 && cp[2] > 0, cp.map((v) => v.toFixed(1)).join(','));
+    await shot('07d-vista-iso-izq');
+    await page.select('.vp-views', 'iso-tras-der'); await sleep(900);
+    cp = await page.evaluate(() => window.__muebles.camPos());
+    check('Vistas: Isométrica trasera derecha', cp[0] > 0 && cp[2] < 0);
+    await clickText('.vp-toolbar button', '◁'); await sleep(900);
+    check('Volver vista regresa a la anterior', (await page.$eval('.vp-views', (e) => e.value)) === 'iso-izq');
+    await clickText('.vp-toolbar button', '▷'); await sleep(900);
+    check('Avanzar vista', (await page.$eval('.vp-views', (e) => e.value)) === 'iso-tras-der');
+    await page.keyboard.press('F8'); await sleep(900);
+    check('F8 pasa a ortogonal', (await page.evaluate(() => window.__muebles.cameraType)) === 'OrthographicCamera');
+    await page.keyboard.press('F8'); await sleep(900);
+    check('F8 vuelve a perspectiva', (await page.evaluate(() => window.__muebles.cameraType)) === 'PerspectiveCamera');
+    await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(900);
+    const pw = await project();
+    const back = pw.room.walls[1] || pw.room.walls[0];
+    const wp = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2300, -2), back.id);
+    await page.mouse.click(wp.x, wp.y, { clickCount: 2 }); await sleep(1000);
+    const vsel = await page.$eval('.vp-views option:checked', (e) => e.textContent);
+    check('Doble clic en una pared muestra su vista frontal', vsel.startsWith('Pared'), vsel);
+    await shot('07e-vista-pared');
+    await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(900);
+    const xs = pw.room.nodes.map((n) => n.x), zs = pw.room.nodes.map((n) => n.z);
+    const fp = await page.evaluate((x, z) => window.__muebles.screenOfPoint(x, z, 0), (Math.min(...xs) + Math.max(...xs)) / 2, Math.max(...zs) - 250);
+    await page.mouse.click(fp.x, fp.y, { clickCount: 2 }); await sleep(1000);
+    check('Doble clic en el piso pasa a Planta', (await page.evaluate(() => window.__muebles.cameraType)) === 'OrthographicCamera' && (await page.$eval('.vp-views', (e) => e.value)) === 'planta');
+    await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(900);
+    const mq = await page.evaluate((id) => window.__muebles.screenOf(id, 100), pw.modules.find((m) => m.type === 'bajo_mixto').id);
+    await page.mouse.click(mq.x, mq.y); await sleep(300);
+    const fp2 = await page.evaluate((x, z) => window.__muebles.screenOfPoint(x, z, 0), (Math.min(...xs) + Math.max(...xs)) / 2, Math.max(...zs) - 250);
+    await page.mouse.click(fp2.x, fp2.y); await sleep(300);
+    check('Clic simple en el piso vacío sigue deseleccionando', (await page.$eval('.sb-sel', (e) => e.textContent)) === 'Sin selección');
+    check('Sin errores con las vistas', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

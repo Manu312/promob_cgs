@@ -71,8 +71,10 @@ function ShowAll({ materials, current, onApply, onClose }) {
 }
 
 // Herramientas · Modelos: ámbito Todos / Selección y una fila por tipo de pieza.
-export default function ModelsPanel({ project, settings, selected, onApply, styles, onStyles, onApplyStyle }) {
-  const [scope, setScope] = useState('todos');
+export default function ModelsPanel({ project, settings, selected, selectedCount = 1, onApply, styles, onStyles, onApplyStyle }) {
+  // con módulos elegidos arranca en Selección (como Promob); sin nada elegido, Todos
+  const [scope, setScope] = useState(selected ? 'seleccion' : 'todos');
+  useEffect(() => { if (selected) setScope('seleccion'); }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [menu, setMenu] = useState(null); // slot con el menú abierto
   const [menuAt, setMenuAt] = useState(null);
   const [all, setAll] = useState(null); // slot con "Mostrar todos" abierto
@@ -120,7 +122,7 @@ export default function ModelsPanel({ project, settings, selected, onApply, styl
       {rows.filter((r) => r.acc).map(row)}
       <p className="hint">{scope === 'todos'
         ? 'Todos: cambia el modelo de todos los módulos del ambiente y de los que insertes después.'
-        : 'Selección: cambia solo el módulo seleccionado. En gris, lo que sigue igual que Todos.'}</p>
+        : `Selección: cambia solo ${selectedCount > 1 ? `los ${selectedCount} módulos seleccionados` : 'el módulo seleccionado'}. En gris, lo que sigue igual que Todos.`}</p>
       {all && (
         <ShowAll materials={rows.find((r) => r.id === all).list}
           current={effectiveModel(project, all, sel).id} onApply={(id) => apply(all, id)} onClose={() => setAll(null)} />

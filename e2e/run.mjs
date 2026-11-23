@@ -1681,6 +1681,68 @@ try {
     check('Sin errores en las pruebas de seguridad', errors.filter((e) => !/QuotaExceeded|quota/i.test(e)).length === 0, errors.slice(-3).join(' | '));
   }
 
+  // #174 Encastre: bacha sobre el bajo bacha y horno en la torre; acompañan al mueble.
+  // Modelos: con varios módulos elegidos arranca en Selección y cambia todos.
+  {
+    const n0 = (await project()).modules.length;
+    const pickList = async (ids, ctrl = false) => {
+      await clickText('.side-tab', 'Lista de Módulos'); await sleep(300);
+      for (const [i, id] of ids.entries()) {
+        if (ctrl || i > 0) await page.keyboard.down('Control');
+        await page.click(`.ml-row[data-id="${id}"]`); await sleep(150);
+        if (ctrl || i > 0) await page.keyboard.up('Control');
+      }
+      await clickText('.side-tab', 'Lista de Módulos'); await sleep(300);
+    };
+    let pm = await project();
+    const bb = pm.modules.find((m) => m.type === 'bajo_bacha' && !m.hidden);
+    await page.keyboard.press('Escape');
+    await pickList([bb.id]);
+    await clickText('.cb-libs .cb-tab', 'Accesorios'); await clickText('.cb-groups .cb-tab', 'Bachas'); await clickText('.cb-subs .cb-tab', 'De apoyo'); await sleep(300);
+    await (await page.$('.cb-items .mod-btn')).click({ count: 2 }); await sleep(600);
+    pm = await project();
+    const sink = pm.modules.find((m) => m.type === 'bacha' && m.hostId === bb.id);
+    const mid = (m) => m.x + (m.rot % 180 ? m.params.depth : m.params.width) / 2;
+    check('Bacha encastrada: centrada sobre la mesada del bajo bacha', !!sink && Math.abs(mid(sink) - mid(bb)) <= 1 && sink.y === bb.params.height + bb.params.mesadaT, sink && `${sink.x} y=${sink.y}`);
+    await page.keyboard.press('Escape');
+    await pickList([bb.id]);
+    const bb0 = (await project()).modules.find((m) => m.id === bb.id);
+    for (let i = 0; i < 3; i++) { await page.keyboard.press('ArrowDown'); await sleep(150); }
+    pm = await project();
+    const bb1 = pm.modules.find((m) => m.id === bb.id), sink1 = pm.modules.find((m) => m.id === sink.id);
+    check('Mover el bajo bacha mueve la bacha', bb1.z !== bb0.z && sink1.z - sink.z === bb1.z - bb0.z, `${bb1.z - bb0.z} / ${sink1.z - sink.z}`);
+    await page.keyboard.press('Escape');
+    await clickText('.cb-libs .cb-tab', 'Cocinas'); await clickText('.cb-groups .cb-tab', 'Altos'); await clickText('.cb-subs .cb-tab', 'Módulos p/Electrodomésticos'); await sleep(300);
+    await (await page.$('.cb-items .mod-btn')).click({ count: 2 }); await sleep(700);
+    const torre = (await project()).modules.at(-1);
+    await clickText('.cb-libs .cb-tab', 'Electrodomésticos'); await clickText('.cb-groups .cb-tab', 'Cocción'); await clickText('.cb-subs .cb-tab', 'Hornos'); await sleep(300);
+    await (await page.$('.cb-items .mod-btn')).click({ count: 2 }); await sleep(700);
+    const horno = (await project()).modules.at(-1);
+    check('Horno encastrado en el hueco de la torre', torre.type === 'torre_horno' && horno.type === 'horno' && horno.hostId === torre.id && horno.y > 0, `y=${horno.y}`);
+    await shot('09b-encastre');
+    await page.keyboard.press('Escape');
+    await pickList([torre.id]);
+    await page.keyboard.press('Delete'); await sleep(400);
+    pm = await project();
+    check('Borrar la torre se lleva el horno', !pm.modules.some((m) => m.id === torre.id || m.id === horno.id));
+    // Modelos con dos bajos elegidos
+    const bajos = pm.modules.filter((m) => m.type.startsWith('bajo') && !m.hidden).slice(0, 2);
+    await page.keyboard.press('Escape');
+    await pickList(bajos.map((m) => m.id));
+    await clickText('.tools-item', '▦Modelos'); await sleep(300);
+    check('Modelos arranca en Selección con módulos elegidos', await page.$eval('.models .mv-tabs button.on', (b) => b.textContent).catch(() => '') === 'Selección');
+    await page.evaluate(() => [...document.querySelectorAll('.md-row')].find((r) => r.querySelector('.md-label').textContent === 'Tapas:')?.querySelector('.md-value').click()); await sleep(300);
+    for (const t of ['Granitos', 'Negro', 'Negro Absoluto']) { const h = await page.evaluateHandle((t) => [...document.querySelectorAll('.cascade .cm-item')].find((b) => b.textContent.trim().replace(/^‹\s*/, '') === t), t); await h.hover(); await h.click(); await sleep(250); }
+    pm = await project();
+    const withTapa = pm.modules.filter((m) => m.mats?.tapas === 'gra_negro_absoluto').map((m) => m.id).sort();
+    check('Modelos · Selección cambia la tapa de los dos bajos elegidos (y de ninguno más)', JSON.stringify(withTapa) === JSON.stringify(bajos.map((m) => m.id).sort()), withTapa.join(','));
+    await clickText('.tools-item', '☰Propiedades'); await sleep(200);
+    await page.keyboard.press('Escape');
+    for (let i = 0; i < 25 && (await project()).modules.length !== n0; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(200); }
+    for (let i = 0; i < 6 && (await project()).modules.some((m) => m.mats?.tapas === 'gra_negro_absoluto'); i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(200); }
+    check('Sin errores con el encastre', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

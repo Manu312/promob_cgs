@@ -2,7 +2,6 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, OrthographicCamera, Environment, Lightformer, ContactShadows } from '@react-three/drei';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { WebGLPathTracer, GradientEquirectTexture } from 'three-gpu-pathtracer';
 import { footprint, localAxes, RESIZE_HANDLES, AXIS_COLORS } from '../domain/modules.js';
 import { bounds } from '../domain/walls.js';
 import { frontTransforms } from '../domain/fronts.js';
@@ -160,58 +159,19 @@ function CameraRig({ view, room, controlsRef }) {
   return null;
 }
 
-// Render fotorrealista por trazado de rayos: acumula muestras cuadro a cuadro.
-function PathTracer({ maxSamples, onProgress, controlsRef, sceneKey }) {
-  const { gl, scene, camera } = useThree();
-  const ptRef = useRef(null);
-  const last = useRef(-1);
+// Puente con la ventana de render: le da el renderer, la escena, la cámara y el tamaño de la vista.
+function RenderBridge({ renderRef }) {
+  const { gl, scene, camera, size } = useThree();
   useEffect(() => {
-    const env = new GradientEquirectTexture(256);
-    env.topColor.set('#fffaf2');
-    env.bottomColor.set('#b9b2a6');
-    env.exponent = 2;
-    env.update();
-    const prevEnv = scene.environment;
-    scene.environment = env;
-    const pt = new WebGLPathTracer(gl);
-    pt.bounces = 6;
-    pt.minSamples = 1;
-    pt.tiles.set(2, 2);
-    pt.filterGlossyFactor = 0.5;
-    pt.fadeDuration = 250;
-    pt.setScene(scene, camera);
-    ptRef.current = pt;
-    last.current = -1;
-    const c = controlsRef.current;
-    const onChange = () => pt.updateCamera();
-    // Al soltar la cámara, las paredes que se ocultan pudieron cambiar: reconstruir la escena del trazador.
-    const onEnd = () => setTimeout(() => { if (ptRef.current === pt) pt.setScene(scene, camera); }, 50);
-    c?.addEventListener('change', onChange);
-    c?.addEventListener('end', onEnd);
-    return () => {
-      c?.removeEventListener('change', onChange);
-      c?.removeEventListener('end', onEnd);
-      try { pt.dispose(); } catch { /* three-gpu-pathtracer 0.0.23 falla al liberar recursos internos no creados */ }
-      ptRef.current = null;
-      scene.environment = prevEnv;
-      env.dispose();
-    };
-  }, [sceneKey, gl, scene, camera, controlsRef]);
-  useFrame(() => {
-    const pt = ptRef.current;
-    if (!pt) return;
-    if (pt.samples < maxSamples) pt.renderSample();
-    const s = Math.floor(pt.samples);
-    if (s !== last.current) { last.current = s; onProgress?.(s); }
-  }, 1);
+    renderRef.current = () => ({ gl, scene, camera, view: { width: Math.round(size.width), height: Math.round(size.height) } });
+  }, [gl, scene, camera, size, renderRef]);
   return null;
 }
 
-function Capturer({ captureRef, photoreal }) {
+function Capturer({ captureRef }) {
   const { gl, scene, camera } = useThree();
   useEffect(() => {
     captureRef.current = (scale = 2) => {
-      if (photoreal) return gl.domElement.toDataURL('image/png'); // la imagen ya está acumulada en el canvas
       const plan = scene.getObjectByName('planImage'); // el plano de referencia no va a la imagen exportada
       if (plan) plan.visible = false;
       const old = gl.getPixelRatio();
@@ -223,7 +183,7 @@ function Capturer({ captureRef, photoreal }) {
       gl.render(scene, camera);
       return url;
     };
-  }, [gl, scene, camera, captureRef, photoreal]);
+  }, [gl, scene, camera, captureRef]);
   return null;
 }
 
@@ -403,7 +363,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, photoreal, maxSamples = 400, onProgress, view, captureRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   const dragRef = useRef(null);
@@ -526,10 +486,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
         shadow-camera-bottom={-5}
         shadow-bias={-0.0004}
       />
-      {photoreal && (
-        <rectAreaLight position={[0, (room.h * S) - 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} width={1.2} height={0.6} intensity={6} color="#fff4e5" />
-      )}
-      {renderMode && !photoreal && (
+      {renderMode && (
         <Environment resolution={256} frames={1}>
           <Lightformer intensity={2} position={[0, 5, -3]} scale={[10, 4, 1]} />
           <Lightformer intensity={1.2} position={[-5, 2, 1]} rotation-y={Math.PI / 2} scale={[10, 3, 1]} />
@@ -562,13 +519,14 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
             onResizeDown={onResize ? onResizeDown : null} planta={planta} />;
         })}
       </group>
-      {renderMode && !photoreal && <ContactShadows position={[0, 0.002, 0]} scale={12} blur={2.2} opacity={0.45} far={2.5} />}
+      {/* sombra de contacto solo del visor: su textura vive en este renderer, no va a la ventana de render */}
+      {renderMode && <group userData={{ noOffscreen: true }}><ContactShadows position={[0, 0.002, 0]} scale={12} blur={2.2} opacity={0.45} far={2.5} /></group>}
       {planta && <OrthographicCamera makeDefault near={0.1} far={200} position={[0, 40, 0.001]} />}
       <OrbitControls ref={controlsRef} makeDefault maxPolarAngle={planta ? Math.PI : Math.PI / 2 - 0.02} minDistance={0.5} maxDistance={20}
         enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={planta ? (drawing || annotating ? DRAW_BUTTONS : PLAN_BUTTONS) : ROTATE_BUTTONS} />
       <CameraRig view={view} room={room} controlsRef={controlsRef} />
-      {photoreal && <PathTracer maxSamples={maxSamples} onProgress={onProgress} controlsRef={controlsRef} sceneKey={JSON.stringify([project.modules, room])} />}
-      <Capturer captureRef={captureRef} photoreal={photoreal} />
+      <Capturer captureRef={captureRef} />
+      {renderRef && <RenderBridge renderRef={renderRef} />}
       <DevProbe project={project} origin={origin} openFronts={openFronts} />
       {pickRef && <Picker pickRef={pickRef} origin={origin} />}
       <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />

@@ -569,14 +569,63 @@ try {
   check('Sin errores tras render', errors.length === 0, errors.slice(-3).join(' | '));
   await clickText('.vp-toolbar button', '✓ Modo render'); await sleep(300); // salir del modo render rápido
 
-  // Render final fotorrealista (trazado de rayos)
-  await clickText('.vp-toolbar button', 'Render final');
+  // Render (Fase 7 S1): diálogo Configuración del render, área del render y ventana de render
+  const setRenderNum = async (label, v) => {
+    const h = await page.evaluateHandle((l) => [...document.querySelectorAll('.render-dialog .field')].find((f) => f.textContent.includes(l))?.querySelector('input'), label);
+    await h.click({ clickCount: 3 }); await h.type(String(v)); await page.keyboard.press('Enter'); await sleep(250);
+  };
+  const rwImage = () => page.$eval('.render-window canvas.rw-image', (c) => {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let diff = 0;
+    for (let i = 0; i < d.length; i += 4 * 997) if (Math.abs(d[i] - 231) + Math.abs(d[i + 1] - 227) + Math.abs(d[i + 2] - 220) > 30) diff++;
+    return { w: c.width, h: c.height, diff };
+  }).catch((e) => ({ err: String(e) }));
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(500);
+  check('Diálogo Configuración del render abierto', !!(await page.$('.render-dialog')));
+  check('Área del render visible en la vista', !!(await page.$('.render-area')));
+  await clickText('.render-dialog .radio', 'Render rápido');
+  await clickText('.render-dialog .radio', 'Tamaños preconfigurados'); await sleep(200);
+  await page.select('.rd-preset', 'hd'); await sleep(300);
+  const areaRatio = await page.$eval('.render-area', (e) => e.offsetWidth / e.offsetHeight);
+  check('El área del render toma la proporción de la imagen (16:9)', Math.abs(areaRatio - 16 / 9) < 0.02, areaRatio.toFixed(3));
+  await shot('04a-render-dialogo');
+  await clickText('.render-dialog .radio', 'Personalizada'); await sleep(200);
+  await setRenderNum('Ancho', 800);
+  const szTxt = await page.$eval('.rd-size b', (e) => e.textContent.replace(/\s/g, ''));
+  check('Proporción trabada: ancho 800 → alto 450', szTxt === '800×450', szTxt);
+  await clickText('.render-dialog .radio', 'Tamaños preconfigurados'); await sleep(200);
+  await clickText('.render-dialog footer button', 'Renderizar'); await sleep(1500);
+  const rr = await rwImage();
+  check('Render rápido: imagen de 1280 × 720', rr.w === 1280 && rr.h === 720, JSON.stringify(rr));
+  check('Render rápido dibuja el ambiente', rr.diff > 50, `${rr.diff} píxeles distintos del fondo`);
+  await shot('04b-render-rapido');
+  await page.evaluate(() => {
+    window.__dl = []; window.__aclick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function click() { if (this.download) { window.__dl.push(this.download); return undefined; } return window.__aclick.call(this); };
+  });
+  await clickText('.render-window button', 'Guardar imagen'); await sleep(800);
+  const dls = await page.evaluate(() => window.__dl);
+  check('Guardar imagen baja un PNG', dls.length === 1 && dls[0].endsWith('.png'), dls.join(','));
+  await page.evaluate(() => { HTMLAnchorElement.prototype.click = window.__aclick; });
+  await clickText('.render-window button', 'Cerrar'); await sleep(300);
+  check('Cerrar la ventana de render', !(await page.$('.render-window')));
+
+  // Render final (trazado de rayos) en la ventana, a un tamaño chico
+  await clickText('.vp-toolbar button', 'Renderizar…'); await sleep(300);
+  await clickText('.render-dialog .radio', 'Render final');
+  await clickText('.render-dialog .radio', 'Personalizada'); await sleep(200);
+  await setRenderNum('Ancho', 400);
+  await clickText('.render-dialog footer button', 'Renderizar');
   let sm = 0;
-  for (let i = 0; i < 40 && sm < 20; i++) { await sleep(1500); sm = await page.$eval('.pt-progress', (e) => parseInt(e.textContent.match(/(\d+)\//)?.[1] || '0', 10)).catch(() => 0); }
-  await shot('04b-render-final');
+  for (let i = 0; i < 40 && sm < 10; i++) { await sleep(1500); sm = await page.$eval('.rw-progress b', (e) => parseInt(e.textContent, 10)).catch(() => 0); }
+  await shot('04c-render-final');
   check('Render final acumula muestras', sm > 0, `${sm} muestras`);
+  const rf = await rwImage();
+  check('Render final al tamaño pedido (400 × 225)', rf.w === 400 && rf.h === 225, JSON.stringify(rf));
+  await clickText('.render-window button', 'Detener'); await sleep(400);
+  check('Detener frena el render', (await page.$eval('.rw-progress', (e) => e.textContent)).startsWith('Detenido'));
   check('Sin errores en render final', errors.length === 0, errors.slice(-3).join(' | '));
-  await clickText('.vp-toolbar button', '■ Detener'); await sleep(500);
+  await clickText('.render-window button', 'Cerrar'); await sleep(300);
 
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');

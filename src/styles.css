@@ -244,3 +244,33 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .tp-preset.on { border-color: #5b8def; background: var(--accent-weak); }
 .tp-orient { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; font-size: 12.5px; }
 .tp-orient .radio { display: inline-flex; gap: 4px; align-items: center; }
+
+/* Render (Fase 7): diálogo de configuración, área del render y ventana de render */
+.render-dialog { position: absolute; top: 46px; right: 10px; z-index: 30; width: min(360px, calc(100% - 20px)); max-height: calc(100% - 90px); display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.render-dialog header, .render-window header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 6px; }
+.render-dialog h3, .render-window h3 { margin: 0; font-size: 14px; }
+.render-dialog .icon-btn, .render-window .icon-btn { border: none; background: none; font-size: 14px; padding: 2px 6px; }
+.rd-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--line); }
+.rd-tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 5px 8px; font-size: 12px; }
+.rd-tabs button.on { border-bottom-color: var(--accent); font-weight: 600; }
+.rd-body { overflow: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+.rd-body fieldset { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px 8px; display: flex; flex-direction: column; gap: 4px; }
+.rd-body legend { font-size: 12px; font-weight: 600; padding: 0 4px; }
+.rd-body .radio, .rd-body .check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.rd-body .hint { margin: 2px 0; font-size: 11px; color: #6b7280; }
+.rd-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: flex-end; }
+.rd-row .field { flex: 1 1 120px; }
+.rd-size { margin: 4px 0 2px; font-size: 12px; }
+.render-dialog footer, .render-window footer { display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding: 8px 12px 10px; border-top: 1px solid var(--line); }
+.render-area { position: absolute; z-index: 5; pointer-events: none; outline: 2px solid rgba(255,255,255,.9); box-shadow: 0 0 0 9999px rgba(17,24,39,.32); }
+.vp-area { overflow: hidden; }
+.render-area span { position: absolute; right: 4px; bottom: 4px; font-size: 11px; color: #fff; background: rgba(17,24,39,.6); padding: 1px 5px; border-radius: 3px; }
+.render-window-backdrop { z-index: 60; }
+.render-window { background: #fff; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.25); width: min(1100px, 94vw); max-height: 92vh; display: flex; flex-direction: column; }
+.rw-holder { flex: 1; min-height: 200px; display: grid; place-items: center; padding: 8px 12px; background: repeating-conic-gradient(#f3f4f6 0 25%, #e5e7eb 0 50%) 0 0 / 16px 16px; overflow: hidden; }
+.rw-image { max-width: 100%; max-height: calc(92vh - 120px); object-fit: contain; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+.rw-progress { margin-right: auto; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.rw-progress progress { width: 140px; }
+.rw-error { color: #b91c1c; }
+.vp-toolbar, .statusbar { z-index: 10; }
+.rd-body input[type=radio], .rd-body input[type=checkbox] { width: auto; margin: 0; }

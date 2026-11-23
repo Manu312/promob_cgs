@@ -32,6 +32,9 @@ import { nestAll } from './domain/nesting.js';
 import { computeBudget } from './domain/budget.js';
 import { sampleProject, emptyProject, normalizeProject } from './domain/project.js';
 import Scene3D from './ui/Scene3D.jsx';
+import RenderDialog, { RenderArea } from './ui/RenderDialog.jsx';
+import RenderWindow from './ui/RenderWindow.jsx';
+import { normalizeRender, qualityOf, renderSize, fitRect } from './domain/render.js';
 import CatalogBar from './ui/CatalogBar.jsx';
 import QuickFind from './ui/QuickFind.jsx';
 import ModuleList from './ui/ModuleList.jsx';
@@ -90,9 +93,12 @@ export default function App() {
   const selectedDimId = selection?.kind === 'dim' ? selection.id : null;
   const selectDim = useCallback((id) => setSelection(id ? { kind: 'dim', id } : null), []);
   const [renderMode, setRenderMode] = useState(false);
-  const [photoreal, setPhotoreal] = useState(false);
-  const [samples, setSamples] = useState(0);
-  const [maxSamples, setMaxSamples] = useState(400);
+  // Render (Fase 7): diálogo de configuración, ventana de render y tamaño de la vista 3D.
+  const [renderDlg, setRenderDlg] = useState(false);
+  const [renderJob, setRenderJob] = useState(null); // { size, quality } mientras la ventana está abierta
+  const renderRef = useRef(null);
+  const vpRef = useRef(null);
+  const [vpSize, setVpSize] = useState({ width: 1000, height: 600 });
   const [view, setView] = useState({ name: 'perspectiva', tick: 0 });
   const captureRef = useRef(null);
   const fileRef = useRef(null);
@@ -419,6 +425,23 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // Tamaño de la vista 3D (Ambiente 3D y área del render).
+  useEffect(() => {
+    const el = vpRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => setVpSize({ width: Math.round(el.clientWidth), height: Math.round(el.clientHeight) }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tab]);
+  const renderCfg = useMemo(() => normalizeRender(project.render), [project.render]);
+  const renderOut = renderSize(renderCfg, vpSize);
+  const startRender = () => {
+    if (!renderRef.current) return;
+    setSelectedId(null);
+    setRenderDlg(false);
+    setRenderJob({ size: renderOut, quality: qualityOf(renderCfg) });
+  };
+
   const exportImage = () => {
     if (!captureRef.current) return;
     download(`${project.name || 'render'}.png`, dataUrlToBlob(captureRef.current(2)));
@@ -473,8 +496,8 @@ export default function App() {
               onFind={() => setQuickFind(true)} />
             {quickFind && <QuickFind thumbCtx={thumbCtx} onClose={() => setQuickFind(false)} onInsert={insertItem}
               onShow={(path, item) => setUi((u) => ({ ...u, catalogPath: [...path, item.id] }))} />}
-            <div className="vp-area" {...vpDrag}>
-            <ErrorBoundary onReset={() => { setPhotoreal(false); setRenderMode(false); }}>
+            <div className="vp-area" ref={vpRef} {...vpDrag}>
+            <ErrorBoundary onReset={() => { setRenderJob(null); setRenderDlg(false); setRenderMode(false); }}>
               <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
                 selectedWallId={selectedWallId} onSelectWall={selectWall}
                 onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
@@ -487,7 +510,7 @@ export default function App() {
                 onRestoreWall={(id) => setProject((p) => ({ ...p, room: updateWall(p.room, id, { lowered: false }) }))}
                 selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
-                renderMode={renderMode || photoreal} photoreal={photoreal} maxSamples={maxSamples} onProgress={setSamples}
+                renderMode={renderMode || renderDlg || !!renderJob} renderRef={renderRef}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower} pickRef={pickRef} ghost={ghost}
                 openFronts={openFronts} onToggleFront={toggleFront} />
             </ErrorBoundary>
@@ -507,21 +530,12 @@ export default function App() {
                 </span>
               )}
               <span className="sep" />
-              <button className={renderMode && !photoreal ? 'active' : ''} disabled={photoreal} onClick={() => { setRenderMode((r) => !r); setSelectedId(null); }}>
-                {renderMode && !photoreal ? '✓ Modo render' : 'Modo render'}
+              <button className={renderMode ? 'active' : ''} onClick={() => { setRenderMode((r) => !r); setSelectedId(null); }}
+                title="Vista previa con la luz del render">
+                {renderMode ? '✓ Modo render' : 'Modo render'}
               </button>
-              <button className={photoreal ? 'active' : ''} onClick={() => { setPhotoreal((r) => !r); setSamples(0); setSelectedId(null); }}
-                title="Trazado de rayos: la imagen se va refinando. Podés girar la cámara y vuelve a empezar.">
-                {photoreal ? '■ Detener render final' : 'Render final'}
-              </button>
-              {photoreal && (
-                <span className="pt-progress">
-                  {samples >= maxSamples ? '✓ Listo' : 'Calculando…'} {samples}/{maxSamples}
-                  <select value={maxSamples} onChange={(e) => setMaxSamples(+e.target.value)} title="Calidad (muestras)">
-                    <option value={150}>Borrador</option><option value={400}>Normal</option><option value={1000}>Alta</option>
-                  </select>
-                </span>
-              )}
+              <button className={renderDlg ? 'active' : ''} onClick={() => { setRenderDlg((o) => !o); setSelectedId(null); }}
+                title="Configuración del render: calidad, dimensión, clima, fondo, marca de agua">Renderizar…</button>
               <button onClick={exportImage} title="Exportar imagen (PNG)">⤓</button>
             </div>
             {drawing && (
@@ -548,6 +562,14 @@ export default function App() {
                 <button onClick={stopScale}>Cancelar</button>
               </div>
             )}
+            {(renderMode || renderDlg) && renderCfg.showArea && <RenderArea rect={fitRect(renderOut.width / renderOut.height, vpSize.width, vpSize.height)} size={renderOut} />}
+            {renderDlg && (
+              <RenderDialog config={renderCfg} view={vpSize} onClose={() => setRenderDlg(false)}
+                onChange={(fn) => setProject((p) => ({ ...p, render: normalizeRender(fn(normalizeRender(p.render))) }))}
+                onRender={startRender} />
+            )}
+            {renderJob && <RenderWindow bridge={renderRef.current} size={renderJob.size} quality={renderJob.quality}
+              fileName={`${project.name || 'render'}.png`} onClose={() => setRenderJob(null)} />}
             {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}
             {deleteDlg && <WallDeleteDialog label={`Pared ${project.room.walls.findIndex((w) => w.id === deleteDlg.wallId) + 1}`} onConfirm={confirmDelete} onCancel={() => setDeleteDlg(null)} />}

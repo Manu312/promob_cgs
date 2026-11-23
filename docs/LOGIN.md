@@ -46,9 +46,13 @@ por hora; si hiciera falta más, se configura un SMTP propio en *Authentication 
 
 ## 3. Proyectos en la nube (Fase 8)
 
-Una sola vez: en Supabase → **SQL Editor**, pegar y ejecutar el contenido de
-`supabase/001_proyectos.sql`. Crea la tabla `projects` con sus políticas: solo los usuarios con
-sesión (los invitados del equipo) pueden leer y escribir; sin sesión, nada.
+Una sola vez: en Supabase → **SQL Editor**, pegar y ejecutar, en orden:
+
+1. `supabase/001_proyectos.sql`: la tabla `projects` con sus políticas (solo los usuarios con sesión,
+   los invitados del equipo, pueden leer y escribir; sin sesión, nada).
+2. `supabase/002_archivos.sql`: el bucket privado `assets` de Storage, donde van las imágenes y los
+   modelos pesados de los proyectos (plano de referencia, fondo del render, modelos 3D importados).
+   Así la base queda liviana; el plan gratis da 1 GB de archivos.
 
 Con eso, al entrar a la app:
 

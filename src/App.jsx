@@ -53,6 +53,7 @@ import { syncGuests, linkedIds, guestKind, findHost, canHost, snapGuest } from '
 import { useAuth } from './ui/AuthGate.jsx';
 import { createLocalRepo, adoptOpenProject, normalizeMeta } from './domain/projectsRepo.js';
 import { createSupabaseRepo, createSyncedRepo } from './domain/cloudRepo.js';
+import { supabaseFiles } from './ui/supabaseFiles.js';
 import ProjectsHome, { NewProjectDialog, ProjectDataDialog } from './ui/ProjectsHome.jsx';
 import { idbStorage } from './ui/idbStorage.js';
 import { describeSelection } from './domain/selection.js';
@@ -1133,7 +1134,7 @@ export default function App() {
   const repo = useMemo(() => {
     const local = createLocalRepo(localStore, { user: auth.user?.email || '' });
     if (!auth.db) return local;
-    return createSyncedRepo(createSupabaseRepo(auth.db, { user: auth.user.email }), local, localStore, { onStatus: setSaveStatus });
+    return createSyncedRepo(createSupabaseRepo(auth.db, { user: auth.user.email, files: supabaseFiles(auth.db) }), local, localStore, { onStatus: setSaveStatus });
   }, [localStore, auth.db, auth.user?.email]);
   const [meta, setMeta] = useState(null); // ficha del proyecto abierto
   const metaRef = useRef(null);

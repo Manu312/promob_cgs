@@ -51,6 +51,9 @@ import { useHistoryState, saveAndReport } from './ui/useHistoryState.js';
 import { mb } from './domain/storage.js';
 import { syncGuests, linkedIds, guestKind, findHost, canHost, snapGuest } from './domain/encastre.js';
 import { useAuth } from './ui/AuthGate.jsx';
+import { createLocalRepo, adoptOpenProject, normalizeMeta } from './domain/projectsRepo.js';
+import ProjectsHome, { NewProjectDialog, ProjectDataDialog } from './ui/ProjectsHome.jsx';
+import { idbStorage } from './ui/idbStorage.js';
 import { describeSelection } from './domain/selection.js';
 import { toggleId, selectAllIds, moveGroup, rotateGroup, describeMulti } from './domain/multiSelect.js';
 import { expandToGroups, groupModules, ungroupModules, selectionGroup, pruneGroups } from './domain/groups.js';
@@ -119,7 +122,7 @@ function useStorageAlert() {
   return [alert, setAlert];
 }
 
-const TABS = [['diseno', 'Diseño 3D'], ['corte', 'Plan de corte'], ['presupuesto', 'Presupuesto'], ['precios', 'Precios']];
+const TABS = [['inicio', 'Proyectos'], ['diseno', 'Diseño 3D'], ['corte', 'Plan de corte'], ['presupuesto', 'Presupuesto'], ['precios', 'Precios']];
 
 export default function App() {
   const [project, setProjectRaw, history] = useHistoryState('mueblesapp.project', sampleProject, normalizeProject);
@@ -1112,10 +1115,80 @@ export default function App() {
     try {
       const p = JSON.parse(await file.text());
       if (!p || !Array.isArray(p.modules) || !p.room) throw new Error('formato');
-      setProject(normalizeProject(p)); setSelectedId(null); recenter();
+      // Abrir un archivo: entra a la lista como proyecto nuevo y se abre
+      await flushSave();
+      const np = normalizeProject(p);
+      const saved = await repo.save(normalizeMeta({ name: np.name || file.name.replace(/\.mueble\.json$|\.json$/i, '') }), np);
+      setHomeKey((k) => k + 1);
+      history.reset(np); setMeta(saved); setUi((u) => ({ ...u, currentProjectId: saved.id }));
+      setSelectedId(null); recenter();
     } catch { window.alert('El archivo no es un proyecto válido.'); }
   };
-  const newProject = () => { if (window.confirm('¿Empezar un proyecto vacío? (exportá el actual si lo querés guardar)')) { setProject(applyPrefsToNewProject(emptyProject(), prefs)); setSelectedId(null); recenter(); } };
+  const newProject = () => setNewDlg(true);
+  // ---- Proyectos (Fase 8): lista, proyecto abierto y guardado de la copia de trabajo ----
+  const localStore = useMemo(() => idbStorage(), []);
+  const repo = useMemo(() => createLocalRepo(localStore, { user: auth.user?.email || '' }), [localStore, auth.user?.email]);
+  const [meta, setMeta] = useState(null); // ficha del proyecto abierto
+  const metaRef = useRef(null);
+  metaRef.current = meta;
+  const [homeKey, setHomeKey] = useState(0);
+  const [newDlg, setNewDlg] = useState(false);
+  const [dataDlg, setDataDlg] = useState(null);
+  // la primera vez, el proyecto que estaba abierto pasa a la lista
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let id = ui.currentProjectId || null;
+      let r = id ? await repo.get(id) : null;
+      if (!r) { id = await adoptOpenProject(repo, projectRef.current); r = id ? await repo.get(id) : null; }
+      if (!alive || !r) return;
+      setMeta(r.meta);
+      if (id !== ui.currentProjectId) setUi((u) => ({ ...u, currentProjectId: id }));
+    })();
+    return () => { alive = false; };
+  }, [repo]); // eslint-disable-line react-hooks/exhaustive-deps
+  // guardado: cada cambio va a la lista de proyectos, con una pequeña demora
+  useEffect(() => {
+    if (!meta) return undefined;
+    const t = setTimeout(() => {
+      repo.save({ ...metaRef.current, name: project.name || metaRef.current.name }, project).then((m) => { if (metaRef.current?.id === m.id) setMeta(m); }).catch(() => {});
+    }, 700);
+    return () => clearTimeout(t);
+  }, [project]); // eslint-disable-line react-hooks/exhaustive-deps
+  const flushSave = async () => { if (metaRef.current) await repo.save({ ...metaRef.current, name: projectRef.current.name || metaRef.current.name }, projectRef.current); };
+  const openProject = async (id) => {
+    await flushSave();
+    const r = await repo.get(id);
+    if (!r) return;
+    history.reset(normalizeProject({ ...(r.data || emptyProject()), name: r.meta.name }));
+    setMeta(r.meta);
+    setUi((u) => ({ ...u, currentProjectId: id }));
+    setSelectedId(null); setTab('diseno'); recenter();
+  };
+  const createProject = async (m) => {
+    setNewDlg(false);
+    await flushSave();
+    const saved = await repo.save(m, { ...applyPrefsToNewProject(emptyProject(), prefs), name: m.name });
+    setHomeKey((k) => k + 1);
+    await openProject(saved.id);
+  };
+  const saveProjectData = async (m) => {
+    setDataDlg(null);
+    const saved = await repo.save(m);
+    if (saved.id === metaRef.current?.id) { setMeta(saved); if (saved.name !== project.name) setProject((p) => ({ ...p, name: saved.name })); }
+    setHomeKey((k) => k + 1);
+  };
+  const exportById = async (id) => {
+    const r = await repo.get(id);
+    if (r?.data) download(`${r.meta.name}.mueble.json`, JSON.stringify({ ...r.data, name: r.meta.name }, null, 2), 'application/json');
+  };
+  // si se borró el proyecto abierto: se abre el último modificado (o uno nuevo)
+  const afterHomeChange = async () => {
+    if (!metaRef.current || (await repo.get(metaRef.current.id))) return;
+    const { items } = await repo.list({});
+    if (items[0]) await openProject(items[0].id);
+    else await createProject(normalizeMeta({ name: 'Proyecto nuevo' }));
+  };
 
   return (
     <div className="app">
@@ -1124,10 +1197,11 @@ export default function App() {
         <nav className="tabs">
           {TABS.map(([k, l]) => <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>{l}</button>)}
         </nav>
+        {meta && <button className="proj-name" onClick={() => setDataDlg(meta)} title="Datos del proyecto">{meta.name}{meta.client ? ` · ${meta.client}` : ''}</button>}
         <div className="top-actions">
           <span className="total-pill" title="Total del presupuesto">{money(budget.total)}</span>
-          <button onClick={history.undo} disabled={!history.canUndo} title="Deshacer (Ctrl+Z)">↶ Deshacer</button>
-          <button onClick={history.redo} disabled={!history.canRedo} title="Rehacer (Ctrl+Y)">↷ Rehacer</button>
+          <button onClick={history.undo} disabled={!history.canUndo} title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button>
+          <button onClick={history.redo} disabled={!history.canRedo} title="Rehacer (Ctrl+Y)" aria-label="Rehacer">↷</button>
           <button onClick={() => setPrefsOpen(true)} title="Preferencias y atajos">Preferencias</button>
           {auth.user && <button className="auth-out" onClick={auth.signOut} title={`Sesión de ${auth.user.email}: salir`}>Salir</button>}
           <button onClick={newProject}>Nuevo</button>
@@ -1487,6 +1561,10 @@ export default function App() {
       {tab === 'corte' && <CutPlan cut={cut} nesting={nesting} settings={settings} project={project} />}
       {tab === 'presupuesto' && <Budget budget={budget} settings={settings} project={project} built={built} />}
       {tab === 'precios' && <Settings settings={settings} setSettings={setSettings} />}
+      {tab === 'inicio' && <ProjectsHome repo={repo} currentId={meta?.id} refreshKey={homeKey} onOpen={openProject} onNew={() => setNewDlg(true)}
+        onData={(m) => setDataDlg(m)} onExport={exportById} onChanged={afterHomeChange} />}
+      {newDlg && <NewProjectDialog onCreate={createProject} onClose={() => setNewDlg(false)} />}
+      {dataDlg && <ProjectDataDialog meta={dataDlg} onSave={saveProjectData} onClose={() => setDataDlg(null)} />}
     </div>
   );
 }

@@ -26,6 +26,8 @@ export function useHistoryState(key, init, migrate = (x) => x) {
     redo: () => setH(redo),
     begin: () => setH(begin),
     commit: () => setH(commit),
+    // abrir otro proyecto: historial nuevo (no se puede deshacer hacia el proyecto anterior)
+    reset: (value) => setH(createHistory(value)),
   }), []);
 
   return [h.present, set, { ...actions, canUndo: canUndo(h), canRedo: canRedo(h) }];

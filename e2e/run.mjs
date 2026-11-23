@@ -1743,6 +1743,43 @@ try {
     check('Sin errores con el encastre', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 8 S1 (#175): Proyectos — lista, proyecto nuevo, datos, buscar, duplicar, borrar, abrir
+  {
+    const before = await project();
+    const rows = () => page.$$eval('.ph-table tbody tr[data-id]', (r) => r.map((x) => ({ id: x.dataset.id, name: x.querySelector('.ph-open').textContent, status: x.children[3].textContent, current: x.classList.contains('current') })));
+    await clickText('.tabs button', 'Proyectos'); await sleep(700);
+    let rs = await rows();
+    check('Proyectos: el proyecto abierto está en la lista (marcado)', rs.some((r) => r.current && r.name === before.name), JSON.stringify(rs));
+    await clickText('.projects-home button', '+ Proyecto nuevo'); await sleep(300);
+    const ins = await page.$$('.new-project input');
+    await ins[0].type('Cocina e2e'); await ins[1].type('Cliente e2e');
+    await clickText('.new-project button', 'Crear'); await sleep(1500);
+    let pn = await project();
+    check('Proyecto nuevo: se abre vacío en el Diseño 3D', pn.name === 'Cocina e2e' && pn.modules.length === 0 && (await page.$eval('.tabs button.active', (b) => b.textContent)) === 'Diseño 3D');
+    check('El nombre y el cliente se ven arriba', (await page.$eval('.proj-name', (e) => e.textContent)) === 'Cocina e2e · Cliente e2e');
+    await clickText('.tabs button', 'Proyectos'); await sleep(700);
+    await page.type('.ph-search', 'e2e cliente'); await sleep(500);
+    rs = await rows();
+    check('Buscar por nombre y cliente', rs.length === 1 && rs[0].name === 'Cocina e2e', JSON.stringify(rs));
+    await page.evaluate(() => { const r = [...document.querySelectorAll('.ph-table tbody tr')].find((x) => x.textContent.includes('Cocina e2e')); r.querySelector('.ph-actions button:nth-child(2)').click(); }); await sleep(300);
+    const sels = await page.$$('.project-data select'); await sels[1].select('Vendido');
+    await clickText('.project-data button', 'Guardar'); await sleep(600);
+    check('Datos del proyecto: situación Vendido', (await rows())[0]?.status === 'Vendido');
+    await shot('10a-proyectos');
+    await page.evaluate(() => { const r = [...document.querySelectorAll('.ph-table tbody tr')].find((x) => x.textContent.includes('Cocina e2e')); r.querySelector('.ph-actions button:nth-child(3)').click(); }); await sleep(800);
+    rs = await rows();
+    check('Duplicar crea «(copia)»', rs.some((r) => r.name === 'Cocina e2e (copia)'), JSON.stringify(rs.map((r) => r.name)));
+    await page.evaluate(() => { const r = [...document.querySelectorAll('.ph-table tbody tr')].find((x) => x.textContent.includes('(copia)')); r.querySelector('.ph-actions button.danger').click(); }); await sleep(300);
+    await clickText('.menu-backdrop .wall-dialog button.danger', 'Borrar'); await sleep(800);
+    check('Borrar saca el proyecto de la lista', !(await rows()).some((r) => r.name.includes('(copia)')));
+    await page.click('.ph-search', { count: 3 }); await page.keyboard.press('Backspace'); await sleep(500);
+    await page.evaluate((n) => [...document.querySelectorAll('.ph-open')].find((b) => b.textContent === n)?.click(), before.name); await sleep(1500);
+    pn = await project();
+    check('Abrir vuelve al proyecto de antes, completo', pn.name === before.name && pn.modules.length === before.modules.length);
+    check('Al abrir otro proyecto no se puede deshacer hacia el anterior', await page.$eval('.top-actions button[aria-label="Deshacer"]', (b) => b.disabled));
+    check('Sin errores en Proyectos', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);
@@ -2073,7 +2110,8 @@ try {
 
   // Construir paredes (#6): proyecto nuevo con 2 paredes y un rectángulo dibujado solo con teclado
   await page.keyboard.press('Escape'); await sleep(200);
-  await clickText('.top-actions button', 'Nuevo'); await sleep(1500);
+  await clickText('.top-actions button', 'Nuevo'); await sleep(300);
+  await page.type('.new-project input', 'Paredes e2e'); await clickText('.new-project button', 'Crear'); await sleep(1500);
   p = await project();
   check('Proyecto nuevo arranca con 2 paredes y piso', p.room.walls.length === 2 && p.room.points === null, `${p.room.walls.length} paredes`);
   await clickText('.vp-toolbar button', '✏ Paredes'); await sleep(1500);

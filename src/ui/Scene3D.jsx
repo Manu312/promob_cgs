@@ -14,6 +14,7 @@ import { fillMode } from '../domain/fillModes.js';
 import { FillContext, FillGroup, useFill, NONE_MATERIAL } from './fill3d.jsx';
 import { GeometryMesh } from './Geometry3D.jsx';
 import Lights3D from './Lights3D.jsx';
+import { ExternalModel, PlanDxf } from './Imported3D.jsx';
 import { outlineOf, boundsOf, holesOn, holesInGeometry } from '../domain/geometry.js';
 import { arcMid } from '../domain/curvedWalls.js';
 import { mat3d, metal, stone, finishMat } from './materials3d.js';
@@ -716,6 +717,8 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
           ))}
         </FillGroup>
         {geoDraft && <GeometryMesh g={geoDraft} room={room} modules={project.modules} draft />}
+        {project.planDxf && !renderMode && show.planos !== false && <PlanDxf dxf={project.planDxf} />}
+        {(project.externals || []).map((e) => <ExternalModel key={e.id} e={e} />)}
         {show.invisibles && !renderMode && project.modules.filter((m) => m.hidden).map((m) => <GhostBox key={'inv' + m.id} mod={m} />)}
         {project.modules.map((m) => {
           const b = builtById.get(m.id);

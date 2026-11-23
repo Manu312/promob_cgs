@@ -161,11 +161,13 @@ function CameraRig({ view, room, controlsRef }) {
 }
 
 // Puente con la ventana de render: le da el renderer, la escena, la cámara y el tamaño de la vista.
-function RenderBridge({ renderRef }) {
+// `roomCenter` = centro del ambiente en coordenadas de la escena (m), para el panorama 360°.
+function RenderBridge({ renderRef, room, origin }) {
   const { gl, scene, camera, size } = useThree();
   useEffect(() => {
-    renderRef.current = () => ({ gl, scene, camera, view: { width: Math.round(size.width), height: Math.round(size.height) } });
-  }, [gl, scene, camera, size, renderRef]);
+    const c = roomCenter(room);
+    renderRef.current = () => ({ gl, scene, camera, view: { width: Math.round(size.width), height: Math.round(size.height) }, roomCenter: [(c.x - origin.x) * S, 0, (c.z - origin.z) * S] });
+  }, [gl, scene, camera, size, renderRef, room, origin]);
   return null;
 }
 
@@ -537,7 +539,7 @@ export default function Scene3D({ project, builtById, selectedId, onSelect, sele
         enableRotate={!planta} zoomToCursor={planta} minZoom={15} maxZoom={4000} mouseButtons={planta ? (drawing || annotating ? DRAW_BUTTONS : PLAN_BUTTONS) : ROTATE_BUTTONS} />
       <CameraRig view={view} room={room} controlsRef={controlsRef} />
       <Capturer captureRef={captureRef} />
-      {renderRef && <RenderBridge renderRef={renderRef} />}
+      {renderRef && <RenderBridge renderRef={renderRef} room={room} origin={origin} />}
       <DevProbe project={project} origin={origin} openFronts={openFronts} />
       {pickRef && <Picker pickRef={pickRef} origin={origin} />}
       <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />

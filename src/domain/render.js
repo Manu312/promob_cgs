@@ -165,6 +165,55 @@ export function watermarkRect(iw, ih, W, H, position, offset) {
   return { x, y, w, h };
 }
 
+// --- Render 360° (Fase 7.5) ---
+// Panorama equirectangular 2:1 desde un punto: el centro del ambiente a la altura de los ojos o la
+// posición de la cámara. Convención: el centro de la imagen mira al fondo de la planta (−z) y hacia
+// la derecha de la imagen gira a la derecha (+x).
+export const PANO_SIZES = [['2k', '2048 × 1024', 2048], ['4k', '4096 × 2048', 4096], ['8k', '8192 × 4096 (lento)', 8192]];
+export const PANO_CENTERS = [['ambiente', 'Centro del ambiente'], ['camara', 'Posición de la cámara']];
+export const DEFAULT_PANORAMA = { on: false, size: '2k', center: 'ambiente', eye: 1600 };
+
+export function normalizePanorama(p) {
+  const s = p && typeof p === 'object' ? p : {};
+  const d = DEFAULT_PANORAMA;
+  return {
+    on: s.on === true,
+    size: PANO_SIZES.some(([k]) => k === s.size) ? s.size : d.size,
+    center: PANO_CENTERS.some(([k]) => k === s.center) ? s.center : d.center,
+    eye: Number.isFinite(+s.eye) ? Math.min(3000, Math.max(100, Math.round(+s.eye))) : d.eye,
+  };
+}
+
+export function panoramaSize(p) {
+  const w = (PANO_SIZES.find(([k]) => k === p.size) || PANO_SIZES[0])[2];
+  return { width: w, height: w / 2 };
+}
+
+// Dirección de vista de un punto (u, v) del panorama (0–1, v = 1 arriba).
+export function equirectDir(u, v) {
+  const lon = (u - 0.5) * 2 * Math.PI;
+  const lat = (v - 0.5) * Math.PI;
+  return [Math.sin(lon) * Math.cos(lat), Math.sin(lat), -Math.cos(lon) * Math.cos(lat)];
+}
+
+// Punto (u, v) del panorama que se ve en la dirección `d` (inversa de equirectDir).
+export function equirectUv([x, y, z]) {
+  const lon = Math.atan2(x, -z);
+  const lat = Math.asin(Math.max(-1, Math.min(1, y / Math.hypot(x, y, z))));
+  return [lon / (2 * Math.PI) + 0.5, lat / Math.PI + 0.5];
+}
+
+// Visor 360°: arrastrar gira la mirada (yaw a la derecha, pitch arriba), la rueda hace zoom (FOV).
+export const PANO_VIEW = { yaw: 0, pitch: 0, fov: 75 };
+export function panoDrag(view, dx, dy, degPerPx = 0.2) {
+  const yaw = ((((view.yaw - dx * degPerPx) % 360) + 540) % 360) - 180;
+  const pitch = Math.max(-85, Math.min(85, view.pitch + dy * degPerPx));
+  return { ...view, yaw, pitch };
+}
+export function panoZoom(view, deltaY) {
+  return { ...view, fov: Math.max(30, Math.min(100, view.fov + deltaY * 0.05)) };
+}
+
 export const DEFAULT_RENDER = {
   quality: 'final',
   samples: { final: 400, profesional: 1000 },
@@ -173,6 +222,7 @@ export const DEFAULT_RENDER = {
   showArea: true,
   clima: DEFAULT_CLIMA,
   background: DEFAULT_BACKGROUND,
+  panorama: DEFAULT_PANORAMA,
 };
 
 const clampSide = (v) => Math.min(MAX_SIDE, Math.max(MIN_SIDE, Math.round(+v || 0)));
@@ -197,6 +247,7 @@ export function normalizeRender(r) {
     showArea: src.showArea !== false,
     clima: normalizeClima(src.clima),
     background: normalizeBackground(src.background),
+    panorama: normalizePanorama(src.panorama),
   };
 }
 
@@ -209,6 +260,7 @@ export function qualityOf(r) {
 
 // Tamaño final de la imagen. `view` = tamaño de la vista 3D en px (Ambiente 3D).
 export function renderSize(r, view) {
+  if (r.panorama?.on) return panoramaSize(r.panorama);
   const s = r.size;
   if (s.mode === 'preset') {
     const p = SIZE_PRESETS.find((x) => x.id === s.preset) || SIZE_PRESETS[2];

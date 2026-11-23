@@ -137,3 +137,32 @@ test('marca de agua más grande que el render: se achica para entrar (sin deform
   const r = watermarkRect(2000, 1000, 1000, 500, 'sup-izq', 0);
   assert.deepEqual(r, { x: 0, y: 0, w: 1000, h: 500 });
 });
+
+// Render 360° (#103)
+import { normalizePanorama, panoramaSize, equirectDir, equirectUv, panoDrag, panoZoom, PANO_VIEW, DEFAULT_PANORAMA } from '../src/domain/render.js';
+
+test('360°: apagado por defecto; con el panorama activo la imagen es 2:1 de su resolución', () => {
+  assert.deepEqual(normalizePanorama(undefined), DEFAULT_PANORAMA);
+  assert.deepEqual(normalizePanorama({ on: true, size: 'x', center: 'y', eye: 99999 }), { on: true, size: '2k', center: 'ambiente', eye: 3000 });
+  assert.deepEqual(panoramaSize({ size: '4k' }), { width: 4096, height: 2048 });
+  const r = normalizeRender({ panorama: { on: true }, size: { mode: 'preset', preset: 'hd' } });
+  assert.deepEqual(renderSize(r, { width: 10, height: 10 }), { width: 2048, height: 1024 });
+});
+
+test('360°: el centro de la imagen mira al fondo (−z), a la derecha gira a +x, arriba es el cielo', () => {
+  const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-9);
+  assert.ok(near(equirectDir(0.5, 0.5), [0, 0, -1]));
+  assert.ok(near(equirectDir(0.75, 0.5), [1, 0, 0]));
+  assert.ok(near(equirectDir(0.25, 0.5), [-1, 0, 0]));
+  assert.ok(near(equirectDir(0.3, 1), [0, 1, 0]));
+  for (const [u, v] of [[0.1, 0.2], [0.6, 0.7], [0.9, 0.45]]) assert.ok(near(equirectUv(equirectDir(u, v)), [u, v]));
+});
+
+test('visor 360°: arrastrar a la izquierda mira a la derecha; la inclinación y el zoom tienen tope', () => {
+  const v = panoDrag(PANO_VIEW, -100, 0);
+  assert.equal(v.yaw, 20);
+  assert.equal(panoDrag(PANO_VIEW, 0, 10000).pitch, 85);
+  assert.equal(panoDrag({ ...PANO_VIEW, yaw: 170 }, -100, 0).yaw, -170);
+  assert.equal(panoZoom(PANO_VIEW, 10000).fov, 100);
+  assert.equal(panoZoom(PANO_VIEW, -10000).fov, 30);
+});

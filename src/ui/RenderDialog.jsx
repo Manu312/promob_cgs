@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { QUALITIES, SIZE_PRESETS, SIZE_MODES, MIN_SIDE, MAX_SIDE, CLIMAS, BG_MODES, BG_IMAGE_MAX, WM_POSITIONS, WM_IMAGE_MAX, renderSize, setCustomSide, applyClima, watermarkRect } from '../domain/render.js';
+import { QUALITIES, SIZE_PRESETS, SIZE_MODES, MIN_SIDE, MAX_SIDE, CLIMAS, BG_MODES, BG_IMAGE_MAX, WM_POSITIONS, WM_IMAGE_MAX, PANO_SIZES, PANO_CENTERS, renderSize, setCustomSide, applyClima, watermarkRect } from '../domain/render.js';
 import { Compass, AltitudeArc } from './SunControls.jsx';
 import { readImageFile } from './imageFile.js';
 import { NumField } from './fields.jsx';
 
 // Diálogo "Configuración del render" (como el de Promob): pestañas con la calidad y la dimensión,
 // el clima, el fondo, la marca de agua y el 360°. Cada cambio se guarda en el proyecto.
-export const RENDER_TABS = [['general', 'Calidad y dimensión'], ['clima', 'Clima'], ['fondo', 'Fondo'], ['marca', 'Marca de agua']];
+export const RENDER_TABS = [['general', 'Calidad y dimensión'], ['clima', 'Clima'], ['fondo', 'Fondo'], ['marca', 'Marca de agua'], ['360', '360°']];
 
 export default function RenderDialog({ config, view, onChange, onRender, onClose, onBegin, onEnd, watermark, onWatermark }) {
   const [tab, setTab] = useState('general');
@@ -69,7 +69,7 @@ export default function RenderDialog({ config, view, onChange, onRender, onClose
                 </label>
               </div>
             )}
-            <p className="rd-size">Tamaño de la imagen: <b>{size.width} × {size.height}</b> px</p>
+            <p className="rd-size">Tamaño de la imagen: <b>{size.width} × {size.height}</b> px{config.panorama.on && ' (panorama 360°)'}</p>
             <label className="check">
               <input type="checkbox" checked={config.showArea} onChange={(e) => onChange((r) => ({ ...r, showArea: e.target.checked }))} /> Mostrar el área del render en la vista
             </label>
@@ -79,6 +79,7 @@ export default function RenderDialog({ config, view, onChange, onRender, onClose
       {tab === 'clima' && <ClimaTab clima={config.clima} onClima={(fn) => onChange((r) => ({ ...r, clima: fn(r.clima) }))} onBegin={onBegin} onEnd={onEnd} />}
       {tab === 'fondo' && <FondoTab bg={config.background} onBg={(patch) => onChange((r) => ({ ...r, background: { ...r.background, ...patch } }))} />}
       {tab === 'marca' && <MarcaTab wm={watermark} onWm={onWatermark} />}
+      {tab === '360' && <PanoTab pano={config.panorama} onPano={(patch) => onChange((r) => ({ ...r, panorama: { ...r.panorama, ...patch } }))} />}
       <footer>
         <button onClick={onClose}>Cerrar</button>
         <button className="active" onClick={onRender}>Renderizar</button>
@@ -234,6 +235,28 @@ function MarcaTab({ wm, onWm }) {
           <b>{wm.transparency}%</b>
         </label>
         <NumField label="Distancia al borde" unit="px" value={wm.offset} min={0} max={2000} onChange={(v) => onWm({ offset: v })} />
+      </fieldset>
+    </div>
+  );
+}
+
+// Pestaña 360°: panorama equirectangular que se recorre arrastrando (visor en la ventana de render).
+function PanoTab({ pano, onPano }) {
+  return (
+    <div className="rd-body">
+      <label className="check"><input type="checkbox" checked={pano.on} onChange={(e) => onPano({ on: e.target.checked })} /> Panorama 360°</label>
+      <fieldset disabled={!pano.on}>
+        <legend>Panorama</legend>
+        <label className="field"><span>Resolución</span>
+          <select className="rd-pano-size" value={pano.size} onChange={(e) => onPano({ size: e.target.value })}>
+            {PANO_SIZES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+        </label>
+        {PANO_CENTERS.map(([k, l]) => (
+          <label key={k} className="radio"><input type="radio" name="rd-pano-center" checked={pano.center === k} onChange={() => onPano({ center: k })} /> {l}</label>
+        ))}
+        {pano.center === 'ambiente' && <NumField label="Altura de los ojos" unit="mm" value={pano.eye} min={100} max={3000} step={50} onChange={(v) => onPano({ eye: v })} />}
+        <p className="hint">La imagen se mira desde ese punto hacia todos lados. Con el panorama activo, la dimensión es la de la resolución elegida.</p>
       </fieldset>
     </div>
   );

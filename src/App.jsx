@@ -442,7 +442,7 @@ export default function App() {
     if (!renderRef.current) return;
     setSelectedId(null);
     setRenderDlg(false);
-    setRenderJob({ size: renderOut, quality: qualityOf(renderCfg), rig: lightRig(renderCfg.clima), background: renderCfg.background, watermark });
+    setRenderJob({ size: renderOut, quality: qualityOf(renderCfg), rig: lightRig(renderCfg.clima), background: renderCfg.background, watermark, panorama: renderCfg.panorama.on ? renderCfg.panorama : null });
   };
 
   const exportImage = () => {
@@ -514,7 +514,7 @@ export default function App() {
                 selectedOpeningId={selectedOpeningId} onSelectOpening={selectOpening} onMoveOpening={onMoveOpening} onOpeningDim={onOpeningDim}
                 selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} onMoveColumn={onMoveColumn}
                 renderMode={renderMode || renderDlg || !!renderJob} renderRef={renderRef}
-                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower} pickRef={pickRef} ghost={ghost}
+                view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower && !renderJob?.panorama} pickRef={pickRef} ghost={ghost}
                 openFronts={openFronts} onToggleFront={toggleFront} />
             </ErrorBoundary>
             <div className="vp-toolbar">
@@ -565,15 +565,15 @@ export default function App() {
                 <button onClick={stopScale}>Cancelar</button>
               </div>
             )}
-            {(renderMode || renderDlg) && renderCfg.showArea && <RenderArea rect={fitRect(renderOut.width / renderOut.height, vpSize.width, vpSize.height)} size={renderOut} watermark={watermark} />}
+            {(renderMode || renderDlg) && renderCfg.showArea && !renderCfg.panorama.on && <RenderArea rect={fitRect(renderOut.width / renderOut.height, vpSize.width, vpSize.height)} size={renderOut} watermark={watermark} />}
             {renderDlg && (
               <RenderDialog config={renderCfg} view={vpSize} onClose={() => setRenderDlg(false)}
                 onChange={(fn) => setProject((p) => ({ ...p, render: normalizeRender(fn(normalizeRender(p.render))) }))}
                 onRender={startRender} onBegin={history.begin} onEnd={history.commit}
                 watermark={watermark} onWatermark={(patch) => setWatermark((w) => normalizeWatermark({ ...normalizeWatermark(w), ...patch }))} />
             )}
-            {renderJob && <RenderWindow bridge={renderRef.current} size={renderJob.size} quality={renderJob.quality} rig={renderJob.rig} background={renderJob.background} watermark={renderJob.watermark}
-              fileName={`${project.name || 'render'}.png`} onClose={() => setRenderJob(null)} />}
+            {renderJob && <RenderWindow bridge={renderRef.current} size={renderJob.size} quality={renderJob.quality} rig={renderJob.rig} background={renderJob.background} watermark={renderJob.watermark} panorama={renderJob.panorama}
+              fileName={`${project.name || 'render'}${renderJob.panorama ? '-360' : ''}.png`} onClose={() => setRenderJob(null)} />}
             {modMenu && <ModuleContextMenu menu={modMenu} canMax={canMaxSize(project.modules.find((m) => m.id === modMenu.id) || {})} onAction={moduleAction} onClose={() => setModMenu(null)} />}
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}
             {deleteDlg && <WallDeleteDialog label={`Pared ${project.room.walls.findIndex((w) => w.id === deleteDlg.wallId) + 1}`} onConfirm={confirmDelete} onCancel={() => setDeleteDlg(null)} />}

@@ -443,10 +443,10 @@ function NodeHandles({ room, onNodeDown }) {
 // flechas de redimensionar. Los listeners están siempre registrados y el arrastre vive en
 // una ref que se carga en el mismo pointerdown: si se registraran al empezar (en un efecto),
 // un clic rápido soltaría el botón antes y el arrastre quedaría "pegado" al mouse.
-function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onMoveGeometry, onMoveHotpoint, onDragEnd, controlsRef, origin }) {
+function DragController({ onChangePlane, dragRef, setDrag, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onMoveGeometry, onMoveHotpoint, onDragEnd, controlsRef, origin }) {
   const { camera, gl } = useThree();
   const live = useRef();
-  live.current = { camera, gl, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onMoveGeometry, onMoveHotpoint, onDragEnd, origin };
+  live.current = { onChangePlane, camera, gl, onMove, onMoveWall, onMoveNode, onResize, onMoveOpening, onMoveColumn, onMoveGeometry, onMoveHotpoint, onDragEnd, origin };
   useEffect(() => {
     const ray = new THREE.Raycaster();
     const v = new THREE.Vector2();
@@ -504,9 +504,20 @@ function DragController({ dragRef, setDrag, onMove, onMoveWall, onMoveNode, onRe
       live.current.onDragEnd?.();
       if (controlsRef.current) controlsRef.current.enabled = true;
     };
+    // Clic derecho mientras se arrastra un módulo: pasa al plano que está bajo el mouse (piso,
+    // arriba de otro módulo o contra una pared) y lo suelta ahí.
+    const ctx = (ev) => {
+      const drag = dragRef.current;
+      if (!drag || drag.kind !== 'module' || !live.current.onChangePlane) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      live.current.onChangePlane(drag.id, ev.clientX, ev.clientY);
+      up();
+    };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
-    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('contextmenu', ctx, true);
+    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('contextmenu', ctx, true); };
   }, [dragRef, setDrag, controlsRef]);
   return null;
 }
@@ -517,7 +528,7 @@ const roomCenter = (room) => {
   return { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
 };
 
-export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, onFloorMenu, rulersOf, surfaceRef, onMoveHotpoint, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
+export default function Scene3D({ project, builtById, selectedId, selectedIds = [], onToggleSelect, onSelect, selectedWallId, onSelectWall, onMove, onMoveWall, onMoveNode, onResize, onDimEdit, onWallLength, onWallAngle, onWallContext, onModuleContext, onRestoreWall, selectedOpeningId, onSelectOpening, onMoveOpening, onOpeningDim, selectedColumnId, onSelectColumn, onMoveColumn, onWallDouble, onFloorDouble, onFloorDown, onFloorMenu, rulersOf, onChangePlane, surfaceRef, onMoveHotpoint, navTool = 'select', navRef, selectedGeoId, onSelectGeometry, onMoveGeometry, geoDraft, onGeometryMenu, annotating, onAnnotatePoint, onAnnotateFinish, selectedDimId, onSelectDim, drawing, drawCursorRef, onDrawPoint, onDrawFinish, step = 10, onDragStart, onDragEnd, renderMode, view, captureRef, renderRef, fill = 'texturas', showDims, autoHideWalls = true, pickRef, ghost, openFronts = {}, onToggleFront }) {
   const controlsRef = useRef();
   const [drag, setDrag] = useState(null);
   // Luz del modo render según el clima del render (sol, cielo, ambiente).
@@ -726,7 +737,7 @@ export default function Scene3D({ project, builtById, selectedId, selectedIds = 
       {renderRef && <RenderBridge renderRef={renderRef} room={room} origin={origin} />}
       <DevProbe project={project} origin={origin} openFronts={openFronts} />
       {pickRef && <Picker pickRef={pickRef} origin={origin} />}
-      <DragController dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onMoveGeometry={onMoveGeometry} onMoveHotpoint={onMoveHotpoint} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
+      <DragController onChangePlane={onChangePlane} dragRef={dragRef} setDrag={setDrag} onMove={onMove} onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} onMoveOpening={onMoveOpening} onMoveColumn={onMoveColumn} onMoveGeometry={onMoveGeometry} onMoveHotpoint={onMoveHotpoint} onDragEnd={onDragEnd} controlsRef={controlsRef} origin={origin} />
       </FillContext.Provider>
     </Canvas>
   );

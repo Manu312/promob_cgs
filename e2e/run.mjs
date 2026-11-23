@@ -1498,6 +1498,47 @@ try {
     check('Sin errores con las reglas', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S22: inserción (dirección, Desasociar, cambiar de plano con clic derecho al arrastrar)
+  {
+    let pm = await project();
+    const al = pm.modules.filter((m) => m.type === 'alacena').at(-1);
+    let q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), al.id);
+    await page.mouse.click(q.x, q.y); await sleep(300);
+    await page.select('.vp-insert-dir', 'izquierda'); await sleep(200);
+    const first = await page.$('.cb-items .mod-btn');
+    await first.click({ count: 2 }); await sleep(500);
+    let pn = await project();
+    const nu = pn.modules.find((m) => !pm.modules.some((o) => o.id === m.id));
+    check('Dirección de inserción: el ítem nuevo queda a la izquierda del seleccionado', nu && nu.x + nu.params.width === al.x && nu.y === al.y, nu && `${nu.x}+${nu.params.width} vs ${al.x}`);
+    await page.select('.vp-insert-dir', ''); await sleep(100);
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
+    q = await page.evaluate((id) => window.__muebles.screenOf(id, 100), al.id);
+    await page.mouse.click(q.x, q.y, { button: 'right' }); await sleep(300);
+    await clickText('.module-menu button', 'Desasociar'); await sleep(300);
+    check('Desasociar: el módulo deja su plano', (await project()).modules.find((m) => m.id === al.id).detached === true);
+    // punto del piso lejos de todos los módulos (las secciones anteriores dejan módulos movidos)
+    const fp = await page.evaluate((alId) => {
+      const p = JSON.parse(localStorage.getItem('mueblesapp.project'));
+      const xs = p.room.nodes.map((n) => n.x), zs = p.room.nodes.map((n) => n.z);
+      const boxes = p.modules.filter((m) => m.id !== alId && !m.hidden).map((m) => { const r = (m.rot || 0) % 180 !== 0; const fw = r ? m.params.depth : m.params.width, fd = r ? m.params.width : m.params.depth; return [m.x, m.z, m.x + fw, m.z + fd]; });
+      let best = null;
+      for (let x = Math.min(...xs) + 400; x <= Math.max(...xs) - 400; x += 100) for (let z = Math.min(...zs) + 400; z <= Math.max(...zs) - 300; z += 100) {
+        const d = Math.min(...boxes.map(([x0, z0, x1, z1]) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1))), 1e9);
+        if (!best || d > best.d || (d === best.d && z > best.z)) best = { x, z, d };
+      }
+      return window.__muebles.screenOfPoint(best.x, best.z, 0);
+    }, al.id);
+    await page.mouse.move(q.x, q.y); await page.mouse.down(); await page.mouse.move(q.x + 20, q.y + 20, { steps: 4 }); await page.mouse.move(fp.x, fp.y, { steps: 8 }); await sleep(200);
+    await page.mouse.down({ button: 'right' }); await page.mouse.up({ button: 'right' }); await sleep(200);
+    await page.mouse.up(); await sleep(400);
+    const a2 = (await project()).modules.find((m) => m.id === al.id);
+    check('Clic derecho al arrastrar: la alacena pasa al plano del piso', a2.y === 0 && !a2.detached, `y=${a2.y}`);
+    await shot('07u-cambio-plano');
+    for (let i = 0; i < 3; i++) { await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(250); }
+    check('Deshacer vuelve la alacena a su lugar', (await project()).modules.find((m) => m.id === al.id).y === al.y);
+    check('Sin errores con la inserción', errors.length === 0, errors.slice(-3).join(' | '));
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

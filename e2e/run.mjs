@@ -78,7 +78,7 @@ try {
 
   // Editar medida en inspector
   const w = await fieldInput('Ancho');
-  await w.click({ clickCount: 3 });
+  await w.click({ count: 3 });
   await w.type('1500');
   await page.keyboard.press('Enter');
   await sleep(400);
@@ -172,7 +172,7 @@ try {
     await page.mouse.click(cp.x, cp.y); await sleep(400);
     await page.keyboard.press('KeyE'); await sleep(200);
     const priceIn = await fieldInput('Precio (opcional, al presupuesto)');
-    if (priceIn) { await priceIn.click({ clickCount: 3 }); await priceIn.type('450000'); await page.keyboard.press('Enter'); await sleep(400); }
+    if (priceIn) { await priceIn.click({ count: 3 }); await priceIn.type('450000'); await page.keyboard.press('Enter'); await sleep(400); }
     await clickText('.tabs button', 'Presupuesto'); await sleep(400);
     const el = await page.$$eval('.page table tbody tr', (rs) => rs.map((r) => r.textContent));
     check('Con precio, la cocina va al presupuesto', el.some((t) => t.includes('Cocina 56 cm') && t.includes('450.000')), el.filter((t) => t.includes('Cocina')).join(' | '));
@@ -198,7 +198,7 @@ try {
     await clickText('.cb-libs .cb-tab', 'Accesorios'); await clickText('.cb-groups .cb-tab', 'Bachas'); await clickText('.cb-subs .cb-tab', 'De apoyo');
     await dbl('Bacha simple con escurridor'); await sleep(400);
     await page.keyboard.press('KeyE'); await sleep(200);
-    const setF = async (label, v) => { const f = await fieldInput(label); await f.click({ clickCount: 3 }); await f.type(String(v)); await page.keyboard.press('Enter'); await sleep(250); };
+    const setF = async (label, v) => { const f = await fieldInput(label); await f.click({ count: 3 }); await f.type(String(v)); await page.keyboard.press('Enter'); await sleep(250); };
     await setF('X (desde pared izq.)', bb.x + 45); await setF('Z (desde pared fondo)', bb.z + 40);
     const apo = () => page.evaluate(() => [...document.querySelectorAll('.inspector label.check-row')].find((l) => l.textContent.includes('Apoyar')).querySelector('input').click());
     await apo(); await sleep(250); await apo(); await sleep(400);
@@ -394,7 +394,7 @@ try {
     let mm = await modNow(target.id);
     check('Ancho + mueve 10 mm sobre el eje del módulo', Math.abs(mm.x - m0.x) + Math.abs(mm.z - m0.z) === 10, `(${m0.x},${m0.z}) → (${mm.x},${mm.z}) rot ${m0.rot}`);
     const stepIn = await page.$('.mv-step input');
-    await stepIn.click({ clickCount: 3 }); await stepIn.type('100'); await page.keyboard.press('Enter'); await sleep(300);
+    await stepIn.click({ count: 3 }); await stepIn.type('100'); await page.keyboard.press('Enter'); await sleep(300);
     await press('Alto +');
     mm = await modNow(target.id);
     check('Con paso 100, Alto + sube el módulo 100 mm', (mm.y || 0) === (m0.y || 0) + 100, `y=${mm.y}`);
@@ -424,7 +424,7 @@ try {
 
     // Rotación libre (#42)
     const rotIn = await fieldInput('Rotación');
-    await rotIn.click({ clickCount: 3 }); await rotIn.type('45'); await page.keyboard.press('Enter'); await sleep(500);
+    await rotIn.click({ count: 3 }); await rotIn.type('45'); await page.keyboard.press('Enter'); await sleep(500);
     mm = await modNow(target.id);
     const sb = await page.$eval('.sb-sel', (e) => e.textContent);
     check('Rotación libre: 45° desde Propiedades', mm.rot === 45 && sb.includes('Rotación: 45°'), sb);
@@ -454,7 +454,7 @@ try {
   {
     const bajoC = (await project()).modules.find((m) => m.type === 'bajo_cajones');
     await insertFromCatalog('Cajonera interior'); await sleep(300);
-    const setField = async (label, v) => { const f = await fieldInput(label); await f.click({ clickCount: 3 }); await f.type(String(v)); await page.keyboard.press('Enter'); await sleep(300); };
+    const setField = async (label, v) => { const f = await fieldInput(label); await f.click({ count: 3 }); await f.type(String(v)); await page.keyboard.press('Enter'); await sleep(300); };
     await setField('X (desde pared izq.)', bajoC.x);
     await setField('Z (desde pared fondo)', 0);
     const cid = (await project()).modules.at(-1).id;
@@ -485,7 +485,7 @@ try {
     await tick('Pies'); await sleep(200); await tick('Ruedas'); await sleep(300);
     await page.click('.aggregates button[aria-label="Opciones de Estantes"]'); await sleep(200);
     const qty = await page.$('.aggregates .ag-opts input');
-    await qty.click({ clickCount: 3 }); await qty.type('3'); await page.keyboard.press('Enter'); await sleep(400);
+    await qty.click({ count: 3 }); await qty.type('3'); await page.keyboard.press('Enter'); await sleep(400);
     let am = (await project()).modules.find((m) => m.id === ag.id);
     check('Agregados: ruedas en vez de pies y 3 estantes', am.aggs?.ruedas && !am.aggs?.pies && am.params.shelves === 3, JSON.stringify(am.aggs) + ' estantes ' + am.params.shelves);
     await clickText('.tabs button', 'Presupuesto'); await sleep(400);
@@ -528,7 +528,7 @@ try {
     const dAl = (await project()).modules.filter((m) => m.type === 'alacena').at(-1); // frente hacia la cámara
     // al centro hay una luz de 3 mm entre las dos puertas: se apunta a la mitad de la puerta izquierda
     const dAlp = await page.evaluate((m) => window.__muebles.screenOfPoint(m.x + m.params.width / 4, m.z + m.params.depth + 10, m.y + m.params.height / 2), dAl);
-    await page.mouse.click(dAlp.x, dAlp.y, { clickCount: 2 }); await sleep(400);
+    await page.mouse.click(dAlp.x, dAlp.y, { count: 2 }); await sleep(400);
     os = await page.evaluate((id) => window.__muebles.openFronts?.[id], dAl.id);
     check('Doble clic sobre una puerta en el 3D la abre', !!os && Object.values(os.open || {}).some(Boolean), JSON.stringify(os));
     await clickText('.ap-tools button', 'Cerrar todos'); await sleep(300);
@@ -554,7 +554,7 @@ try {
     await clickText('.tools-item', '⊥Posición del Tirador');
     await clickText('.tp-preset span', 'Personalizada');
     const offIn = await page.evaluateHandle(() => [...document.querySelectorAll('.tirador label.field')].find((l) => l.textContent.includes('Desde el borde'))?.querySelector('input'));
-    await offIn.click({ clickCount: 3 }); await offIn.type('120'); await page.keyboard.press('Enter'); await sleep(300);
+    await offIn.click({ count: 3 }); await offIn.type('120'); await page.keyboard.press('Enter'); await sleep(300);
     await page.evaluate(() => [...document.querySelectorAll('.tp-orient label')].find((l) => l.textContent.trim() === 'Horizontal').querySelector('input').click()); await sleep(300);
     let tmm = (await project()).modules.find((m) => m.id === tm.id);
     check('Tirador personalizado a 120 mm y horizontal', tmm.params.handlePos === 'custom' && tmm.params.handleOffset === 120 && tmm.params.handleOrient === 'horizontal', JSON.stringify([tmm.params.handlePos, tmm.params.handleOffset, tmm.params.handleOrient]));
@@ -583,7 +583,7 @@ try {
   // Render (Fase 7 S1): diálogo Configuración del render, área del render y ventana de render
   const setRenderNum = async (label, v) => {
     const h = await page.evaluateHandle((l) => [...document.querySelectorAll('.render-dialog .field')].find((f) => f.textContent.includes(l))?.querySelector('input'), label);
-    await h.click({ clickCount: 3 }); await h.type(String(v)); await page.keyboard.press('Enter'); await sleep(250);
+    await h.click({ count: 3 }); await h.type(String(v)); await page.keyboard.press('Enter'); await sleep(250);
   };
   const rwImage = () => page.$eval('.render-window canvas.rw-image', (c) => {
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
@@ -977,14 +977,14 @@ try {
     const pw = await project();
     const back = pw.room.walls[1] || pw.room.walls[0];
     const wp = await page.evaluate((id) => window.__muebles.screenOfWall(id, 2300, -2), back.id);
-    await page.mouse.click(wp.x, wp.y, { clickCount: 2 }); await sleep(1000);
+    await page.mouse.click(wp.x, wp.y, { count: 2 }); await sleep(1000);
     const vsel = await page.$eval('.vp-views option:checked', (e) => e.textContent);
     check('Doble clic en una pared muestra su vista frontal', vsel.startsWith('Pared'), vsel);
     await shot('07e-vista-pared');
     await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(900);
     const xs = pw.room.nodes.map((n) => n.x), zs = pw.room.nodes.map((n) => n.z);
     const fp = await page.evaluate((x, z) => window.__muebles.screenOfPoint(x, z, 0), (Math.min(...xs) + Math.max(...xs)) / 2, Math.max(...zs) - 250);
-    await page.mouse.click(fp.x, fp.y, { clickCount: 2 }); await sleep(1000);
+    await page.mouse.click(fp.x, fp.y, { count: 2 }); await sleep(1000);
     check('Doble clic en el piso pasa a Planta', (await page.evaluate(() => window.__muebles.cameraType)) === 'OrthographicCamera' && (await page.$eval('.vp-views', (e) => e.value)) === 'planta');
     await clickText('.vp-toolbar button', 'Perspectiva'); await sleep(900);
     const mq = await page.evaluate((id) => window.__muebles.screenOf(id, 100), pw.modules.find((m) => m.type === 'bajo_mixto').id);
@@ -1095,7 +1095,7 @@ try {
     // propiedades en Propiedades > Ambiente > Piso
     await page.keyboard.press('Escape'); await sleep(200);
     const rotIn = await page.evaluateHandle(() => [...document.querySelectorAll('.finish-fields .field')].find((f) => f.textContent.includes('Rotación'))?.querySelector('input'));
-    await rotIn.click({ clickCount: 3 }); await rotIn.type('90'); await page.keyboard.press('Enter'); await sleep(300);
+    await rotIn.click({ count: 3 }); await rotIn.type('90'); await page.keyboard.press('Enter'); await sleep(300);
     check('Rotación del material del piso', (await project()).room.finishes.floor.rot === 90);
     await shot('07h-material-piso');
     // Copiar material: origen la pared del fondo, destino otra pared
@@ -1230,11 +1230,11 @@ try {
     check('Rectangular en el piso: dos clics', rg?.kind === 'rect' && rg.plane.kind === 'floor' && rg.height === 150);
     check('Queda seleccionada con sus propiedades', !!(await page.$('.geometry-panel')));
     const hIn = await page.evaluateHandle(() => [...document.querySelectorAll('.geometry-panel .field')].find((f) => f.textContent.startsWith('Altura'))?.querySelector('input'));
-    await hIn.click({ clickCount: 3 }); await hIn.type('900'); await page.keyboard.press('Enter'); await sleep(300);
+    await hIn.click({ count: 3 }); await hIn.type('900'); await page.keyboard.press('Enter'); await sleep(300);
     check('Altura desde Propiedades', (await project()).geometries[n0].height === 900);
     await page.evaluate(() => { const cb = [...document.querySelectorAll('.geometry-panel .check')].find((l) => l.textContent.includes('Presupuestado')); cb.querySelector('input').click(); }); await sleep(200);
     const pIn = await page.evaluateHandle(() => [...document.querySelectorAll('.geometry-panel .field')].find((f) => f.textContent.startsWith('Precio'))?.querySelector('input'));
-    await pIn.click({ clickCount: 3 }); await pIn.type('12345'); await page.keyboard.press('Enter'); await sleep(300);
+    await pIn.click({ count: 3 }); await pIn.type('12345'); await page.keyboard.press('Enter'); await sleep(300);
     await shot('07l-geometria');
     await page.keyboard.press('Escape');
     // lineal: dos puntos y clic derecho → diálogo
@@ -1364,7 +1364,7 @@ try {
     await clickText('.vp-toolbar button', 'Luces'); await sleep(300);
     check('Editor de luces lista la luminaria', (await page.$$eval('.lights-editor .le-item', (x) => x.length)) >= 1);
     const ap = await page.evaluateHandle(() => [...document.querySelectorAll('.lights-editor .field')].find((f) => f.textContent.startsWith('Apertura'))?.querySelector('input'));
-    await ap.click({ clickCount: 3 }); await ap.type('60'); await page.keyboard.press('Enter'); await sleep(300);
+    await ap.click({ count: 3 }); await ap.type('60'); await page.keyboard.press('Enter'); await sleep(300);
     pm = await project();
     check('Apertura del spot desde el Editor de luces', pm.modules.at(-1).params.beam === 60);
     await clickText('.vp-toolbar button', 'Modo render'); await sleep(1500);
@@ -1422,7 +1422,7 @@ try {
     await clickText('.wall-menu button', '30-40-50'); await sleep(300);
     check('30-40-50 abre su diálogo (300/400/500 → 90°)', (await page.$eval('.dlg-304-ang', (e) => e.textContent)) === 'Ángulo de la esquina: 90°');
     const cIn = await page.evaluateHandle(() => [...document.querySelectorAll('.dlg-304050 .field')].find((f) => f.textContent.startsWith('C'))?.querySelector('input'));
-    await cIn.click({ clickCount: 3 }); await cIn.type('560'); await sleep(200);
+    await cIn.click({ count: 3 }); await cIn.type('560'); await sleep(200);
     const ang = await page.$eval('.dlg-304-ang', (e) => e.textContent);
     await clickText('.dlg-304050 button', 'Aplicar'); await sleep(400);
     const pm2 = await project();
@@ -1430,7 +1430,7 @@ try {
     await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(300);
     await page.mouse.click(wp.x, wp.y); await sleep(400);
     const ext = await page.evaluateHandle(() => [...document.querySelectorAll('.inspector .field')].find((f) => f.textContent.startsWith('Extremo final'))?.querySelector('input'));
-    await ext.click({ clickCount: 3 }); await ext.type('300'); await page.keyboard.press('Enter'); await sleep(300);
+    await ext.click({ count: 3 }); await ext.type('300'); await page.keyboard.press('Enter'); await sleep(300);
     check('Extremo final de la pared', (await project()).room.walls[1].extFin === 300);
     await page.evaluate(() => { const f = [...document.querySelectorAll('.inspector .field')].find((x) => x.textContent.startsWith('Tipo de pared')); const s = f.querySelector('select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, 'drywall'); s.dispatchEvent(new Event('change', { bubbles: true })); }); await sleep(300);
     check('Tipo de pared: Dry Wall', (await project()).room.walls[1].tipo === 'drywall');
@@ -1569,7 +1569,7 @@ try {
     await clickText('.top-actions button', 'Preferencias'); await sleep(300);
     const fieldIn = (txt) => page.evaluateHandle((txt) => [...document.querySelectorAll('.prefs-dialog .field')].find((f) => f.textContent.includes(txt)).querySelector('input'), txt);
     let step = await fieldIn('Paso de las flechas');
-    await step.click({ clickCount: 3 }); await step.type('25'); await page.keyboard.press('Enter'); await sleep(200);
+    await step.click({ count: 3 }); await step.type('25'); await page.keyboard.press('Enter'); await sleep(200);
     check('Preferencias: paso de flechas 25 mm', (await ui()).moveStep === 25 && (await ui()).prefs?.arrowStep === 25);
     await clickText('.pd-tabs button', 'Configurar atajos'); await sleep(200);
     await page.click('tr[data-action="collision"] td:nth-child(2) button'); await sleep(200);
@@ -1592,7 +1592,7 @@ try {
     // dejar todo como estaba
     await clickText('.top-actions button', 'Preferencias'); await sleep(300);
     step = await fieldIn('Paso de las flechas');
-    await step.click({ clickCount: 3 }); await step.type('10'); await page.keyboard.press('Enter'); await sleep(200);
+    await step.click({ count: 3 }); await step.type('10'); await page.keyboard.press('Enter'); await sleep(200);
     await clickText('.pd-tabs button', 'Configurar atajos'); await sleep(200);
     await page.click('tr[data-action="collision"] td:nth-child(3) button'); await sleep(200);
     await clickText('.prefs-dialog .row-btns button', 'Cerrar'); await sleep(300);
@@ -1696,7 +1696,7 @@ try {
   check('Precios muestra la biblioteca (Colores, Maderas, Granitos › color › nombre…)', libPaths.includes('Colores > Blanco') && libPaths.includes('Maderas > Roble') && libPaths.includes('Granitos > Gris > Gris Mara') && libPaths.includes('Cuarzo > Blanco Estelar'), libPaths.length + ' materiales');
   const blancoRow = await page.evaluateHandle(() => [...document.querySelectorAll('table.edit tbody tr')].find((r) => [...r.querySelectorAll('input[type=text]')].some((i) => i.value === 'Melamina 18mm Blanco')));
   const priceInputs = await blancoRow.$$('input[type=number], input[inputmode=decimal]');
-  await priceInputs.at(-1).click({ clickCount: 3 });
+  await priceInputs.at(-1).click({ count: 3 });
   await priceInputs.at(-1).type('200000');
   await page.keyboard.press('Enter'); await sleep(500);
   const total2 = await page.$eval('.total-pill', (e) => e.textContent);
@@ -1770,7 +1770,7 @@ try {
   check('Guardar nuevo estilo con los modelos tildados', !!saved && JSON.stringify(saved.models) === JSON.stringify({ puertas: 'mel18_nogal', tapas: 'cua_gris_concreto' }), JSON.stringify(saved?.models));
   await page.click('.styles-bar button[aria-label="Editar estilos"]'); await sleep(300);
   const mine = await page.evaluateHandle(() => [...document.querySelectorAll('.style-dialog .sd-row')].find((r) => r.querySelector('input').value === 'Mi cocina'));
-  const inp = await mine.$('input'); await inp.click({ clickCount: 3 }); await inp.type('Cocina Pérez');
+  const inp = await mine.$('input'); await inp.click({ count: 3 }); await inp.type('Cocina Pérez');
   await page.evaluate((r) => [...r.querySelectorAll('button')].find((b) => b.textContent === 'Renombrar').click(), mine); await sleep(300);
   let names = await page.evaluate(() => JSON.parse(localStorage.getItem('mueblesapp.settings')).styles.map((s) => s.name));
   check('Editar estilos: renombrar', names.includes('Cocina Pérez') && !names.includes('Mi cocina'), names.join(', '));
@@ -1861,7 +1861,7 @@ try {
   const sb = await page.$eval('.statusbar .sb-sel', (e) => e.textContent);
   check('Barra de estado describe la pared', sb.startsWith('Pared 1 · 4000 × 150 × 2600'), sb);
   const largo = await fieldInput('Largo');
-  await largo.click({ clickCount: 3 }); await largo.type('4500'); await page.keyboard.press('Enter'); await sleep(500);
+  await largo.click({ count: 3 }); await largo.type('4500'); await page.keyboard.press('Enter'); await sleep(500);
   p = await project();
   check('Cambiar largo corre la pared siguiente y el ambiente sigue cerrado', p.room.w === 4500 && p.room.points?.length === 6, `w=${p.room.w}`);
   await page.mouse.click(wp.x, wp.y + 400); await sleep(200); // foco fuera del input
@@ -1871,7 +1871,7 @@ try {
   check('Deshacer el cambio de largo', p.room.w === 4000, `w=${p.room.w}`);
   await page.mouse.click(wp.x, wp.y); await sleep(500);
   const altoFinal = await fieldInput('Alto final');
-  await altoFinal.click({ clickCount: 3 }); await altoFinal.type('2000'); await page.keyboard.press('Enter'); await sleep(600);
+  await altoFinal.click({ count: 3 }); await altoFinal.type('2000'); await page.keyboard.press('Enter'); await sleep(600);
   p = await project();
   check('Alto final distinto deja la pared inclinada', p.room.walls[0].h0 === 2600 && p.room.walls[0].h1 === 2000);
   await shot('14-pared-seleccionada-inclinada');
@@ -1953,7 +1953,7 @@ try {
   const vjp = await page.evaluate((id) => window.__muebles.screenOf(id), vj.id);
   await page.mouse.click(vjp.x, vjp.y); await sleep(600);
   const alt = await fieldInput('Altura desde el piso');
-  await alt.click({ clickCount: 3 }); await alt.type('80'); await page.keyboard.press('Enter'); await sleep(600);
+  await alt.click({ count: 3 }); await alt.type('80'); await page.keyboard.press('Enter'); await sleep(600);
   const vText = (cls) => page.$$eval(cls, (els) => els.map((e) => e.textContent.trim()));
   const down = await vText('.cota-down'), up = await vText('.cota-up');
   check('Módulo a 80 mm del piso muestra la cota al piso y al techo', down[0] === '80' && up.length === 1, `abajo ${down}, arriba ${up}`);
@@ -2150,7 +2150,7 @@ try {
   check('Frente muestra la regla de alturas (referencias + módulos)', ['100', '820', '1470', '2010', '2280', '870'].every((h) => ruler.includes(h)), ruler.join(', '));
   await shot('25-regla-alturas');
   const rh = await fieldInput('Regla de alturas (Frente)');
-  await rh.click({ clickCount: 3 }); await rh.type('100, 900, 2100'); await page.keyboard.press('Enter'); await sleep(500);
+  await rh.click({ count: 3 }); await rh.type('100, 900, 2100'); await page.keyboard.press('Enter'); await sleep(500);
   p = await project();
   const ruler2 = await page.$$eval('.cota-ruler', (els) => els.map((e) => e.textContent));
   check('Editar la lista de alturas se guarda en el proyecto', JSON.stringify(p.room.refHeights) === '[100,900,2100]' && ruler2.includes('900') && !ruler2.includes('1470'), ruler2.join(', '));

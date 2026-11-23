@@ -1352,6 +1352,31 @@ try {
     check('Sin errores con Decore', errors.length === 0, errors.slice(-3).join(' | '));
   }
 
+  // Fase 7b S17: Lumen y Editor de luces
+  {
+    const dblItem = (t) => page.evaluate((t) => [...document.querySelectorAll('.mod-btn')].find((b) => b.textContent.includes(t))?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })), t);
+    const n0 = (await project()).modules.length;
+    await clickText('.cb-libs .cb-tab', 'Lumen'); await sleep(300);
+    await clickText('.cb-subs .cb-tab', 'Spots'); await sleep(200); await dblItem('Spot embutido'); await sleep(400);
+    let pm = await project();
+    check('Lumen: spot embutido en el techo', pm.modules.length === n0 + 1 && pm.modules.at(-1).type === 'spot_embutido' && pm.modules.at(-1).y > 2400);
+    await page.keyboard.press('Escape');
+    await clickText('.vp-toolbar button', 'Luces'); await sleep(300);
+    check('Editor de luces lista la luminaria', (await page.$$eval('.lights-editor .le-item', (x) => x.length)) >= 1);
+    const ap = await page.evaluateHandle(() => [...document.querySelectorAll('.lights-editor .field')].find((f) => f.textContent.startsWith('Apertura'))?.querySelector('input'));
+    await ap.click({ clickCount: 3 }); await ap.type('60'); await page.keyboard.press('Enter'); await sleep(300);
+    pm = await project();
+    check('Apertura del spot desde el Editor de luces', pm.modules.at(-1).params.beam === 60);
+    await clickText('.vp-toolbar button', 'Modo render'); await sleep(1500);
+    await shot('07q-lumen');
+    check('Sin errores con las luces en Modo render', errors.length === 0, errors.slice(-3).join(' | '));
+    await clickText('.vp-toolbar button', '✓ Modo render'); await sleep(300);
+    await clickText('.lights-editor .icon-btn', '✕'); await sleep(200);
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(200);
+    await page.keyboard.down('Control'); await page.keyboard.press('KeyZ'); await page.keyboard.up('Control'); await sleep(200);
+    await clickText('.cb-libs .cb-tab', 'Cocinas'); await sleep(200);
+  }
+
   // Pestañas
   await clickText('.tabs button', 'Plan de corte'); await sleep(800); await shot('05-corte');
   const nSheets = await page.$$eval('.sheet svg', (s) => s.length);

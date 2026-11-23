@@ -60,7 +60,27 @@ function alfombra({ width: W, depth: D, material: m = 'tela_beige' }) {
   return [box(0, 0, 0, W, 8, D, m)];
 }
 
-export const DECORE_BUILDERS = { mesa, silla, banqueta, sofa, planta, cuadro, frutero, ollas, alfombra };
+// Lumen (luminarias): el difusor usa la terminación "luz" (se ve encendido).
+function colgante({ width: W, height: H, material: m = 'negro' }) {
+  const r = W / 2;
+  return [cyl(r, 0, r, r, 200, m), cyl(r, 20, r, r - 20, 30, 'luz'), cyl(r, 200, r, 6, Math.max(10, H - 200), 'negro'), cyl(r, H - 10, r, 50, 10, 'negro')];
+}
+function spot({ width: W, material: m = 'blanco' }) {
+  const r = W / 2;
+  return [cyl(r, 5, r, r, 15, m), cyl(r, 0, r, r * 0.6, 6, 'luz')];
+}
+function tiraLed({ width: W, depth: D }) {
+  return [box(0, 0, 0, W, 10, D, 'inox'), box(5, 0, 2, W - 10, 3, D - 4, 'luz')];
+}
+function aplique({ width: W, height: H, depth: D, material: m = 'dorado' }) {
+  return [box(W / 2 - 40, H / 2 - 40, 0, 80, 80, 15, m), cyl(W / 2, H * 0.25, D * 0.6, W / 2, H * 0.6, 'luz')];
+}
+function lamparaPie({ width: W, height: H, material: m = 'negro' }) {
+  const r = W / 2;
+  return [cyl(r, 0, r, r * 0.7, 25, m), cyl(r, 25, r, 10, H - 300, m), cyl(r, H - 300, r, r, 300, 'luz')];
+}
+
+export const DECORE_BUILDERS = { mesa, silla, banqueta, sofa, planta, cuadro, frutero, ollas, alfombra, colgante, spot, tiraLed, aplique, lamparaPie };
 
 // "Aplicar en todos de este tipo": el material elegido pasa a todos los objetos iguales.
 export function applyDecoreMaterialToType(project, type, material) {

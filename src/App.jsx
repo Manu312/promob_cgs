@@ -60,6 +60,7 @@ import { applyRoomMaterial, copyFinish, setFinishProps, finishesOf } from './dom
 import MaterialsPanel from './ui/MaterialsPanel.jsx';
 import { StripEditor, RegionEditor } from './ui/SurfaceEditors.jsx';
 import TamponamentoEditor from './ui/TamponamentoEditor.jsx';
+import LightsEditor from './ui/LightsEditor.jsx';
 import { linearItemFor, DEFAULT_TOP_ITEMS } from './domain/tamponamento.js';
 import { setHole, GEOMETRY_KINDS, newGeometry, addGeometry, updateGeometry, removeGeometry, moveGeometry, outlineOf, boundsOf, resizeGeometry, regularPolygon, snapSegment, nextPoint, rectPts, convertGeometry, geometryBudgetLines } from './domain/geometry.js';
 import { GeometryHud, LinealDialog, GeometryPanel } from './ui/GeometryPanels.jsx';
@@ -493,6 +494,7 @@ export default function App() {
   };
   // Tamponamentos (Promob): tapas y laterales para los módulos seleccionados.
   const [tamponDlg, setTamponDlg] = useState(null);
+  const [lightsDlg, setLightsDlg] = useState(false);
   const insertModules = (list) => {
     const mods = list.filter(Boolean).map((m) => ({ id: uid(), mats: {}, ...m }));
     if (!mods.length) return;
@@ -997,6 +999,7 @@ export default function App() {
                 title="Vista previa con la luz del render">
                 {renderMode ? '✓ Modo render' : 'Modo render'}
               </button>
+              <button className={lightsDlg ? 'active' : ''} onClick={() => setLightsDlg((o) => !o)} title="Editor de luces: luminarias, color, intensidad, apertura">Luces…</button>
               <button className={renderDlg ? 'active' : ''} onClick={() => { setRenderDlg((o) => !o); setSelectedId(null); }}
                 title="Configuración del render: calidad, dimensión, clima, fondo, marca de agua">Renderizar…</button>
               <button onClick={exportImage} title="Exportar imagen (PNG)">⤓</button>
@@ -1097,6 +1100,8 @@ export default function App() {
               onRegions={() => { setRegionDlg({ surface: { kind: 'wall', wallId: stripDlg.wallId } }); setStripDlg(null); }} onClose={() => setStripDlg(null)} />}
             {regionDlg && <RegionEditor room={project.room} surface={regionDlg.surface} onRoom={(fn) => setProject((p) => ({ ...p, room: fn(p.room) }))}
               onUndo={history.undo} onRedo={history.redo} onClose={() => setRegionDlg(null)} />}
+            {lightsDlg && <LightsEditor project={project} onClose={() => setLightsDlg(false)} onSelect={selectModule}
+              onParams={(id, patch) => setProject((p) => ({ ...p, modules: p.modules.map((m) => (m.id === id ? { ...m, params: { ...m.params, ...patch } } : m)) }))} />}
             {tamponDlg && <TamponamentoEditor mods={project.modules.filter((m) => tamponDlg.ids.includes(m.id))}
               items={ui.topItems || []} onItems={(list) => setUi((u) => ({ ...u, topItems: list }))}
               onInsert={insertModules} onClose={() => setTamponDlg(null)} />}

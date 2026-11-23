@@ -361,3 +361,6 @@ table.edit td { padding: 4px 6px; } table.edit input[type='text'] { min-width: 2
 .geo-hud input[type=number] { width: 64px; }
 .vp-toolbar .vp-geometry { max-width: 130px; }
 .geometry-panel textarea { width: 100%; font: inherit; }
+/* La barra de la vista va arriba del 3D, no encima (antes tapaba las paredes del fondo en Planta). */
+.vp-toolbar { position: static; padding: 4px 8px; border-bottom: 1px solid var(--line); background: #fafafa; pointer-events: auto; }
+.lights-editor .le-item legend .link { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; font-weight: 600; }

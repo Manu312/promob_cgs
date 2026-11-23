@@ -70,6 +70,7 @@ export default function Inspector({ project, settings, selected, selectedWallId,
       {fieldsFor(selected.type).map((k) => {
         const d = PARAM_DEFS[k];
         if (p[k] === undefined) return null;
+        if (d.type === 'color') return <label key={k} className="field"><span>{d.label}</span><input type="color" value={p[k]} onChange={(e) => onParams({ [k]: e.target.value })} /></label>;
         return d.type === 'num'
           ? <NumField key={k} label={d.label} unit={d.unit} value={p[k]} min={d.min} max={d.max} step={d.step} onChange={(v) => onParams({ [k]: v })} />
           : <SelField key={k} label={d.label} value={p[k]} options={d.options} onChange={(v) => onParams({ [k]: v })} />;

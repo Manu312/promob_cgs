@@ -10,22 +10,18 @@ const Bulb = ({ on }) => (
 
 // Lista de Módulos (pestaña vertical a la izquierda, como Promob): por plano de inserción;
 // clic selecciona (Ctrl+clic suma a la selección de la lista), lamparita = visible / oculto.
-export default function ModuleList({ project, selectedId, onSelect, onToggleHidden, onRemove }) {
+export default function ModuleList({ project, selectedIds = [], onSelect, onToggleHidden, onRemove }) {
   const tree = moduleTree(project);
   const [closed, setClosed] = useState({});
-  const [multi, setMulti] = useState([]);
-  const sel = multi.length ? multi : selectedId ? [selectedId] : [];
+  const sel = selectedIds;
   const byId = new Map(project.modules.map((m) => [m.id, m]));
-  const click = (e, id) => {
-    if (e.ctrlKey || e.metaKey) setMulti((xs) => { const base = xs.length ? xs : selectedId ? [selectedId] : []; return base.includes(id) ? base.filter((x) => x !== id) : [...base, id]; });
-    else setMulti([]);
-    onSelect(id);
-  };
+  // Ctrl+clic suma o quita (la misma selección que en el 3D).
+  const click = (e, id) => onSelect(id, e.ctrlKey || e.metaKey);
   return (
     <aside className="module-list">
       <div className="ml-head"><b>Lista de Módulos</b> <small>{project.modules.length}</small></div>
       <div className="row-btns ml-actions">
-        <button disabled={!sel.length} onClick={() => { onRemove(sel); setMulti([]); }} title="Remover los módulos seleccionados (Ctrl+clic para varios)">Remover</button>
+        <button disabled={!sel.length} onClick={() => onRemove(sel)} title="Remover los módulos seleccionados (Ctrl+clic para varios)">Remover</button>
         <button disabled={!sel.length} onClick={() => onToggleHidden(sel)} title="Visibilidad (O)">Visibilidad</button>
       </div>
       <div className="ml-tree">

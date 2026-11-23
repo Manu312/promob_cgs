@@ -38,6 +38,7 @@ import { normalizeRender, normalizeWatermark, qualityOf, renderSize, fitRect, li
 import CatalogBar from './ui/CatalogBar.jsx';
 import QuickFind from './ui/QuickFind.jsx';
 import ModuleList from './ui/ModuleList.jsx';
+import MultiSelectionPanel from './ui/MultiSelectionPanel.jsx';
 import { toggleHidden, removeModules } from './domain/moduleList.js';
 import { itemParams } from './domain/library.js';
 import Inspector from './ui/Inspector.jsx';
@@ -48,6 +49,7 @@ import ErrorBoundary from './ui/ErrorBoundary.jsx';
 import { download, money } from './ui/fields.jsx';
 import { useHistoryState } from './ui/useHistoryState.js';
 import { describeSelection } from './domain/selection.js';
+import { toggleId, selectAllIds, moveGroup, rotateGroup, describeMulti } from './domain/multiSelect.js';
 
 function usePersistent(key, init, migrate = (x) => x) {
   const [v, setV] = useState(() => {
@@ -83,6 +85,14 @@ export default function App() {
   // Selección única: { kind: 'module' | 'wall', id } (Fase 1 suma aberturas, columnas y cotas).
   const [selection, setSelection] = useState(null);
   const selectedId = selection?.kind === 'module' ? selection.id : null;
+  // Varios módulos (Ctrl+clic, Ctrl+T): `id` es el último elegido; `ids` todos los seleccionados.
+  const selectedIds = useMemo(() => (selection?.kind === 'module' ? (selection.ids || [selection.id]) : []), [selection]);
+  const multiSel = selectedIds.length > 1;
+  const selectIds = useCallback((ids) => setSelection(ids.length ? { kind: 'module', id: ids[ids.length - 1], ids } : null), []);
+  const toggleSelect = useCallback((id) => setSelection((s) => {
+    const ids = toggleId(s?.kind === 'module' ? (s.ids || [s.id]) : [], id);
+    return ids.length ? { kind: 'module', id: ids[ids.length - 1], ids } : null;
+  }), []);
   const selectedWallId = selection?.kind === 'wall' ? selection.id : null;
   const setSelectedId = useCallback((id) => setSelection(id ? { kind: 'module', id } : null), []);
   const selectWall = useCallback((id) => setSelection(id ? { kind: 'wall', id } : null), []);
@@ -141,9 +151,24 @@ export default function App() {
     if (pos.x === m.x && pos.z === m.z && (pos.y ?? m.y) === m.y) return p;
     return { ...p, modules: p.modules.map((o) => (o.id === id ? { ...o, ...pos } : o)) };
   }, [gridStep, ui.collision]);
-  const onMove = useCallback((id, x, z) => setProject((p) => placeModule(p, id, x, z, ui.magnets !== false, axisLock)), [setProject, placeModule, ui.magnets, axisLock]);
+  // Arrastrar un módulo de una selección múltiple mueve todo el conjunto (desde donde estaba al empezar).
+  const onMove = useCallback((id, x, z) => setProject((p) => {
+    if (selectedIds.length > 1 && selectedIds.includes(id)) {
+      const base = baseModsRef.current || p.modules;
+      const m0 = base.find((m) => m.id === id);
+      if (!m0) return p;
+      const { x: lx, z: lz } = lockAxis(m0, x, z, axisLock);
+      return moveGroup(p, selectedIds, lx - m0.x, lz - m0.z, { collision: ui.collision !== false, base });
+    }
+    return placeModule(p, id, x, z, ui.magnets !== false, axisLock);
+  }), [setProject, placeModule, ui.magnets, ui.collision, axisLock, selectedIds]);
   // Panel Movimiento: un paso por eje (con Colisión no atraviesa nada) y giro sobre el centro.
   const nudgeSelected = (axis, sign, step = ui.moveStep ?? 10) => selectedId && setProject((p) => {
+    if (multiSel && axis !== 'h') {
+      const d = nudgeTarget({ x: 0, z: 0, rot: 0 }, axis, sign, step, false);
+      return moveGroup(p, selectedIds, d.x, d.z, { collision: ui.collision !== false });
+    }
+    if (multiSel) return { ...p, modules: p.modules.map((o) => (selectedIds.includes(o.id) ? { ...o, y: Math.max(0, (o.y || 0) + sign * step) } : o)) };
     const m = p.modules.find((o) => o.id === selectedId);
     if (!m) return p;
     const t = nudgeTarget(m, axis, sign, step, ui.relative !== false);
@@ -151,7 +176,9 @@ export default function App() {
     const y = ui.collision !== false ? collideLift(m, t.y, p.room, p.modules) : t.y;
     return y === (m.y || 0) ? p : { ...p, modules: p.modules.map((o) => (o.id === m.id ? { ...o, y } : o)) };
   });
-  const rotateBy = (deg) => selectedId && mapModule(selectedId, (m) => ({ ...m, ...rotateAboutCenter(m, deg) }));
+  const rotateBy = (deg) => selectedId && (multiSel
+    ? setProject((p) => rotateGroup(p, selectedIds, deg))
+    : mapModule(selectedId, (m) => ({ ...m, ...rotateAboutCenter(m, deg) })));
   const setGrid = (patch) => setProject((p) => ({ ...p, room: { ...p.room, grid: { ...grid, ...patch } } }));
 
   // Arrastre de paredes y vértices: cada movimiento parte del ambiente que había al
@@ -356,7 +383,7 @@ export default function App() {
   };
   const deleteSelected = () => {
     if (!selectedId) return;
-    setProject((p) => ({ ...p, modules: p.modules.filter((m) => m.id !== selectedId) }));
+    setProject((p) => removeModules(p, selectedIds));
     setSelectedId(null);
   };
   const duplicateSelected = () => {
@@ -385,7 +412,8 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 'd') { e.preventDefault(); duplicateSelected(); return; }
       if (plain && key === 'e') { setTool('propiedades'); return; }
       if (plain && key === 'a') { setTool('agregados'); return; } // Agregados
-      if (plain && key === 'o' && selectedId) { setProject((p) => toggleHidden(p, [selectedId])); return; } // visible / oculto
+      if (plain && key === 'o' && selectedId) { setProject((p) => toggleHidden(p, selectedIds)); return; } // visible / oculto
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === 't') { e.preventDefault(); selectIds(selectAllIds(project)); return; } // Seleccionar todo
       if (plain && key === 'x') { setAxisLock((l) => (l === 'x' ? null : 'x')); return; }
       if (plain && key === 'y') { setAxisLock((l) => (l === 'z' ? null : 'z')); return; }
       if (plain && key === 'm') { stopDrawWalls(); stopAnnotate(); stopScale(); return; } // Seleccionar / Mover
@@ -421,6 +449,7 @@ export default function App() {
         const st = e.shiftKey ? 100 : 10;
         const dx = e.key === 'ArrowLeft' ? -st : e.key === 'ArrowRight' ? st : 0;
         const dz = e.key === 'ArrowUp' ? -st : e.key === 'ArrowDown' ? st : 0;
+        if (multiSel) { setProject((p) => moveGroup(p, selectedIds, dx, dz, { collision: ui.collision !== false })); return; }
         setProject((p) => { const m = p.modules.find((o) => o.id === selectedId); return m ? placeModule(p, selectedId, m.x + dx, m.z + dz, false) : p; });
       }
     };
@@ -489,7 +518,7 @@ export default function App() {
               onAmbiente={(cat, ids, on, onlySel) => setProject((p) => applyAuto(p, cat, ids, on, (m) => resolveRules(m, p), onlySel ? (selectedId ? [selectedId] : []) : null))} />
           )}
           {side === 'lista' && (
-            <ModuleList project={project} selectedId={selectedId} onSelect={setSelectedId}
+            <ModuleList project={project} selectedIds={selectedIds} onSelect={(id, add) => (add ? toggleSelect(id) : setSelectedId(id))}
               onToggleHidden={(ids) => setProject((p) => toggleHidden(p, ids))}
               onRemove={(ids) => { setProject((p) => removeModules(p, ids)); setSelectedId(null); }} />
           )}
@@ -501,7 +530,7 @@ export default function App() {
               onShow={(path, item) => setUi((u) => ({ ...u, catalogPath: [...path, item.id] }))} />}
             <div className="vp-area" ref={vpRef} {...vpDrag}>
             <ErrorBoundary onReset={() => { setRenderJob(null); setRenderDlg(false); setRenderMode(false); }}>
-              <Scene3D project={project} builtById={builtById} selectedId={selectedId} onSelect={setSelectedId} onMove={onMove}
+              <Scene3D project={project} builtById={builtById} selectedId={selectedId} selectedIds={selectedIds} onSelect={setSelectedId} onToggleSelect={toggleSelect} onMove={onMove}
                 selectedWallId={selectedWallId} onSelectWall={selectWall}
                 onMoveWall={onMoveWall} onMoveNode={onMoveNode} onResize={onResize} step={gridStep}
                 onDimEdit={onDimEdit} onWallLength={onWallLength} onWallAngle={onWallAngle}
@@ -578,7 +607,7 @@ export default function App() {
             {wallMenu && <WallContextMenu menu={wallMenu} wall={project.room.walls.find((w) => w.id === wallMenu.wallId)} onAction={wallAction} onClose={() => setWallMenu(null)} />}
             {deleteDlg && <WallDeleteDialog label={`Pared ${project.room.walls.findIndex((w) => w.id === deleteDlg.wallId) + 1}`} onConfirm={confirmDelete} onCancel={() => setDeleteDlg(null)} />}
             <div className="statusbar">
-              <span className="sb-sel">{describeSelection(project, selection) || 'Sin selección'}</span>
+              <span className="sb-sel">{(multiSel ? describeMulti(project, selectedIds) : describeSelection(project, selection)) || 'Sin selección'}</span>
               {axisLock && <span className="sb-lock" title="X / Y cambian la traba">Movimiento trabado: solo {axisLock === 'x' ? 'ancho (X)' : 'profundidad (Y)'}</span>}
               <span className="sb-stats">{project.modules.length} módulos · {cut.rows.reduce((a, r) => a + r.qty, 0)} piezas · {nesting.reduce((a, n) => a + n.sheets.length, 0)} placas</span>
               <StatusToggles ui={ui} onToggle={toggleUi} showDims={showDims} onShowDims={setShowDims}
@@ -609,9 +638,14 @@ export default function App() {
               styles={stylesOf(settings)} onStyles={(list) => setSettings((s) => ({ ...s, styles: list }))}
               onApplyStyle={(style, scope) => setProject((p) => applyStyle(p, style, scope, selectedId ? [selectedId] : []))} />
           )}
+          {tool === 'propiedades' && multiSel && (
+            <MultiSelectionPanel count={selectedIds.length} text={describeMulti(project, selectedIds)}
+              onDelete={deleteSelected} onHide={() => setProject((p) => toggleHidden(p, selectedIds))}
+              onRotate={() => rotateBy(90)} onClear={() => setSelectedId(null)} />
+          )}
           {tool === 'movimiento'
             ? <MovementPanel label={selected ? describeSelection(project, selection) : null} ui={ui} setUi={setUi} onNudge={nudgeSelected} onRotate={(sign) => rotateBy(sign * (ui.rotStep ?? 90))} />
-            : tool === 'propiedades' && <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
+            : tool === 'propiedades' && !multiSel && <Inspector project={project} settings={settings} selected={selected} built={selected ? builtById.get(selected.id) : null}
             selectedWallId={selectedWallId} onSelectWall={selectWall} onDrawWalls={startDrawWalls}
             onDeleteWall={(id) => setDeleteDlg({ wallId: id })} onSplitWall={doSplit}
             selectedOpeningId={selectedOpeningId} selectedColumnId={selectedColumnId} onSelectItem={setSelection} onScaleImage={startScale}

@@ -137,6 +137,22 @@ Orden acordado con el usuario. Cada fase se entrega usable y con tests.
 | 7.5 | Render 360° (panorámica) | Puede |
 | — | Render con IA: **fuera de alcance** por ahora | — |
 
+### Fase 7b — Paridad de diseño con Promob
+
+Agregada el 23/11/2026 a pedido del usuario: la funcionalidad de diseño tiene que ser **idéntica a Promob**. Va antes que la auditoría de seguridad y que la Fase 8.
+
+Salió de una auditoría contra la ayuda oficial de Promob (~45 artículos) y las fotos. Detalle, decisiones y las 34 rebanadas en [`docs/PLAN-FASE-7B.md`](PLAN-FASE-7B.md) (epic #109).
+
+| Área | Requisitos |
+|---|---|
+| Selección y edición | Selección múltiple, agrupar, copiar/pegar, duplicar con Reposicionar, sustitución rápida, atajos de movimiento |
+| Vistas | Menú Vistas, historial, zoom total/entidad/ventana, Caminar, modos de relleno, vista dinámica |
+| Ambiente | Materiales de paredes y piso, franjas, regiones, paredes curvas, encuentros, 30-40-50, piso editable, réguas, escaleras, importar DXF/3D |
+| Geometría | Geometrías libres, convertir en panel, perforar, tamponamento e ítems lineales |
+| Catálogo | Gola, Salas, Decore, luces, favoritos, valores propuestos, constructor de armarios, puertas corredizas |
+| Documentación | Página de impresión, viewports, cotas, capas, texto, imagen, listado |
+| Preferencias | Preferencias, atajos configurables, menú Mostrar |
+
 ### Fase 8 — Proyectos, clientes y Supabase
 
 | # | Requisito | Prioridad |

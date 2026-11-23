@@ -43,3 +43,21 @@ por hora; si hiciera falta más, se configura un SMTP propio en *Authentication 
 2. Recibe un email con un código y un enlace: escribe el código o toca el enlace.
 3. Si el email no fue invitado, Supabase no manda nada y la app avisa que no tiene acceso.
 4. **Salir** (arriba a la derecha) cierra la sesión.
+
+## 3. Proyectos en la nube (Fase 8)
+
+Una sola vez: en Supabase → **SQL Editor**, pegar y ejecutar el contenido de
+`supabase/001_proyectos.sql`. Crea la tabla `projects` con sus políticas: solo los usuarios con
+sesión (los invitados del equipo) pueden leer y escribir; sin sesión, nada.
+
+Con eso, al entrar a la app:
+
+- Los proyectos que estaban en esa compu se suben solos la primera vez.
+- Cada cambio se guarda en la compu al instante y en la nube unos segundos después. Arriba se ve
+  el estado: **✓ Guardado**, **Guardando…** o **⚠ Sin conexión** (los cambios quedan en la compu
+  y se suben solos cuando vuelve internet).
+- Todo el equipo ve los mismos proyectos. Si dos personas editan el mismo proyecto a la vez, queda
+  el último guardado.
+
+El plan gratis de Supabase pausa el proyecto si pasa una semana sin uso; se reactiva desde el panel
+(*Restore project*).

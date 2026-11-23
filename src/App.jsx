@@ -52,6 +52,7 @@ import { mb } from './domain/storage.js';
 import { syncGuests, linkedIds, guestKind, findHost, canHost, snapGuest } from './domain/encastre.js';
 import { useAuth } from './ui/AuthGate.jsx';
 import { createLocalRepo, adoptOpenProject, normalizeMeta } from './domain/projectsRepo.js';
+import { createSupabaseRepo, createSyncedRepo } from './domain/cloudRepo.js';
 import ProjectsHome, { NewProjectDialog, ProjectDataDialog } from './ui/ProjectsHome.jsx';
 import { idbStorage } from './ui/idbStorage.js';
 import { describeSelection } from './domain/selection.js';
@@ -1127,13 +1128,30 @@ export default function App() {
   const newProject = () => setNewDlg(true);
   // ---- Proyectos (Fase 8): lista, proyecto abierto y guardado de la copia de trabajo ----
   const localStore = useMemo(() => idbStorage(), []);
-  const repo = useMemo(() => createLocalRepo(localStore, { user: auth.user?.email || '' }), [localStore, auth.user?.email]);
+  // Con sesión iniciada: Supabase con copia local (sincronizado). Sin login: solo en esta compu.
+  const [saveStatus, setSaveStatus] = useState(null); // 'guardado' | 'guardando' | 'sin-conexion'
+  const repo = useMemo(() => {
+    const local = createLocalRepo(localStore, { user: auth.user?.email || '' });
+    if (!auth.db) return local;
+    return createSyncedRepo(createSupabaseRepo(auth.db, { user: auth.user.email }), local, localStore, { onStatus: setSaveStatus });
+  }, [localStore, auth.db, auth.user?.email]);
   const [meta, setMeta] = useState(null); // ficha del proyecto abierto
   const metaRef = useRef(null);
   metaRef.current = meta;
   const [homeKey, setHomeKey] = useState(0);
   const [newDlg, setNewDlg] = useState(false);
   const [dataDlg, setDataDlg] = useState(null);
+  // Nube: la primera vez sube los proyectos de esta compu; si se corta, reintenta solo
+  useEffect(() => {
+    if (repo.kind !== 'sincronizado') { setSaveStatus(null); return undefined; }
+    let alive = true;
+    setSaveStatus('guardando');
+    repo.uploadLocal().then(() => repo.flush()).then(() => { if (alive) setHomeKey((k) => k + 1); }).catch(() => { if (alive) setSaveStatus('sin-conexion'); });
+    const retry = () => { repo.flush().catch(() => {}); };
+    window.addEventListener('online', retry);
+    const t = setInterval(() => { if (repo.status === 'sin-conexion') retry(); }, 30000);
+    return () => { alive = false; window.removeEventListener('online', retry); clearInterval(t); };
+  }, [repo]);
   // la primera vez, el proyecto que estaba abierto pasa a la lista
   useEffect(() => {
     let alive = true;
@@ -1198,6 +1216,7 @@ export default function App() {
           {TABS.map(([k, l]) => <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>{l}</button>)}
         </nav>
         {meta && <button className="proj-name" onClick={() => setDataDlg(meta)} title="Datos del proyecto">{meta.name}{meta.client ? ` · ${meta.client}` : ''}</button>}
+        {saveStatus && <span className={`save-status ${saveStatus}`} title={saveStatus === 'sin-conexion' ? 'Sin conexión con la nube: los cambios quedan guardados en esta compu y se suben solos cuando vuelve' : 'Proyectos guardados en la nube'}>{{ guardado: '✓ Guardado', guardando: 'Guardando…', 'sin-conexion': '⚠ Sin conexión' }[saveStatus]}</span>}
         <div className="top-actions">
           <span className="total-pill" title="Total del presupuesto">{money(budget.total)}</span>
           <button onClick={history.undo} disabled={!history.canUndo} title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button>

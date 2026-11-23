@@ -30,7 +30,8 @@ export default function AuthGate({ children }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => { check(s); });
     return () => { alive = false; sub.subscription.unsubscribe(); };
   }, []);
-  const value = useMemo(() => ({ user: session?.user || null, enabled: !!supabase, signOut: supabase ? () => supabase.auth.signOut() : null }), [session]);
+  // `db`: el cliente de Supabase para guardar los proyectos en la nube (solo con sesión)
+  const value = useMemo(() => ({ user: session?.user || null, enabled: !!supabase, db: session?.user ? supabase : null, signOut: supabase ? () => supabase.auth.signOut() : null }), [session]);
   if (!supabase) return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
   if (session === undefined) return <div className="auth-page"><p className="hint">Cargando…</p></div>;
   if (!session) return <LoginForm denied={denied} />;

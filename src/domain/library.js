@@ -78,6 +78,26 @@ export const LIBRARY = [
     ],
   },
   {
+    // Línea Gola (como la biblioteca "Cocina Gola" de Promob): sin tiradores, con perfil de aluminio
+    id: 'cocina-gola', label: 'Cocina Gola', groups: [
+      { id: 'inferiores', label: 'Inferiores', subgroups: [
+        { id: 'puertas', label: 'Puertas', items: [
+          it('gola-inf-2p', 'bajo', 'Bajo gola 2 puertas', { gola: 'superior', handlePos: 'none' }, W_BAJO),
+          it('gola-inf-1p', 'bajo', 'Bajo gola 1 puerta', { width: 450, doors: 1, gola: 'superior', handlePos: 'none' }, W(300, 350, 400, 450, 500, 600)),
+        ] },
+        { id: 'cajoneros', label: 'Cajoneros', items: [
+          it('gola-inf-caj', 'bajo_cajones', 'Cajonero gola 3 cajones', { gola: 'superior_medio', handlePos: 'none' }, W_CAJ),
+          it('gola-inf-caj2', 'bajo_cajones', 'Cajonero gola 2 cajones', { drawers: 2, gola: 'superior_medio', handlePos: 'none' }, W_CAJ),
+        ] },
+        { id: 'mixtos', label: 'Cajón + puertas', items: [it('gola-inf-mixto', 'bajo_mixto', 'Bajo gola cajón + puertas', { gola: 'superior', handlePos: 'none' }, W(600, 700, 800, 900, 1000))] },
+        { id: 'lavaplatos', label: 'Lavaplatos', items: [it('gola-inf-bacha', 'bajo_bacha', 'Bajo bacha gola', { gola: 'superior', handlePos: 'none' })] },
+      ] },
+      { id: 'altos', label: 'Altos', subgroups: [
+        { id: 'alacenas', label: 'Alacenas', items: [it('gola-alt-2p', 'alacena', 'Alacena gola 2 puertas', { gola: 'inferior', handlePos: 'none' }, W_ALTO)] },
+      ] },
+    ],
+  },
+  {
     id: 'electro', label: 'Electrodomésticos', groups: [
       { id: 'coccion', label: 'Cocción', subgroups: [
         { id: 'cocinas', label: 'Cocinas', items: [

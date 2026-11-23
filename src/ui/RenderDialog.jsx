@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { QUALITIES, SIZE_PRESETS, SIZE_MODES, MIN_SIDE, MAX_SIDE, CLIMAS, BG_MODES, BG_IMAGE_MAX, renderSize, setCustomSide, applyClima } from '../domain/render.js';
+import { QUALITIES, SIZE_PRESETS, SIZE_MODES, MIN_SIDE, MAX_SIDE, CLIMAS, BG_MODES, BG_IMAGE_MAX, WM_POSITIONS, WM_IMAGE_MAX, renderSize, setCustomSide, applyClima, watermarkRect } from '../domain/render.js';
 import { Compass, AltitudeArc } from './SunControls.jsx';
 import { readImageFile } from './imageFile.js';
 import { NumField } from './fields.jsx';
 
 // Diálogo "Configuración del render" (como el de Promob): pestañas con la calidad y la dimensión,
 // el clima, el fondo, la marca de agua y el 360°. Cada cambio se guarda en el proyecto.
-export const RENDER_TABS = [['general', 'Calidad y dimensión'], ['clima', 'Clima'], ['fondo', 'Fondo']];
+export const RENDER_TABS = [['general', 'Calidad y dimensión'], ['clima', 'Clima'], ['fondo', 'Fondo'], ['marca', 'Marca de agua']];
 
-export default function RenderDialog({ config, view, onChange, onRender, onClose, onBegin, onEnd }) {
+export default function RenderDialog({ config, view, onChange, onRender, onClose, onBegin, onEnd, watermark, onWatermark }) {
   const [tab, setTab] = useState('general');
   useEffect(() => {
     const k = (e) => { if (e.key === 'Escape') onClose(); };
@@ -78,6 +78,7 @@ export default function RenderDialog({ config, view, onChange, onRender, onClose
       )}
       {tab === 'clima' && <ClimaTab clima={config.clima} onClima={(fn) => onChange((r) => ({ ...r, clima: fn(r.clima) }))} onBegin={onBegin} onEnd={onEnd} />}
       {tab === 'fondo' && <FondoTab bg={config.background} onBg={(patch) => onChange((r) => ({ ...r, background: { ...r.background, ...patch } }))} />}
+      {tab === 'marca' && <MarcaTab wm={watermark} onWm={onWatermark} />}
       <footer>
         <button onClick={onClose}>Cerrar</button>
         <button className="active" onClick={onRender}>Renderizar</button>
@@ -87,9 +88,18 @@ export default function RenderDialog({ config, view, onChange, onRender, onClose
 }
 
 // Recuadro del área que se va a renderizar (lo de afuera queda oscurecido).
-export function RenderArea({ rect, size }) {
+// Si hay marca de agua, se ve en su lugar (a escala) dentro del área.
+export function RenderArea({ rect, size, watermark }) {
+  const [wmSize, setWmSize] = useState(null);
+  const wm = watermark?.use && watermark.image ? watermark : null;
+  const k = rect.w / size.width;
+  const r = wm && wmSize && watermarkRect(wmSize.w, wmSize.h, size.width, size.height, wm.position, wm.offset);
   return (
     <div className="render-area" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+      {wm && (
+        <img className="render-area-wm" src={wm.image} alt="" onLoad={(e) => setWmSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+          style={r ? { left: r.x * k, top: r.y * k, width: r.w * k, height: r.h * k, opacity: 1 - wm.transparency / 100 } : { visibility: 'hidden' }} />
+      )}
       <span>{size.width} × {size.height}</span>
     </div>
   );
@@ -180,6 +190,50 @@ function FondoTab({ bg, onBg }) {
         {err && <p className="rw-error">{err}</p>}
         <div className="rd-bg-preview" style={preview}>{bg.mode === 'imagen' && !bg.image && 'Sin imagen: se usa el color principal'}</div>
         <p className="hint">El fondo aparece solo en la imagen renderizada, detrás del ambiente; no ilumina la escena.</p>
+      </fieldset>
+    </div>
+  );
+}
+
+// Pestaña Marca de agua: queda guardada para los próximos renders (en este navegador).
+function MarcaTab({ wm, onWm }) {
+  const fileRef = useRef(null);
+  const [err, setErr] = useState(null);
+  const [hover, setHover] = useState(null);
+  const pick = async (file) => {
+    setErr(null);
+    try { onWm({ image: await readImageFile(file, { max: WM_IMAGE_MAX, type: 'image/png' }), use: true }); } catch (e) { setErr(e.message); }
+  };
+  const label = (id) => WM_POSITIONS.find(([k]) => k === id)?.[1];
+  return (
+    <div className="rd-body">
+      <label className="check"><input type="checkbox" checked={wm.use} onChange={(e) => onWm({ use: e.target.checked })} /> Usar marca de agua</label>
+      <fieldset disabled={!wm.use}>
+        <legend>Imagen</legend>
+        <div className="rd-row">
+          {wm.image && <img className="rd-wm-thumb" src={wm.image} alt="Marca de agua" />}
+          <button onClick={() => fileRef.current?.click()}>{wm.image ? 'Cambiar…' : 'Buscar…'}</button>
+          <input ref={fileRef} className="rd-wm-file" type="file" accept="image/*" hidden
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = ''; }} />
+        </div>
+        <p className="hint">Va a su propio tamaño; si no entra en el render, se achica. Un PNG con fondo transparente queda mejor.</p>
+        {err && <p className="rw-error">{err}</p>}
+      </fieldset>
+      <fieldset disabled={!wm.use}>
+        <legend>Posición</legend>
+        <div className="rd-wm-pos" onMouseLeave={() => setHover(null)}>
+          {WM_POSITIONS.map(([k, l]) => (
+            <button key={k} className={wm.position === k ? 'on' : ''} title={l} aria-label={l}
+              onMouseEnter={() => setHover(k)} onClick={() => onWm({ position: k })}><i /></button>
+          ))}
+        </div>
+        <p className="rd-size">{label(hover || wm.position)}</p>
+        <label className="rd-slider">
+          <span>Transparencia</span>
+          <input type="range" min={0} max={100} value={wm.transparency} onChange={(e) => onWm({ transparency: +e.target.value })} />
+          <b>{wm.transparency}%</b>
+        </label>
+        <NumField label="Distancia al borde" unit="px" value={wm.offset} min={0} max={2000} onChange={(v) => onWm({ offset: v })} />
       </fieldset>
     </div>
   );

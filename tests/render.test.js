@@ -113,3 +113,27 @@ test('al cargar, la imagen se achica a un lado mayor máximo (no se agranda)', (
   assert.deepEqual(shrinkSize(4096, 2048, 2048), { width: 2048, height: 1024 });
   assert.deepEqual(shrinkSize(800, 600, 2048), { width: 800, height: 600 });
 });
+
+// Marca de agua (#102)
+import { normalizeWatermark, watermarkRect, WM_POSITIONS, DEFAULT_WATERMARK } from '../src/domain/render.js';
+
+test('marca de agua: apagada y centrada por defecto; valida transparencia y distancia', () => {
+  assert.deepEqual(normalizeWatermark(null), DEFAULT_WATERMARK);
+  const w = normalizeWatermark({ use: true, transparency: 140, offset: -5, position: 'raro' });
+  assert.deepEqual([w.use, w.transparency, w.offset, w.position], [true, 100, 0, 'centro']);
+  assert.equal(WM_POSITIONS.length, 9);
+});
+
+test('marca de agua: a su tamaño en las 9 posiciones, con la distancia desde los bordes de la esquina', () => {
+  const r = (pos) => watermarkRect(200, 100, 1000, 500, pos, 20);
+  assert.deepEqual(r('inf-izq'), { x: 20, y: 380, w: 200, h: 100 });
+  assert.deepEqual(r('sup-der'), { x: 780, y: 20, w: 200, h: 100 });
+  assert.deepEqual(r('centro'), { x: 400, y: 200, w: 200, h: 100 });
+  assert.deepEqual(r('inf-centro'), { x: 400, y: 380, w: 200, h: 100 });
+  assert.deepEqual(r('centro-der'), { x: 780, y: 200, w: 200, h: 100 });
+});
+
+test('marca de agua más grande que el render: se achica para entrar (sin deformarse)', () => {
+  const r = watermarkRect(2000, 1000, 1000, 500, 'sup-izq', 0);
+  assert.deepEqual(r, { x: 0, y: 0, w: 1000, h: 500 });
+});

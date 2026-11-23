@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { WebGLPathTracer, GradientEquirectTexture } from 'three-gpu-pathtracer';
-import { fitRect, renderFov, coverRect } from '../domain/render.js';
+import { fitRect, renderFov, coverRect, watermarkRect } from '../domain/render.js';
 import { loadImage } from './imageFile.js';
 
 // Motor de la ventana de render: un WebGLRenderer aparte, fuera de pantalla, al tamaño pedido.
@@ -52,7 +52,17 @@ export function drawBackground(ctx, bg, W, H, img) {
   }
 }
 
-export function createRenderJob({ gl, scene, camera, view, size, quality, rig, background, onProgress, onDone }) {
+// Marca de agua encima de todo, con su transparencia.
+export function drawWatermark(ctx, wm, W, H, img) {
+  if (!wm?.use || !img) return;
+  const r = watermarkRect(img.naturalWidth, img.naturalHeight, W, H, wm.position, wm.offset);
+  ctx.save();
+  ctx.globalAlpha = 1 - wm.transparency / 100;
+  ctx.drawImage(img, r.x, r.y, r.w, r.h);
+  ctx.restore();
+}
+
+export function createRenderJob({ gl, scene, camera, view, size, quality, rig, background, watermark, onProgress, onDone }) {
   const { width: W, height: H } = size;
   const glCanvas = document.createElement('canvas');
   const off = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -96,15 +106,21 @@ export function createRenderJob({ gl, scene, camera, view, size, quality, rig, b
   };
 
   let bgImg = null;
+  let wmImg = null;
   let pending = 0; // cargas de imágenes en curso (fondo); la imagen final espera a que terminen
   const compose = () => {
     ctx.clearRect(0, 0, W, H);
     drawBackground(ctx, background, W, H, bgImg);
     ctx.drawImage(glCanvas, 0, 0, W, H);
+    drawWatermark(ctx, watermark, W, H, wmImg);
   };
   if (background?.mode === 'imagen' && background.image) {
     pending += 1;
     loadImage(background.image).then((img) => { bgImg = img; }).catch(() => {}).finally(() => { pending -= 1; compose(); });
+  }
+  if (watermark?.use && watermark.image) {
+    pending += 1;
+    loadImage(watermark.image).then((img) => { wmImg = img; }).catch(() => {}).finally(() => { pending -= 1; compose(); });
   }
 
   let pt = null;

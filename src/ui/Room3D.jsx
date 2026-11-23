@@ -7,6 +7,7 @@ import { wallCorners, floorPolygon, wallFacesCamera } from '../domain/walls.js';
 import { finishesOf } from '../domain/roomMaterials.js';
 import { finishMaterial } from './roomTextures.js';
 import { stripsOf, stripCells, rectMinusRects, regionsOn } from '../domain/strips.js';
+import { arcPoints, arcNormals } from '../domain/curvedWalls.js';
 
 const OV = { side: THREE.DoubleSide };
 // Franjas con material y regiones sobre la cara interior de una pared (1 mm hacia adentro del ambiente),
@@ -58,6 +59,20 @@ function HoledWall({ len, H, T, zc, gap, openings, holes, material, finishMat })
   return geos.map((x, i) => (
     <mesh key={i} geometry={x.g} material={mats} position={[0, 0, inSign > 0 ? x.z0 * S : -(x.z0 + x.d) * S]} castShadow receiveShadow />
   ));
+}
+
+// Pared curva (Flecha): banda en planta (cara interior = el arco, exterior = el arco + espesor)
+// extruida hasta el alto. Coordenadas locales de la pared: x a lo largo, z hacia afuera (sOut).
+function CurvedWall({ len, H, T, sOut, flecha, material }) {
+  const geo = useMemo(() => {
+    const inner = arcPoints([0, 0], [len, 0], [0, sOut], flecha, 32);
+    const ns = arcNormals(inner, [0, sOut]);
+    const outer = inner.map((p, i) => [p[0] + ns[i][0] * T, p[1] + ns[i][1] * T]);
+    const shape = new THREE.Shape([...inner, ...outer.reverse()].map(([x, z]) => new THREE.Vector2(x * S, -z * S)));
+    return new THREE.ExtrudeGeometry(shape, { depth: H * S, bevelEnabled: false });
+  }, [len, H, T, sOut, flecha]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return <mesh geometry={geo} material={material} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow />;
 }
 
 // Región: en pared (u, v) o en piso (x, z); la geometría se libera al cambiar.
@@ -151,7 +166,7 @@ function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onD
   const lowered = W.lowered || autoLow;
   const h0 = (lowered ? Math.min(lowerH, W.h0) : W.h0) - gap, h1 = (lowered ? Math.min(lowerH, W.h1) : W.h1) - gap;
   const H = Math.max(h0, h1);
-  const ops = lowered ? [] : openings;
+  const ops = lowered || W.flecha ? [] : openings; // en paredes curvas no se dibujan los vanos (van sobre la cuerda)
   const mat = W.transparent ? (selected ? wallSelTransMat : wallTransMat) : (selected ? wallSelMat : wallMat);
   const theta = Math.atan2(-w.u[1], w.u[0]);
   // Eje z local del grupo rotado = (-uz, ux). El espesor va hacia el lado de la normal exterior.
@@ -176,7 +191,9 @@ function Wall({ w, prev, origin, openings, autoHide, lowerH = 100, selected, onD
     <group ref={ref} position={[w.a[0] * S, gap * S, w.a[1] * S]} rotation={[0, theta, 0]} onPointerDown={onDown} userData={{ wallId: w.id, gap }}
       onDoubleClick={onDouble ? (e) => { if (!ref.current?.visible || !firstHitIn(e)) return; e.stopPropagation(); onDouble(w.id); } : undefined}
       onContextMenu={(e) => { if (!onMenu || !ref.current?.visible) return; e.stopPropagation(); onMenu(e, w); }}>
-      {!sloped && holes.length > 0
+      {W.flecha
+        ? <CurvedWall len={w.len} H={H} T={T} sOut={zc > 0 ? 1 : -1} flecha={W.flecha} material={mat} />
+        : !sloped && holes.length > 0
         ? <HoledWall len={w.len} H={H} T={T} zc={zc} gap={gap} openings={ops} holes={holes} material={mat} finishMat={finishMaterial(finish, w.len, H, mat)} />
         : sloped
         ? <SlopedWall len={w.len} h0={h0} h1={h1} T={T} zc={zc} openings={ops} material={mat} />
@@ -212,7 +229,23 @@ export function Room3D({ room, origin, autoHide = true, selectedWallId, onWallDo
   const walls = useMemo(() => roomWalls(room).filter((w) => w.wall.visible), [room]);
   // Esquina de cada pared: la pared que llega a su vértice de inicio.
   const incomingOf = useMemo(() => new Map(wallCorners(room).map((c) => [c.outgoing.id, c.incoming])), [room]);
-  const floorPts = useMemo(() => floorPolygon(room), [room]);
+  // el piso sigue las paredes curvas: entre sus dos vértices va el arco
+  const floorPts = useMemo(() => {
+    const pts = floorPolygon(room);
+    const curved = roomWalls(room).filter((g) => g.wall.flecha);
+    if (!curved.length) return pts;
+    const same = (p, q) => Math.abs(p[0] - q[0]) < 1 && Math.abs(p[1] - q[1]) < 1;
+    const out = [];
+    pts.forEach((p, i) => {
+      out.push(p);
+      const q = pts[(i + 1) % pts.length];
+      const g = curved.find((c) => (same(c.a, p) && same(c.b, q)) || (same(c.b, p) && same(c.a, q)));
+      if (!g) return;
+      const arc = arcPoints(g.a, g.b, g.n, g.wall.flecha, 32).slice(1, -1);
+      out.push(...(same(g.a, p) ? arc : arc.reverse()));
+    });
+    return out;
+  }, [room]);
   const floorGeo = useMemo(() => {
     const shape = new THREE.Shape(floorPts.map(([x, z]) => new THREE.Vector2(x * S, -z * S)));
     for (const h of floorHoles) shape.holes.push(new THREE.Path(h.pts.map(([x, z]) => new THREE.Vector2(x * S, -z * S)))); // perforado por geometrías

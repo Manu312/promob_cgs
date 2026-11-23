@@ -1,3 +1,4 @@
+import { arcPoints, arcNormals } from './curvedWalls.js';
 // Colisión entre módulos, paredes y columnas (como el interruptor "Colisión" de Promob).
 // Cada objeto es un polígono convexo en planta (mm) más un rango de alto [y0, y1].
 import { footprint, localAxes } from './modules.js';
@@ -25,6 +26,15 @@ export function obstaclesFor(mod, room, modules) {
   const out = [];
   for (const g of roomWalls(room)) {
     const t = g.t;
+    if (g.wall.flecha) { // pared curva: un tramo de obstáculo por cada segmento del arco
+      const pts = arcPoints(g.a, g.b, g.n, g.wall.flecha, 16);
+      const ns = arcNormals(pts, g.n);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p = pts[i], q = pts[i + 1];
+        out.push({ kind: 'wall', id: g.id, y0: 0, y1: Math.max(g.wall.h0 ?? room.h, g.wall.h1 ?? room.h), poly: [p, q, [q[0] + ns[i + 1][0] * t, q[1] + ns[i + 1][1] * t], [p[0] + ns[i][0] * t, p[1] + ns[i][1] * t]] });
+      }
+      continue;
+    }
     out.push({
       kind: 'wall', id: g.id, y0: 0, y1: Math.max(g.wall.h0 ?? room.h, g.wall.h1 ?? room.h),
       poly: [g.a, g.b, [g.b[0] + g.n[0] * t, g.b[1] + g.n[1] * t], [g.a[0] + g.n[0] * t, g.a[1] + g.n[1] * t]],

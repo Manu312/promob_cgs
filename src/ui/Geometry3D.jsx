@@ -12,6 +12,9 @@ const colorMat = (c, sel) => {
   return colorMats.get(k);
 };
 const draftMat = new THREE.MeshStandardMaterial({ color: '#22c55e', transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide });
+// La geometría perforante casi no se ve (deja ver el agujero) pero se sigue pudiendo elegir.
+const holeMat = new THREE.MeshBasicMaterial({ color: '#64748b', transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide });
+const holeSelMat = new THREE.MeshBasicMaterial({ color: '#2563eb', transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide });
 
 // Marco del plano de construcción: piso (y del afastamiento), tapa de un módulo o cara interior de una pared.
 export function planeFrame(g, room, modules) {
@@ -31,18 +34,20 @@ export function planeFrame(g, room, modules) {
 }
 
 // Una geometría extruida sobre su plano. `draft` = vista previa mientras se construye.
-export function GeometryMesh({ g, room, modules, selected, draft, onDown, onMenu }) {
+export function GeometryMesh({ g, room, modules, selected, draft, onDown, onMenu, holes = [] }) {
   const f = planeFrame(g, room, modules);
   const pts = outlineOf(g);
-  const key = JSON.stringify([pts, g.height, f?.kind, f?.gap]);
+  const key = JSON.stringify([pts, g.height, f?.kind, f?.gap, holes.map((h) => h.pts)]);
   const geo = useMemo(() => {
     if (!f || pts.length < 3) return null;
-    const shape = new THREE.Shape(pts.map(([a, b]) => (f.kind === 'wall' ? new THREE.Vector2(a * S, (b - f.gap) * S) : new THREE.Vector2(a * S, -b * S))));
+    const v2 = ([a, b]) => (f.kind === 'wall' ? new THREE.Vector2(a * S, (b - f.gap) * S) : new THREE.Vector2(a * S, -b * S));
+    const shape = new THREE.Shape(pts.map(v2));
+    for (const h of holes) shape.holes.push(new THREE.Path(h.pts.map(v2))); // perforada por otra geometría
     return new THREE.ExtrudeGeometry(shape, { depth: Math.max(1, g.height || 1) * S, bevelEnabled: false });
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => geo?.dispose(), [geo]);
   if (!geo || g.visible === false) return null;
-  const mat = draft ? draftMat : (g.finish ? finishMaterial(g.finish, 1000, 1000, { side: THREE.DoubleSide }) : colorMat(g.color || '#c9c4ba', selected));
+  const mat = draft ? draftMat : g.hole?.on ? (selected ? holeSelMat : holeMat) : (g.finish ? finishMaterial(g.finish, 1000, 1000, { side: THREE.DoubleSide }) : colorMat(g.color || '#c9c4ba', selected));
   const handlers = draft ? { raycast: () => null } : {
     onPointerDown: onDown ? (e) => onDown(e, g) : undefined,
     onContextMenu: onMenu ? (e) => onMenu(e, g) : undefined,

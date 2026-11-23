@@ -62,7 +62,7 @@ export function LinealDialog({ onOk, onCancel }) {
 }
 
 // Propiedades de una geometría (Promob: Dimensões, Posição, Material, Orçamento, Outras, Perfurante).
-export function GeometryPanel({ g, onChange, onResize, onDelete, onConvert, onBack, children }) {
+export function GeometryPanel({ g, onChange, onResize, onDelete, onConvert, onBack, onHole, children }) {
   const d = geometryDims(g);
   const [scale, setScale] = useState(false);
   const [target, setTarget] = useState('vista');
@@ -106,6 +106,12 @@ export function GeometryPanel({ g, onChange, onResize, onDelete, onConvert, onBa
       <label className="check"><input type="checkbox" checked={g.visible !== false} onChange={(e) => set({ visible: e.target.checked })} /> Visible</label>
       <label className="check"><input type="checkbox" checked={g.movable !== false} onChange={(e) => set({ movable: e.target.checked })} /> Movible</label>
       <label className="field"><span>Observaciones</span><textarea rows={2} value={g.notes || ''} onChange={(e) => set({ notes: e.target.value })} /></label>
+      <h4>Perforante</h4>
+      <label className="check"><input type="checkbox" checked={!!g.hole?.on} onChange={(e) => onHole(e.target.checked, g.hole?.depth ?? null)} /> Perforar (agujerea la pared, el piso, la tapa o la geometría donde está)</label>
+      {g.hole?.on && <label className="field"><span>Profundidad</span><span className="numwrap">
+        <input type="number" min={1} max={2000} value={g.hole.depth ?? ''} placeholder="pasante" onChange={(e) => onHole(true, e.target.value === '' ? null : +e.target.value)} /><em>mm</em>
+      </span></label>}
+      {g.hole?.on && <p className="hint">Sobre una tapa es el área húmeda: después insertá la bacha en el hueco.</p>}
       {children}
       <h4>Convertir en</h4>
       <div className="row-btns">

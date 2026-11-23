@@ -61,7 +61,7 @@ import MaterialsPanel from './ui/MaterialsPanel.jsx';
 import { StripEditor, RegionEditor } from './ui/SurfaceEditors.jsx';
 import TamponamentoEditor from './ui/TamponamentoEditor.jsx';
 import { linearItemFor, DEFAULT_TOP_ITEMS } from './domain/tamponamento.js';
-import { GEOMETRY_KINDS, newGeometry, addGeometry, updateGeometry, removeGeometry, moveGeometry, outlineOf, boundsOf, resizeGeometry, regularPolygon, snapSegment, nextPoint, rectPts, convertGeometry, geometryBudgetLines } from './domain/geometry.js';
+import { setHole, GEOMETRY_KINDS, newGeometry, addGeometry, updateGeometry, removeGeometry, moveGeometry, outlineOf, boundsOf, resizeGeometry, regularPolygon, snapSegment, nextPoint, rectPts, convertGeometry, geometryBudgetLines } from './domain/geometry.js';
 import { GeometryHud, LinealDialog, GeometryPanel } from './ui/GeometryPanels.jsx';
 import { planeFrame } from './ui/Geometry3D.jsx';
 import { stripsOf, cellAt, applyStripMaterial, updateRegion } from './domain/strips.js';
@@ -143,7 +143,7 @@ export default function App() {
   const fileRef = useRef(null);
 
   // La geometría no depende de la posición: no recalcular corte/presupuesto al arrastrar.
-  const buildKey = JSON.stringify([project.modules.map((m) => [m.id, m.type, m.params, m.mats, m.rules, m.aggs]), project.defaults, project.rules]);
+  const buildKey = JSON.stringify([project.modules.map((m) => [m.id, m.type, m.params, m.mats, m.rules, m.aggs]), project.defaults, project.rules, (project.geometries || []).filter((g) => g.hole?.on && g.plane.kind === 'module')]);
   const built = useMemo(() => buildAll(project, settings), [buildKey, settings]); // eslint-disable-line react-hooks/exhaustive-deps
   const builtById = useMemo(() => new Map(built.map((b) => [b.id, b])), [built]);
   const cut = useMemo(() => computeCutList(built), [built]);
@@ -525,6 +525,7 @@ export default function App() {
   const [geoTool, setGeoTool] = useState(null); // { kind, plane, pts, cursor, opts }
   const [linealDlg, setLinealDlg] = useState(null);
   const [geoMsg, setGeoMsg] = useState(null);
+  const [geoMenu, setGeoMenu] = useState(null); // clic derecho en una geometría: Perforar, Eliminar
   const startGeometry = (kind) => {
     stopDrawWalls(); stopAnnotate(); stopScale();
     const d = ui.geoDefaults || {};
@@ -1006,6 +1007,7 @@ export default function App() {
                 onWallDouble={(id) => goView({ name: 'pared', wallId: id })} onFloorDouble={() => goView({ name: 'planta' })}
                 navTool={navTool} navRef={navRef} surfaceRef={surfaceRef}
                 selectedGeoId={selectedGeoId} onSelectGeometry={(id) => setSelection({ kind: 'geometry', id })} onMoveGeometry={onMoveGeometry} geoDraft={geoDraft}
+                onGeometryMenu={(g, ev) => setGeoMenu({ id: g.id, x: ev.clientX, y: ev.clientY })}
                 onFloorDown={side === 'materiales' || roomTool ? () => { if (!roomToolClick({ kind: 'floor' })) setSelection({ kind: 'floor' }); } : null}
                 renderMode={renderMode || renderDlg || !!renderJob || fill === 'presentacion'} renderRef={renderRef} fill={fill === 'presentacion' ? 'texturas' : fill}
                 view={view} captureRef={captureRef} showDims={showDims} autoHideWalls={autoLower && !renderJob?.panorama} pickRef={pickRef} ghost={ghost}
@@ -1050,6 +1052,21 @@ export default function App() {
             {geoTool && <GeometryHud tool={geoTool} onTool={setGeoTool} onEnter={geoEnter} onFinish={geoFinish} onCancel={() => setGeoTool(null)} />}
             {linealDlg && <LinealDialog onOk={finishLineal} onCancel={() => setLinealDlg(null)} />}
             {geoMsg && <div className="menu-backdrop dim" onPointerDown={() => setGeoMsg(null)}><div className="wall-dialog"><p>{geoMsg}</p><div className="row-btns"><button className="active" onClick={() => setGeoMsg(null)}>Aceptar</button></div></div></div>}
+            {geoMenu && (() => {
+              const g = (project.geometries || []).find((x) => x.id === geoMenu.id);
+              if (!g) return null;
+              const act = (fn) => { setGeoMenu(null); fn(); };
+              return (
+                <div className="menu-backdrop" onPointerDown={() => setGeoMenu(null)} onContextMenu={(e) => { e.preventDefault(); setGeoMenu(null); }}>
+                  <div className="wall-menu geo-menu" style={{ left: geoMenu.x, top: geoMenu.y }} onPointerDown={(e) => e.stopPropagation()}>
+                    <button onClick={() => act(() => setProject((p) => updateGeometry(p, g.id, setHole(g, !g.hole?.on))))}>{g.hole?.on ? 'Quitar perforación' : 'Perforar'}</button>
+                    <button onClick={() => act(() => setProject((p) => updateGeometry(p, g.id, { visible: !(g.visible !== false) })))}>{g.visible === false ? 'Mostrar' : 'Ocultar'}</button>
+                    <hr />
+                    <button onClick={() => act(() => { setProject((p) => removeGeometry(p, g.id)); setSelection(null); })}>Eliminar</button>
+                  </div>
+                </div>
+              );
+            })()}
             {navOverlay && <div className={`nav-overlay ${navTool}`} {...navOverlay}>
               {zoomBox && <div className="zoom-box" style={{ left: Math.min(zoomBox.x0, zoomBox.x1), top: Math.min(zoomBox.y0, zoomBox.y1), width: Math.abs(zoomBox.x1 - zoomBox.x0), height: Math.abs(zoomBox.y1 - zoomBox.y0) }} />}
             </div>}
@@ -1110,6 +1127,7 @@ export default function App() {
           )}
           {tool === 'propiedades' && selectedGeo && (
             <GeometryPanel g={selectedGeo} onBack={() => setSelection(null)}
+              onHole={(on, depth) => setProject((p) => updateGeometry(p, selectedGeo.id, setHole(selectedGeo, on, depth)))}
               onChange={(patch) => setProject((p) => updateGeometry(p, selectedGeo.id, patch))}
               onResize={(key, v, scale) => setProject((p) => updateGeometry(p, selectedGeo.id, resizeGeometry(selectedGeo, key, v, scale)))}
               onDelete={() => { setProject((p) => removeGeometry(p, selectedGeo.id)); setSelection(null); }}

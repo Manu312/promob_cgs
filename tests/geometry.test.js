@@ -59,3 +59,32 @@ test('presupuesto: solo las presupuestadas y visibles', () => {
   const b = newGeometry('rect', floor, { pts: rectPts(0, 0, 1, 1) });
   assert.deepEqual(geometryBudgetLines({ geometries: [a, b] }), [{ label: 'Zócalo especial', ref: '', qty: 1, price: 5000 }]);
 });
+
+import { setHole, holesOn, holesInGeometry } from '../src/domain/geometry.js';
+test('perforar: la geometría agujerea su plano (pared, piso, módulo) y a otras geometrías', () => {
+  const wall = { kind: 'wall', wallId: 'w1' };
+  const hole = setHole(newGeometry('circ', wall, { cx: 500, cy: 1200, radius: 100 }), true);
+  const other = newGeometry('rect', wall, { pts: rectPts(0, 0, 1000, 2000) });
+  const lejos = newGeometry('rect', wall, { pts: rectPts(3000, 0, 3500, 500) });
+  const p = { geometries: [hole, other, lejos, setHole(newGeometry('rect', { kind: 'floor' }, { pts: rectPts(0, 0, 10, 10) }), false)] };
+  assert.equal(holesOn(p, wall).length, 1);
+  assert.equal(holesOn(p, { kind: 'wall', wallId: 'w2' }).length, 0);
+  assert.equal(holesOn(p, { kind: 'floor' }).length, 0, 'la que no perfora no cuenta');
+  assert.equal(holesInGeometry(p, other).length, 1);
+  assert.equal(holesInGeometry(p, lejos).length, 0);
+  assert.equal(setHole(hole, true, 40).hole.depth, 40);
+  assert.equal(setHole(hole, true, '').hole.depth, null, 'sin profundidad = pasante');
+});
+
+import { cutoutsFor, buildAll } from '../src/domain/cutlist.js';
+import { DEFAULT_SETTINGS, mergeSettings } from '../src/domain/catalog.js';
+import { emptyProject } from '../src/domain/project.js';
+import { MODULE_TYPES } from '../src/domain/modules.js';
+test('área húmeda: una geometría perforante sobre la tapa la cala (y cobra el calado)', () => {
+  const tapa = { id: 't', type: 'tapa', params: { ...MODULE_TYPES.tapa.defaults, width: 1200, depth: 600 }, x: 0, z: 0, y: 870, rot: 0, mats: {} };
+  const g = setHole(newGeometry('rect', { kind: 'module', id: 't' }, { pts: rectPts(100, 100, 500, 400) }), true);
+  assert.deepEqual(cutoutsFor([tapa], [g]), { t: [{ x0: 100, z0: 100, x1: 500, z1: 400 }] });
+  assert.deepEqual(cutoutsFor([tapa], [setHole(g, false)]), {});
+  const [b] = buildAll({ ...emptyProject(), modules: [tapa], geometries: [g] }, mergeSettings(DEFAULT_SETTINGS));
+  assert.equal(b.hardware.calado, 1);
+});
